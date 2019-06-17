@@ -8,9 +8,9 @@ namespace Angel {
 class InetAddr {
 public:
     InetAddr();
+    explicit InetAddr(int);
+    InetAddr(int, const char *);
     struct sockaddr_in& inetAddr() { return _sockaddr; }
-    void setPort(int port);
-    void setAddr(const char *addr);
 private:
     struct sockaddr_in _sockaddr;
 };

@@ -7,16 +7,24 @@
 #include <atomic>
 #include "Buffer.h"
 #include "LogStream.h"
+#include "Noncopyable.h"
 
 namespace Angel {
 
-class Logger {
+class Logger : Noncopyable {
 public:
     Logger();
     ~Logger();
+    enum FLAGS {
+        FLUSH_TO_FILE = 1,
+        FLUSH_TO_STDOUT,
+        FLUSH_TO_STDERR,
+    };
     const size_t _writeBufMaxSize = 1024 * 1024;
     void writeToBuffer(const std::string& s);
     void writeToBufferUnlocked(const std::string& s);
+    void flushToStdout() { _flag = FLUSH_TO_STDOUT; }
+    void flushToStderr() { _flag = FLUSH_TO_STDERR; }
     void wakeup();
     void writeToFile();
     void flushToFile();
@@ -33,10 +41,11 @@ private:
     std::mutex _mutex;
     std::condition_variable _condVar;
     std::atomic_bool _quit;
-    int _fd;
+    int _flag;
+    int _fd = -1;
 };
 
-extern Angel::Logger _logger;
+extern Angel::Logger __logger;
 
 const char *strerrno();
 const char *strerr(int err);

@@ -18,7 +18,7 @@
 using namespace Angel;
 
 namespace Angel {
-    Angel::Logger _logger;
+    Angel::Logger __logger;
 
     __thread char _errnobuf[256];
 
@@ -33,23 +33,35 @@ namespace Angel {
         return strerr(errno);
     }
 }
+
 Logger::Logger()
-    : _quit(false),
-    _thread(std::thread([this]{ this->flushToFile(); }))
+    : _thread(std::thread([this]{ this->flushToFile(); })),
+    _quit(false),
+    _flag(FLUSH_TO_FILE)
 {
     mkdir(".log", 0777);
-    _fd = open("./.log/x.log", O_WRONLY | O_APPEND | O_CREAT, 0777);
 }
 
 Logger::~Logger()
 {
-    _quit = true;
-    wakeup();
+    quit();
     _thread.join();
 }
 
 void Logger::flushToFile()
 {
+    switch (_flag) {
+    case FLUSH_TO_FILE:
+        _fd = open("./.log/x.log", O_WRONLY | O_APPEND | O_CREAT, 0777);
+        break;
+    case FLUSH_TO_STDOUT:
+        _fd = STDOUT_FILENO;
+        break;
+    case FLUSH_TO_STDERR:
+        _fd = STDERR_FILENO;
+        break;
+    }
+
     while (1) {
         waitFor();
         if (_flushBuf.readable() > 0)

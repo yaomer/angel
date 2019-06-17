@@ -19,15 +19,15 @@ public:
 
 class Timer {
 public:
-    void add(TimerTask *_task)
-    {
-        _task->setTimeout(_task->timeout() + TimeStamp::now()); 
-        _timer.insert(std::unique_ptr<TimerTask>(_task));
-    }
+    size_t add(TimerTask *_task);
     // 取出最小定时器
     const TimerTask *get() { return _timer.cbegin()->get(); };
     // 删除最小定时器事件
-    void pop() { _timer.erase(_timer.begin()); }
+    void pop() 
+    { 
+        _freeIdList.insert(get()->id());
+        _timer.erase(_timer.begin()); 
+    }
     // 返回最小超时值
     int64_t timeout()
     {
@@ -38,10 +38,16 @@ public:
             timeval = -1;
         return timeval == 0 ? 1 : timeval;
     }
+    void cancel(size_t id);
     // 处理所有到期的定时事件
     void tick();
 private:
-    std::set<std::unique_ptr<TimerTask>, TimerTaskCmp> _timer;
+    // [0 : _timerId]之间的freeId
+    std::set<size_t> _freeIdList;
+    // TimerTask中的timeout可能会有重复
+    std::multiset<std::unique_ptr<TimerTask>, TimerTaskCmp> _timer;
+    // 唯一标识一个TimerTask
+    size_t _timerId = 1;
 };
 }
 

@@ -7,7 +7,7 @@ using namespace Angel;
 namespace Angel {
 
 // 默认打印所有级别的日志
-int loggerLevel = LogStream::DEBUG;
+int __loggerLevel = LogStream::DEBUG;
 
 const char *levelStr[LogStream::LEVEL_NUMS] = {
     "DEBUG: ",
@@ -19,7 +19,10 @@ const char *levelStr[LogStream::LEVEL_NUMS] = {
 }
 
 LogStream::LogStream(int level, const char *file, int line, const char *func)
-    : _level(level), _file(file), _line(line), _func(func)
+    : _level(level),
+    _file(file),
+    _line(line),
+    _func(func)
 {
     char buf[32];
     *this << levelStr[level]
@@ -31,9 +34,9 @@ LogStream::LogStream(int level, const char *file, int line, const char *func)
 LogStream::~LogStream()
 {
     *this << " - " << _file << ":" << _line << "\n";
-    _logger.writeToBufferUnlocked(_buffer.c_str());
+    __logger.writeToBufferUnlocked(_buffer.c_str());
     if (_level == FATAL)
-        _logger.quit();
+        __logger.quit();
 }
 
 const char digits[] = "9876543210123456789";
@@ -152,5 +155,5 @@ LogStream& LogStream::operator<<(double v)
 
 void Angel::setLoggerLevel(int level)
 {
-    loggerLevel = level;
+    __loggerLevel = level;
 }

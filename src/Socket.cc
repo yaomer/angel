@@ -16,7 +16,7 @@ Socket::~Socket()
 void Socket::socket()
 {
     if ((_sockfd = ::socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        LOG_FATAL << "socket error: " << strerrno();
+        LOG_FATAL << strerrno();
 }
 
 void Socket::bind(InetAddr& _inetAddr)
@@ -24,13 +24,13 @@ void Socket::bind(InetAddr& _inetAddr)
     if (::bind(_sockfd,
                reinterpret_cast<struct sockaddr*>(&_inetAddr.inetAddr()),
                sizeof(_inetAddr.inetAddr())) < 0)
-        LOG_FATAL << "bind error: " << strerrno();
+        LOG_FATAL << strerrno();
 }
 
 void Socket::listen()
 {
     if (::listen(_sockfd, 1024) < 0)
-        LOG_FATAL << "listen error: " << strerrno();
+        LOG_FATAL << strerrno();
 }
 
 // accept()和connect()都可能涉及到非阻塞问题，
@@ -44,9 +44,8 @@ int Socket::accept()
                     &socklen);
 }
 
-int Socket::connect()
+int Socket::connect(InetAddr& _inetAddr)
 {
-    InetAddr _inetAddr;
     return ::connect(_sockfd,
                     reinterpret_cast<struct sockaddr*>(&_inetAddr.inetAddr()),
                     sizeof(_inetAddr.inetAddr()));
@@ -54,8 +53,7 @@ int Socket::connect()
 
 void Socket::setNonBlock()
 {
-    int oflag = fcntl(_sockfd, F_GETFL, 0);
-    fcntl(_sockfd, F_SETFL, oflag | O_NONBLOCK);
+    setNonBlock(_sockfd);
 }
 
 void Socket::setNoDelay(bool on)
@@ -63,6 +61,7 @@ void Socket::setNoDelay(bool on)
     socklen_t opt = on ? 1 : 0;
     if (setsockopt(_sockfd, SOL_SOCKET, TCP_NODELAY, &opt, sizeof(opt)) < 0)
         LOG_FATAL << "setsockopt error: " << strerrno();
+    LOG_INFO << (on ? "enable" : "disable") << " TCP_NODELAY";
 }
 
 void Socket::setReuseAddr(bool on)
@@ -70,6 +69,7 @@ void Socket::setReuseAddr(bool on)
     socklen_t opt = on ? 1 : 0;
     if (setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
         LOG_FATAL << "setsockopt error: " << strerrno();
+    LOG_INFO << (on ? "enable" : "disable") << " SO_REUSEADDR";
 }
 
 void Socket::setReusePort(bool on)
@@ -77,6 +77,7 @@ void Socket::setReusePort(bool on)
     socklen_t opt = on ? 1 : 0;
     if (setsockopt(_sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
         LOG_FATAL << "setsockopt error: " << strerrno();
+    LOG_INFO << (on ? "enable" : "disable") << " SO_REUSEPORT";
 }
 
 void Socket::socketpair(int fd[])
@@ -92,4 +93,10 @@ int Socket::socketError()
     if (::getsockopt(_sockfd, SOL_SOCKET, SO_ERROR, &err, &len) < 0)
         LOG_FATAL << "getsockopt error: " << strerrno();
     return static_cast<int>(err);
+}
+
+void Socket::setNonBlock(int fd)
+{
+    int oflag = ::fcntl(fd, F_GETFL, 0);
+    ::fcntl(fd, F_SETFL, oflag | O_NONBLOCK);
 }

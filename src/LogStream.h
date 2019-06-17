@@ -40,7 +40,7 @@ private:
     const char *_func;
 };
 
-extern int loggerLevel;
+extern int __loggerLevel;
 
 // 设置打印的日志级别
 // 如果设置为WARN，则只打印>=WARN级别的日志
@@ -53,19 +53,19 @@ void setLoggerLevel(int level);
 // 当此次调用结束时，它就会被析构，所写的数据会被写入到Logger中，
 // Logger则会在合适的时机将数据flush到文件中
 #define LOG_DEBUG \
-    if (Angel::LogStream::DEBUG >= Angel::loggerLevel) \
+    if (Angel::LogStream::DEBUG >= Angel::__loggerLevel) \
         Angel::LogStream(Angel::LogStream::DEBUG, __FILE__, __LINE__, __func__)
 #define LOG_INFO \
-    if (Angel::LogStream::INFO >= Angel::loggerLevel) \
+    if (Angel::LogStream::INFO >= Angel::__loggerLevel) \
         Angel::LogStream(Angel::LogStream::INFO, __FILE__, __LINE__, __func__)
 #define LOG_WARN \
-    if (Angel::LogStream::WARN >= Angel::loggerLevel) \
+    if (Angel::LogStream::WARN >= Angel::__loggerLevel) \
         Angel::LogStream(Angel::LogStream::WARN, __FILE__, __LINE__, __func__)
 #define LOG_ERROR \
-    if (Angel::LogStream::ERROR >= Angel::loggerLevel) \
+    if (Angel::LogStream::ERROR >= Angel::__loggerLevel) \
         Angel::LogStream(Angel::LogStream::ERROR, __FILE__, __LINE__, __func__)
 #define LOG_FATAL \
-    if (Angel::LogStream::FATAL >= Angel::loggerLevel) \
+    if (Angel::LogStream::FATAL >= Angel::__loggerLevel) \
         Angel::LogStream(Angel::LogStream::FATAL, __FILE__, __LINE__, __func__)
 
 #endif // _ANGEL_LOGSTREAM_H
