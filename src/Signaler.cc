@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <functional>
+#include <mutex>
 #include <memory>
 #include "EventLoop.h"
 #include "Channel.h"
@@ -12,6 +13,10 @@ using namespace Angel;
 using namespace std::placeholders;
 
 namespace Angel{
+    // 保护__signalerPtr，使之正确初始化
+    std::mutex _SYNC_INIT_LOCK;
+    Angel::Signaler *__signalerPtr = nullptr;
+
     static int _signalFd = -1;
 }
 
@@ -92,4 +97,16 @@ void Signaler::sigCatch(std::shared_ptr<Channel> chl, Buffer& buf)
             it->second();
     }
     buf.retrieveAll();
+}
+
+void Angel::addSignal(int signo, const Signaler::SignalerCallback _cb)
+{
+    if (__signalerPtr)
+        __signalerPtr->add(signo, _cb);
+}
+
+void Angel::cancelSignal(int signo)
+{
+    if (__signalerPtr)
+        __signalerPtr->cancel(signo);
 }

@@ -1,11 +1,10 @@
-#include <sys/socket.h>
 #include <unistd.h>
 #include <csignal>
 #include <thread>
 #include <mutex>
 #include "EventLoop.h"
 #include "Timer.h"
-#include "Logger.h"
+#include "Signaler.h"
 #include "LogStream.h"
 #include "Socket.h"
 #include "config.h"
@@ -19,36 +18,55 @@
 #ifdef _ANGEL_HAVE_POLL
 #include "Poll.h"
 #endif
+#ifdef _ANGEL_HAVE_SELECT
+#include "Select.h"
+#endif
 
 using namespace Angel;
 
+__thread EventLoop *_thisThreadLoop = nullptr;
+
 EventLoop::EventLoop()
-    : _signaler(this),
-    _quit(false)
+    : _quit(false)
 {
 #if _ANGEL_HAVE_EPOLL
     Epoll *poller = new Epoll;
-#elif _ANGEL_HAVE_KQUEUE
+/* #elif _ANGEL_HAVE_KQUEUE
     Kqueue *poller = new Kqueue;
 #elif _ANGEL_HAVE_POLL
-    Poll *poller = new Poll;
+    Poll *poller = new Poll; */
+#elif _ANGEL_HAVE_SELECT
+    Select *poller = new Select;
 #else
     LOG_FATAL << "No supported I/O multiplexing";
 #endif
     _poller = poller;
+    if (_thisThreadLoop) {
+        LOG_FATAL << "Only have one EventLoop in this thread";
+    } else
+        _thisThreadLoop = this;
     _tid = std::this_thread::get_id();
     Socket::socketpair(_wakeFd);
+    std::lock_guard<std::mutex> mlock(_SYNC_INIT_LOCK);
+    if (!__signalerPtr) {
+        _signaler = new Signaler(this);
+        __signalerPtr = _signaler;
+    } else
+        _signaler = nullptr;
 }
 
 EventLoop::~EventLoop()
 {
     delete _poller;
+    if (_signaler)
+        delete _signaler;
 }
 
 void EventLoop::run()
 {
     wakeupInit();
-    _signaler.start();
+    if (_signaler)
+        _signaler->start();
     while (!_quit) {
         int nevents = _poller->wait(this, _timer.timeout());
         if (nevents > 0) {
@@ -76,7 +94,7 @@ void EventLoop::doFunctors()
         LOG_INFO << "execute " << _functors.size() << " functors";
         std::lock_guard<std::mutex> mlock(_mutex);
         for (auto& it : _functors) {
-            funcs.push_back(it);
+            funcs.push_back(std::move(it));
             _functors.pop_back();
         }
     }
@@ -132,7 +150,7 @@ size_t EventLoop::runAfter(int64_t timeout,
 {
     TimerTask *task = new TimerTask(timeout, 0, _cb);
     size_t id = _timer.add(task);
-    LOG_INFO << "added a timer after " << timeout
+    LOG_INFO << "added a timer after " << timeout << " ms"
              << " timerId = " << id;
     return id;
 }
@@ -142,7 +160,7 @@ size_t EventLoop::runEvery(int64_t interval,
 {
     TimerTask *task = new TimerTask(interval, interval, _cb);
     size_t id = _timer.add(task);
-    LOG_INFO << "added a timer every " << interval
+    LOG_INFO << "added a timer every " << interval << " ms"
              << " timerId = " << id;
     return id;
 }

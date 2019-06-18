@@ -21,7 +21,7 @@ public:
     void remove(int fd);
     const int _INIT_EVLIST_SIZE = 64;
 private:
-    int evret(int events);
+    int evret(struct kevent&);
 
     int _kqfd;
     int _addFds = 0;

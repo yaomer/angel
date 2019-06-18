@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include "Channel.h"
 #include "Noncopyable.h"
 
@@ -27,6 +28,13 @@ private:
     std::map<int, SignalerCallback> _sigCallbackMaps;
     int _pairFd[2];
 };
+
+extern std::mutex _SYNC_INIT_LOCK;
+
+extern Angel::Signaler *__signalerPtr;
+
+void addSignal(int signo, const Signaler::SignalerCallback _cb);
+void cancelSignal(int signo);
 
 }
 

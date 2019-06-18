@@ -84,22 +84,34 @@ int Kqueue::wait(EventLoop *loop, int64_t timeout)
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
             auto chl = loop->searchChannel(_evlist[i].ident);
-            chl.get()->setRevents(evret(_evlist[i].filter));
+            chl.get()->setRevents(evret(_evlist[i]));
             loop->fillActiveChannel(chl);
         }
     }
     return nevents;
 }
 
-int Kqueue::evret(int events)
+int Kqueue::evret(struct kevent& ev)
 {
     int rets = 0;
-    if (events == EVFILT_READ)
+    if (ev.filter == EVFILT_READ)
         rets = Channel::READ;
-    else if (events == EVFILT_WRITE)
+    else if (ev.filter == EVFILT_WRITE)
         rets = Channel::WRITE;
-    else if (events == EVFILT_EXCEPT)
-        rets = Channel::ERROR;
+    else if (ev.flags) {
+        switch (ev.flags) {
+        case ENOENT:
+        case EINVAL:
+        case EPIPE:
+        case EPERM:
+        case EBADF:
+            break;
+        default:
+            errno = ev.data;
+            rets = Channel::ERROR;
+            break;
+        }
+    }
     return rets;
 }
 

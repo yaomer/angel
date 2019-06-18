@@ -117,3 +117,13 @@ void Logger::wakeup()
     if (_writeBuf.readable() > 0)
         _condVar.notify_one();
 }
+
+void Logger::flushToStdout()
+{
+    __logger._flag = Logger::FLUSH_TO_STDOUT;
+}
+
+void Logger::flushToStderr()
+{
+    __logger._flag = Logger::FLUSH_TO_STDERR;
+}

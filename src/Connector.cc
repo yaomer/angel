@@ -11,7 +11,8 @@ Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
     : _loop(loop),
     _connect(new Channel(loop)),
     _inetAddr(inetAddr),
-    _connected(false)
+    _connected(false),
+    _waitTime(2)
 {
     _socket.socket();
     _socket.setNonBlock();
@@ -40,10 +41,11 @@ void Connector::connect()
 
 void Connector::connecting()
 {
+    // 2 4 8 16
     LOG_INFO << "connfd = " << _socket.fd() << " is connecting";
-    _loop->runAfter(1000 * 5, [this]{ this->timeout(); });
-    _connect->setReadCb([this]{ this->handleRead(); });
-    _connect->setWriteCb([this]{ this->handleWrite(); });
+    _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
+    _connect->setReadCb([this]{ this->check(); });
+    _connect->setWriteCb([this]{ this->check(); });
     _connect->setErrorCb([this]{ this->handleError(); });
     _connect->enableWrite();
 }
@@ -62,7 +64,11 @@ void Connector::connected()
 void Connector::timeout()
 {
     if (!isConnected()) {
-        LOG_FATAL << "connect fatal: timeout";
+        if (_waitTime == _waitMaxTime)
+            LOG_FATAL << "connect timeout: " << _waitAllTime << " s";
+        LOG_INFO << "connect: waited " << _waitTime << " s";
+        _waitTime *= 2;
+        _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
     }
 }
 
@@ -79,16 +85,6 @@ void Connector::check()
     if (_connectionCb) _connectionCb(*_connect);
 }
 
-void Connector::handleRead()
-{
-    check();
-}
-
-void Connector::handleWrite()
-{
-    check();
-}
-
 void Connector::handleClose()
 {
     LOG_INFO << "server closed connection";
@@ -98,5 +94,4 @@ void Connector::handleClose()
 void Connector::handleError()
 {
     LOG_ERROR << strerrno();
-    _loop->quit();
 }

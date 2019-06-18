@@ -24,17 +24,19 @@ public:
     void connected();
     void timeout();
     void check();
-    void handleRead();
-    void handleWrite();
     void handleClose();
     void handleError();
-    Channel& channel() { return *_connect; }
     bool isConnected() { return _connected; }
+    Channel& channel() { return *_connect; }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = _cb; }
     void setMessageCb(const MessageCallback _cb)
     { _messageCb = _cb; }
 private:
+    //  wait [2, 4, 8, 16]s = [30]s
+    static const int _waitMaxTime = 16;
+    static const int _waitAllTime = 30;
+
     EventLoop *_loop;
     Channel *_connect;
     Socket _socket;
@@ -42,6 +44,7 @@ private:
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     bool _connected;
+    int _waitTime;
 };
 }
 

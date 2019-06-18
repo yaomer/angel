@@ -23,18 +23,19 @@ public:
     const size_t _writeBufMaxSize = 1024 * 1024;
     void writeToBuffer(const std::string& s);
     void writeToBufferUnlocked(const std::string& s);
-    void flushToStdout() { _flag = FLUSH_TO_STDOUT; }
-    void flushToStderr() { _flag = FLUSH_TO_STDERR; }
     void wakeup();
-    void writeToFile();
-    void flushToFile();
-    void waitFor();
+    static void flushToStdout();
+    static void flushToStderr();
     void quit() 
     { 
         _quit = true; 
         wakeup();
     }
 private:
+    void writeToFile();
+    void flushToFile();
+    void waitFor();
+
     Buffer _writeBuf;
     Buffer _flushBuf;
     std::thread _thread;

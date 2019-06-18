@@ -6,11 +6,11 @@ GREEN_ = \033[0m
 
 ifeq "$(PLATFORM)" "linux"
 	CXX = g++
-	OPTION_OBJS = Poll.o Epoll.o
+	OPTION_OBJS = Poll.o Epoll.o Select.o
 endif
 ifeq "$(PLATFORM)" "macos"
 	CXX = clang++
-	OPTION_OBJS = Poll.o Kqueue.o
+	OPTION_OBJS = Poll.o Kqueue.o Select.o
 endif
 
 COMMON_OBJS = Acceptor.o \
