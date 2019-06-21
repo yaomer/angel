@@ -13,7 +13,7 @@ public:
     };
     int64_t time() { _ms = now(); return _ms; }
     static int64_t now();
-    static const char *timeStr(int option, char *buf, size_t len);
+    static const char *timeStr(int option);
 private:
     int64_t _ms = 0;
 };

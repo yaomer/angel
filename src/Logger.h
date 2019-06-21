@@ -34,7 +34,6 @@ public:
 private:
     void writeToFile();
     void flushToFile();
-    void waitFor();
 
     Buffer _writeBuf;
     Buffer _flushBuf;

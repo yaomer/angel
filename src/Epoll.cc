@@ -57,7 +57,7 @@ int Epoll::wait(EventLoop *loop, int64_t timeout)
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
             auto chl = loop->search(_evList[i].data.fd);
-            chl.get()->setRevents(evret(_evList[i].events));
+            chl->setRevents(evret(_evList[i].events));
             loop->fillActiveChannel(chl);
         }
     }

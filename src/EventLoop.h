@@ -23,18 +23,8 @@ class EventLoop : Noncopyable {
 public:
     EventLoop();
     ~EventLoop();
-    void addChannel(Channel *chl)
-    {
-        chl->enableRead();
-        _poller->add(chl->fd(), chl->events());
-        _channelMaps.insert(std::pair<int,
-                std::shared_ptr<Channel>>(chl->fd(), chl));
-    }
-    void removeChannel(Channel *chl)
-    {
-        _poller->remove(chl->fd());
-        _channelMaps.erase(chl->fd());
-    }
+    void addChannel(std::shared_ptr<Channel> chl);
+    void removeChannel(std::shared_ptr<Channel> chl);
     void changeEvent(int fd, int events)
     {
         _poller->change(fd, events);
@@ -44,7 +34,7 @@ public:
         auto it = _channelMaps.find(fd);
         return it->second;
     }
-    void fillActiveChannel(std::shared_ptr<Channel>& chl)
+    void fillActiveChannel(std::shared_ptr<Channel> chl)
     {
         _activeChannels.push_back(chl);
     }
@@ -55,14 +45,17 @@ public:
     bool isInLoopThread();
     void runInLoop(const Functor _cb);
     void doFunctors();
-    size_t runAfter(int64_t timeout, const TimerTask::TimerCallback _cb);
-    size_t runEvery(int64_t interval, const TimerTask::TimerCallback _cb);
+    size_t runAfter(int64_t timeout, const TimerCallback _cb);
+    size_t runEvery(int64_t interval, const TimerCallback _cb);
     void cancelTimer(size_t id);
     void quit() { _quit = true; wakeup(); }
 private:
-    Poller *_poller;
-    Timer _timer;
-    Signaler *_signaler;
+    void addChannelInLoop(std::shared_ptr<Channel> chl);
+    void removeChannelInLoop(std::shared_ptr<Channel> chl);
+
+    std::unique_ptr<Poller> _poller;
+    std::unique_ptr<Timer> _timer;
+    std::unique_ptr<Signaler> _signaler;
     std::map<int, std::shared_ptr<Channel>> _channelMaps;
     std::vector<std::shared_ptr<Channel>> _activeChannels;
     std::atomic_bool _quit;

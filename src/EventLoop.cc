@@ -2,11 +2,15 @@
 #include <csignal>
 #include <thread>
 #include <mutex>
+#include <memory>
+#include <map>
+#include <vector>
 #include "EventLoop.h"
 #include "Timer.h"
 #include "Signaler.h"
 #include "LogStream.h"
 #include "Socket.h"
+#include "SocketOps.h"
 #include "config.h"
 
 #ifdef _ANGEL_HAVE_KQUEUE
@@ -27,58 +31,76 @@ using namespace Angel;
 __thread EventLoop *_thisThreadLoop = nullptr;
 
 EventLoop::EventLoop()
-    : _quit(false)
+    : _timer(new Timer),
+    _quit(false)
 {
 #if _ANGEL_HAVE_EPOLL
-    Epoll *poller = new Epoll;
-/* #elif _ANGEL_HAVE_KQUEUE
-    Kqueue *poller = new Kqueue;
+    _poller.reset(new Epoll);
+#elif _ANGEL_HAVE_KQUEUE
+    _poller.reset(new Kqueue);
 #elif _ANGEL_HAVE_POLL
-    Poll *poller = new Poll; */
+    _poller.reset(new Poll);
 #elif _ANGEL_HAVE_SELECT
-    Select *poller = new Select;
+    _poller.reset(new Select);
 #else
     LOG_FATAL << "No supported I/O multiplexing";
 #endif
-    _poller = poller;
     if (_thisThreadLoop) {
         LOG_FATAL << "Only have one EventLoop in this thread";
     } else
         _thisThreadLoop = this;
     _tid = std::this_thread::get_id();
-    Socket::socketpair(_wakeFd);
+    SocketOps::socketpair(_wakeFd);
     std::lock_guard<std::mutex> mlock(_SYNC_INIT_LOCK);
     if (!__signalerPtr) {
-        _signaler = new Signaler(this);
-        __signalerPtr = _signaler;
-    } else
-        _signaler = nullptr;
+        _signaler.reset(new Signaler(this));
+        __signalerPtr = _signaler.get();
+    }
 }
 
 EventLoop::~EventLoop()
 {
-    delete _poller;
-    if (_signaler)
-        delete _signaler;
+
+}
+
+void EventLoop::addChannel(std::shared_ptr<Channel> chl)
+{
+    runInLoop([this, chl]{ this->addChannelInLoop(chl); });
+}
+
+void EventLoop::removeChannel(std::shared_ptr<Channel> chl)
+{
+    runInLoop([this, chl]{ this->removeChannelInLoop(chl); });
+}
+
+void EventLoop::addChannelInLoop(std::shared_ptr<Channel> chl)
+{
+    chl->enableRead();
+    _poller->add(chl->fd(), chl->events());
+    auto it = std::pair<int, std::shared_ptr<Channel>>(chl->fd(), chl);
+    _channelMaps.insert(it);
+}
+
+void EventLoop::removeChannelInLoop(std::shared_ptr<Channel> chl)
+{
+    _poller->remove(chl->fd());
+    _channelMaps.erase(chl->fd());
 }
 
 void EventLoop::run()
 {
     wakeupInit();
-    if (_signaler)
-        _signaler->start();
+    if (_signaler) _signaler->start();
     while (!_quit) {
-        int nevents = _poller->wait(this, _timer.timeout());
+        int nevents = _poller->wait(this, _timer->timeout());
         if (nevents > 0) {
-            LOG_INFO << "there are " << nevents << " active events";
+            LOG_DEBUG << "[nevents = " << nevents << "]";
             for (auto& it : _activeChannels) {
-                LOG_INFO << "fd = " << it->fd() << " revents is "
-                         << eventStr[it.get()->revents()];
-                it.get()->handleEvent();
+                it->handleEvent();
             }
             _activeChannels.clear();
         } else if (nevents == 0) {
-            _timer.tick();
+            _timer->tick();
         } else {
             if (errno != EINTR)
                 LOG_ERROR << "Poller::wait(): " << strerrno();
@@ -104,9 +126,9 @@ void EventLoop::doFunctors()
 
 void EventLoop::wakeupInit()
 {
-    Channel *chl = new Channel(this);
+    auto chl = std::shared_ptr<Channel>(new Channel(this));
     chl->setFd(_wakeFd[0]);
-    chl->setReadCb([this]{ this->handleRead(); });
+    chl->setEventReadCb([this]{ this->handleRead(); });
     addChannel(chl);
 }
 
@@ -145,21 +167,19 @@ void EventLoop::runInLoop(Functor _cb)
     }
 }
 
-size_t EventLoop::runAfter(int64_t timeout,
-                           const TimerTask::TimerCallback _cb)
+size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(timeout, 0, _cb);
-    size_t id = _timer.add(task);
+    size_t id = _timer->add(task);
     LOG_INFO << "added a timer after " << timeout << " ms"
              << " timerId = " << id;
     return id;
 }
 
-size_t EventLoop::runEvery(int64_t interval,
-                           const TimerTask::TimerCallback _cb)
+size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(interval, interval, _cb);
-    size_t id = _timer.add(task);
+    size_t id = _timer->add(task);
     LOG_INFO << "added a timer every " << interval << " ms"
              << " timerId = " << id;
     return id;
@@ -168,5 +188,5 @@ size_t EventLoop::runEvery(int64_t interval,
 void EventLoop::cancelTimer(size_t id)
 {
     LOG_INFO << "cancel a timer, timerId = " << id;
-    _timer.cancel(id);
+    _timer->cancel(id);
 }

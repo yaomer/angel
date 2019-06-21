@@ -4,8 +4,7 @@
 
 using namespace Angel;
 
-// Add a TimerTask is Log(n)
-size_t Timer::add(TimerTask *_task)
+size_t Timer::getId()
 {
     size_t id;
     if (!_freeIdList.empty()) {
@@ -14,9 +13,20 @@ size_t Timer::add(TimerTask *_task)
     } else {
         id = _timerId++;
     }
+    return id;
+}
+
+void Timer::putId(size_t id)
+{
+    _freeIdList.insert(id);
+}
+
+// Add a TimerTask is Log(n)
+size_t Timer::add(TimerTask *_task)
+{
+    size_t id = getId();
     _task->setId(id);
-    int64_t timeout = _task->timeout() + TimeStamp::now();
-    _task->setTimeout(timeout);
+    _task->setTimeout(_task->timeout() + TimeStamp::now());
     _timer.insert(std::unique_ptr<TimerTask>(_task));
     return id;
 }
@@ -25,9 +35,9 @@ size_t Timer::add(TimerTask *_task)
 void Timer::cancel(size_t id)
 {
     for (auto& it : _timer) {
-        if (it.get()->id() == id) {
+        if (it->id() == id) {
             _timer.erase(it);
-            _freeIdList.insert(id);
+            putId(id);
             break;
         }
     }

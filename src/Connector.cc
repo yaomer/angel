@@ -2,6 +2,8 @@
 #include "EventLoop.h"
 #include "Channel.h"
 #include "Socket.h"
+#include "SocketOps.h"
+#include "InetAddr.h"
 #include "Connector.h"
 #include "LogStream.h"
 
@@ -9,61 +11,64 @@ using namespace Angel;
 
 Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
     : _loop(loop),
-    _connect(new Channel(loop)),
-    _inetAddr(inetAddr),
+    _connectChannel(new Channel(loop)),
+    _peerAddr(inetAddr),
     _connected(false),
     _waitTime(2)
 {
-    _socket.socket();
-    _socket.setNonBlock();
-    _connect->setFd(_socket.fd());
-    _loop->addChannel(_connect);
+    LOG_INFO << "[Connector::ctor] -> [" << _peerAddr.toIpAddr() << ":"
+             << _peerAddr.toIpPort() << "]";
 }
 
 Connector::~Connector()
 {
-
+    LOG_INFO << "[Connector::dtor]";
 }
 
 void Connector::connect()
 {
-    int ret = _socket.connect(_inetAddr);
+    int sockfd = SocketOps::socket();
+    SocketOps::setnonblock(sockfd);
+    int ret = SocketOps::connect(sockfd, &_peerAddr.inetAddr());
+    _connectChannel->setFd(sockfd);
+    _loop->addChannel(_connectChannel);
     if (ret == 0) {
         // 通常如果服务端和客户端在同一台主机，连接会立即建立
-        connected();
+        connected(sockfd);
     } else if (ret < 0) {
         if (errno == EINPROGRESS) {
             // 连接正在建立
-            connecting();
+            connecting(sockfd);
         }
     }
 }
 
-void Connector::connecting()
+void Connector::connecting(int sockfd)
 {
-    // 2 4 8 16
-    LOG_INFO << "connfd = " << _socket.fd() << " is connecting";
+    LOG_INFO << "connfd = " << sockfd << " is connecting";
     _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
-    _connect->setReadCb([this]{ this->check(); });
-    _connect->setWriteCb([this]{ this->check(); });
-    _connect->setErrorCb([this]{ this->handleError(); });
-    _connect->enableWrite();
+    _connectChannel->setEventReadCb(
+            [this, sockfd]{ this->check(sockfd); });
+    _connectChannel->setEventWriteCb(
+            [this, sockfd]{ this->check(sockfd); });
+    _connectChannel->enableWrite();
 }
 
-void Connector::connected()
+void Connector::connected(int sockfd)
 {
+    LOG_INFO << "connfd = " << sockfd << " is connected";
+    // std::cout << "cnt " << _connectChannel.use_count() << std::endl;
+    _loop->removeChannel(_connectChannel);
+    if (_newConnectionCb)
+        _newConnectionCb(sockfd);
+    else
+        _loop->quit();
     _connected = true;
-    LOG_INFO << "connfd = " << _socket.fd() << " is connected";
-    _connect->setReadCb([this]{ this->_connect->handleRead(); });
-    _connect->setWriteCb([this]{ this->_connect->handleWrite(); });
-    _connect->setMessageCb(_messageCb);
-    _connect->setCloseCb([this]{ this->handleClose(); });
-    _connect->disableWrite();
 }
 
 void Connector::timeout()
 {
-    if (!isConnected()) {
+    if (!_connected) {
         if (_waitTime == _waitMaxTime)
             LOG_FATAL << "connect timeout: " << _waitAllTime << " s";
         LOG_INFO << "connect: waited " << _waitTime << " s";
@@ -75,23 +80,12 @@ void Connector::timeout()
 // 在Mac OS上使用poll判断sockfd的状态，好像有时会可读，有时会可写
 // 所以我们在可读可写情况下都使用getsockopt来获取sockfd的状态
 
-void Connector::check()
+void Connector::check(int sockfd)
 {
-    int err = _socket.socketError();
+    int err = SocketOps::getSocketError(sockfd);
     if (err) {
         LOG_FATAL << "connect: " << strerr(err);
     }
-    connected();
-    if (_connectionCb) _connectionCb(*_connect);
-}
-
-void Connector::handleClose()
-{
-    LOG_INFO << "server closed connection";
-    _loop->quit();
-}
-
-void Connector::handleError()
-{
-    LOG_ERROR << strerrno();
+    _connectChannel->disableWrite();
+    connected(sockfd);
 }

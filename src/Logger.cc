@@ -63,24 +63,21 @@ void Logger::flushToFile()
     }
 
     while (1) {
-        waitFor();
+        {
+            std::unique_lock<std::mutex> mlock(_mutex);
+            if (!_quit)
+                _condVar.wait_for(mlock, std::chrono::seconds(1));
+            if (_quit) {
+                _writeBuf.swap(_flushBuf);
+                writeToFile();
+                abort();
+            }
+            if (_writeBuf.readable() > 0)
+                _writeBuf.swap(_flushBuf);
+        }
         if (_flushBuf.readable() > 0)
             writeToFile();
     }
-}
-
-void Logger::waitFor()
-{
-    std::unique_lock<std::mutex> mlock(_mutex);
-    if (!_quit)
-        _condVar.wait_for(mlock, std::chrono::seconds(1));
-    if (_quit) {
-        _writeBuf.swap(_flushBuf);
-        writeToFile();
-        abort();
-    }
-    if (_writeBuf.readable() > 0)
-        _writeBuf.swap(_flushBuf);
 }
 
 void Logger::writeToFile()

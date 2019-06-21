@@ -85,7 +85,7 @@ int Select::wait(EventLoop *loop, int64_t timeout)
             if (FD_ISSET(it, &errset))
                 revs |= Channel::ERROR;
             auto chl = loop->searchChannel(it);
-            chl.get()->setRevents(revs);
+            chl->setRevents(revs);
             loop->fillActiveChannel(chl);
             if (revs > 0 && --nevents == 0)
                 break;

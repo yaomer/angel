@@ -1,10 +1,14 @@
 #ifndef _ANGEL_TCPSERVER_H
 #define _ANGEL_TCPSERVER_H
 
+#include <map>
+#include <set>
 #include <functional>
 #include <memory>
 #include "Acceptor.h"
+#include "TcpConnection.h"
 #include "InetAddr.h"
+#include "decls.h"
 
 namespace Angel {
 
@@ -14,19 +18,27 @@ class TcpServer {
 public:
     explicit TcpServer(EventLoop *, InetAddr&);
     ~TcpServer();
+    // Set to TcpConnection::_newConnectionCb
+    void newConnection(int fd);
+    void removeConnection(const TcpConnectionPtr& conn);
     void start();
     void quit();
-    void setAcceptionCb(const Acceptor::AcceptionCallback _cb)
-    {
-        _acceptor.setAcceptionCb(_cb);
-    }
-    void setMessageCb(const Acceptor::MessageCallback _cb)
-    {
-        _acceptor.setMessageCb(_cb);
-    }
+    void setConnectionCb(const ConnectionCallback _cb)
+    { _connectionCb = _cb; }
+    void setMessageCb(const MessageCallback _cb)
+    { _messageCb = _cb; }
 private:
+    size_t getId();
+    void putId(size_t id);
+    EventLoop* getNextLoop();
+
     EventLoop *_loop;
-    Acceptor _acceptor;
+    std::unique_ptr<Acceptor> _acceptor;
+    std::map<size_t, TcpConnectionPtr> _connectionMaps;
+    size_t _connId;
+    std::set<size_t> _freeIdList;
+    ConnectionCallback _connectionCb;
+    MessageCallback _messageCb;
 };
 
 }

@@ -8,6 +8,7 @@
 #include "Channel.h"
 #include "Buffer.h"
 #include "Noncopyable.h"
+#include "decls.h"
 
 namespace Angel {
 
@@ -15,35 +16,27 @@ class EventLoop;
 
 class Connector : Noncopyable {
 public:
-    typedef std::function<void(Channel&)> ConnectionCallback;
-    typedef std::function<void(std::shared_ptr<Channel>, Buffer&)> MessageCallback;
     Connector(EventLoop *, InetAddr&);
     ~Connector();
     void connect();
-    void connecting();
-    void connected();
+    void connecting(int fd);
+    void connected(int fd);
     void timeout();
-    void check();
+    void check(int fd);
     void handleClose();
     void handleError();
-    bool isConnected() { return _connected; }
-    Channel& channel() { return *_connect; }
-    void setConnectionCb(const ConnectionCallback _cb)
-    { _connectionCb = _cb; }
-    void setMessageCb(const MessageCallback _cb)
-    { _messageCb = _cb; }
+    void setNewConnectionCb(const NewConnectionCallback _cb)
+    { _newConnectionCb = _cb; }
 private:
     //  wait [2, 4, 8, 16]s = [30]s
     static const int _waitMaxTime = 16;
     static const int _waitAllTime = 30;
 
     EventLoop *_loop;
-    Channel *_connect;
-    Socket _socket;
-    InetAddr _inetAddr;
-    ConnectionCallback _connectionCb;
-    MessageCallback _messageCb;
-    bool _connected;
+    std::shared_ptr<Channel> _connectChannel;
+    InetAddr _peerAddr;
+    NewConnectionCallback _newConnectionCb;
+    int _connected;
     int _waitTime;
 };
 }

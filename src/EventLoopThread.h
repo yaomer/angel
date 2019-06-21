@@ -5,6 +5,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <atomic>
 
 namespace Angel {
 
@@ -22,7 +23,7 @@ private:
     void threadFunc();
 
     EventLoop *_loop;
-    bool _start;
+    std::atomic_bool _start;
     std::thread _thread;
     std::mutex _mutex;
     std::condition_variable _condVar;

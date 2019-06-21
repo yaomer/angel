@@ -13,7 +13,7 @@ public:
     bool operator()(const std::unique_ptr<TimerTask>& lhs,
                     const std::unique_ptr<TimerTask>& rhs) const
     {
-        return lhs.get()->timeout() < rhs.get()->timeout();
+        return lhs->timeout() < rhs->timeout();
     }
 };
 
@@ -42,6 +42,9 @@ public:
     // 处理所有到期的定时事件
     void tick();
 private:
+    size_t getId();
+    void putId(size_t id);
+
     // [0 : _timerId]之间的freeId
     std::set<size_t> _freeIdList;
     // TimerTask中的timeout可能会有重复

@@ -44,7 +44,7 @@ int Poll::wait(EventLoop *loop, int64_t timeout)
         for (auto& it : _pollfds) {
             if (it.revents > 0) {
                 auto chl = loop->searchChannel(it.fd);
-                chl.get()->setRevents(evret(it.revents));
+                chl->setRevents(evret(it.revents));
                 loop->fillActiveChannel(chl);
                 if (--nevents == 0)
                     break;

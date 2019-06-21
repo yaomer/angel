@@ -2,9 +2,11 @@
 #define _ANGEL_TCPCLIENT_H
 
 #include "Connector.h"
+#include "TcpConnection.h"
 #include "InetAddr.h"
 #include "Channel.h"
 #include "Buffer.h"
+#include "decls.h"
 
 namespace Angel {
 
@@ -12,30 +14,23 @@ class EventLoop;
 
 class TcpClient {
 public:
-    typedef std::function<void(Channel&)> ConnectionCallback;
-    typedef std::function<void(std::shared_ptr<Channel>, Buffer&)> MessageCallback;
-    typedef std::function<void(Channel&, Buffer&)> StdinCallback;
     TcpClient(EventLoop *, InetAddr&);
     ~TcpClient();
     void start();
     void quit();
-    void listenStdin();
     void setConnectionCb(const ConnectionCallback _cb)
-    { 
-        _connector.setConnectionCb(_cb); 
-    }
+    { _connectionCb = _cb; }
     void setMessageCb(const MessageCallback _cb)
-    {
-        _connector.setMessageCb(_cb);
-    }
-    void setStdinCb(const StdinCallback _cb)
-    { _stdinCb = _cb; }
+    { _messageCb = _cb; }
 private:
-    void readStdin();
+    void newConnection(int fd);
+    void handleClose(const TcpConnectionPtr&);
 
     EventLoop *_loop;
     Connector _connector;
-    StdinCallback _stdinCb;
+    std::shared_ptr<TcpConnection> _connection;
+    ConnectionCallback _connectionCb;
+    MessageCallback _messageCb;
 };
 
 }

@@ -1,44 +1,46 @@
 #include "TcpClient.h"
 #include "EventLoop.h"
 #include "InetAddr.h"
+#include "SocketOps.h"
 #include "Connector.h"
+#include "TcpConnection.h"
 #include "Channel.h"
+#include "LogStream.h"
 
 using namespace Angel;
+using std::placeholders::_1;
 
 TcpClient::TcpClient(EventLoop *loop, InetAddr& inetAddr)
     : _loop(loop),
     _connector(loop, inetAddr)
 {
-
+    _connector.setNewConnectionCb(
+            std::bind(&TcpClient::newConnection, this, _1));
+    LOG_INFO << "[TcpClient::ctor]";
 }
 
 TcpClient::~TcpClient()
 {
-
+    LOG_INFO << "[TcpClient::dtor]";
 }
 
-void TcpClient::listenStdin()
+void TcpClient::newConnection(int fd)
 {
-    Channel *sin = new Channel(_loop);
-    sin->setFd(0);
-    sin->setReadCb([this]{ this->readStdin(); });
-    _loop->addChannel(sin);
+    InetAddr localAddr = InetAddr(SocketOps::getLocalAddr(fd));
+    InetAddr peerAddr = InetAddr(SocketOps::getPeerAddr(fd));
+    _connection = TcpConnectionPtr(new TcpConnection(1, _loop, fd,
+                localAddr, peerAddr));
+    _connection->setMessageCb(_messageCb);
+    if (_connectionCb) _connectionCb(_connection);
+    // _connection->setConnectionCb(_connectionCb);
+    _connection->setCloseCb(
+            std::bind(&TcpClient::handleClose, this, _1));
+    _connection->setState(TcpConnection::CONNECTED);
 }
 
-void TcpClient::readStdin()
+void TcpClient::handleClose(const TcpConnectionPtr& conn)
 {
-    Buffer buf;
-    ssize_t n = buf.readFd(0);
-    if (n > 0) {
-        if (_stdinCb) {
-            _stdinCb(_connector.channel(), buf);
-        }
-    } else if (n == 0) {
-        _connector.handleClose();
-    } else {
-        _connector.handleError();
-    }
+    quit();
 }
 
 void TcpClient::start()

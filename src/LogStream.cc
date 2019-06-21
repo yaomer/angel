@@ -24,9 +24,8 @@ LogStream::LogStream(int level, const char *file, int line, const char *func)
     _line(line),
     _func(func)
 {
-    char buf[32];
     *this << levelStr[level]
-          << TimeStamp::timeStr(TimeStamp::LOCAL_TIME, buf, sizeof(buf))
+          << TimeStamp::timeStr(TimeStamp::LOCAL_TIME)
           // << " " << std::this_thread::get_id()
           << " " << _func << ": ";
 }

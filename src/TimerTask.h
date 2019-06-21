@@ -3,12 +3,12 @@
 
 #include <cinttypes>
 #include <functional>
+#include "decls.h"
 
 namespace Angel {
 
 class TimerTask {
 public:
-    typedef std::function<void()> TimerCallback;
     TimerTask(int64_t timeout, int64_t interval, const TimerCallback _cb)
         : _timeout(timeout),
         _interval(interval),

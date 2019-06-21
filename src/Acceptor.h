@@ -6,34 +6,29 @@
 #include "InetAddr.h"
 #include "Socket.h"
 #include "Buffer.h"
+#include "Channel.h"
 #include "Noncopyable.h"
+#include "decls.h"
 
 namespace Angel {
 
 class EventLoop;
-class Channel;
 
 class Acceptor : Noncopyable {
 public:
-    typedef std::function<void(Channel&)> AcceptionCallback;
-    typedef std::function<void(std::shared_ptr<Channel>, Buffer&)> MessageCallback;
     Acceptor(EventLoop *, InetAddr&);
     ~Acceptor();
-    void handleAccept();
-    void handleClose(Channel *);
-    void registerNewChannel(int fd);
     void listen();
-    void setAcceptionCb(const AcceptionCallback _cb)
-    { _acceptionCb = _cb; }
-    void setMessageCb(const MessageCallback _cb)
-    { _messageCb = _cb; }
+    void setNewConnectionCb(const NewConnectionCallback _cb)
+    { _newConnectionCb = _cb; }
 private:
+    void handleAccept();
+
     EventLoop *_loop;
-    Channel *_accept;
-    InetAddr _inetAddr;
+    std::shared_ptr<Channel> _acceptChannel;
     Socket _socket;
-    AcceptionCallback _acceptionCb;
-    MessageCallback _messageCb;
+    InetAddr _inetAddr;
+    NewConnectionCallback _newConnectionCb;
 };
 }
 

@@ -6,8 +6,10 @@
 #include "EventLoop.h"
 #include "Channel.h"
 #include "Signaler.h"
-#include "LogStream.h"
 #include "Socket.h"
+#include "SocketOps.h"
+#include "LogStream.h"
+#include "decls.h"
 
 using namespace Angel;
 using namespace std::placeholders;
@@ -26,14 +28,10 @@ Signaler::Signaler(EventLoop *loop)
 {
     if (_signalFd != -1)
         LOG_FATAL << "Only have one Signaler in one process";
-
-    Socket::socketpair(_pairFd);
+    SocketOps::socketpair(_pairFd);
     _sigChannel->setFd(_pairFd[0]);
     _signalFd = _pairFd[1];
-    _sigChannel->setReadCb(
-            [this]{ this->_sigChannel->handleRead(); });
-    _sigChannel->setMessageCb(
-            std::bind(&Signaler::sigCatch, this, _1, _2));
+    _sigChannel->setEventReadCb([this]{ this->sigCatch(); });
 }
 
 Signaler::~Signaler()
@@ -55,8 +53,20 @@ void Signaler::sigHandler(int signo)
         LOG_ERROR << "write " << n << " bytes instead of 1";
 }
 
-// if _cb == nullptr, ignore signo
 void Signaler::add(int signo, const SignalerCallback _cb)
+{
+    _loop->runInLoop(
+            [this, signo, _cb]{ this->addInLoop(signo, _cb); });
+}
+
+void Signaler::cancel(int signo)
+{
+    _loop->runInLoop(
+            [this, signo]{ this->cancelInLoop(signo); });
+}
+
+// if _cb == nullptr, ignore signo
+void Signaler::addInLoop(int signo, const SignalerCallback _cb)
 {
     struct sigaction sa;
     bzero(&sa, sizeof(sa));
@@ -76,7 +86,7 @@ void Signaler::add(int signo, const SignalerCallback _cb)
 }
 
 // 恢复信号signo的默认语义
-void Signaler::cancel(int signo)
+void Signaler::cancelInLoop(int signo)
 {
     struct sigaction sa;
     bzero(&sa, sizeof(sa));
@@ -88,18 +98,21 @@ void Signaler::cancel(int signo)
         LOG_ERROR << "sigaction: " << strerrno();
 }
 
-void Signaler::sigCatch(std::shared_ptr<Channel> chl, Buffer& buf)
+void Signaler::sigCatch()
 {
-    const char *sig = buf.c_str();
-    for (int i = 0; i < buf.readable(); i++) {
-        auto it = _sigCallbackMaps.find(sig[i]);
+    static char buf[1024];
+    bzero(buf, sizeof(buf));
+    ssize_t n = read(_sigChannel->fd(), buf, sizeof(buf));
+    if (n < 0)
+        LOG_ERROR << "read(): " << strerrno();
+    for (int i = 0; i < n; i++) {
+        auto it = _sigCallbackMaps.find(buf[i]);
         if (it != _sigCallbackMaps.end())
             it->second();
     }
-    buf.retrieveAll();
 }
 
-void Angel::addSignal(int signo, const Signaler::SignalerCallback _cb)
+void Angel::addSignal(int signo, const SignalerCallback _cb)
 {
     if (__signalerPtr)
         __signalerPtr->add(signo, _cb);

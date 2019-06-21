@@ -59,6 +59,7 @@ void Kqueue::remove(int fd)
 {
     struct kevent ev[2];
     // 删除fd上注册的所有事件，kqueue即会从内核事件列表中移除fd
+    change(fd, Channel::READ | Channel::WRITE);
     EV_SET(&ev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
     EV_SET(&ev[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
     if (kevent(_kqfd, ev, 2, nullptr, 0, nullptr) < 0)
@@ -84,7 +85,7 @@ int Kqueue::wait(EventLoop *loop, int64_t timeout)
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
             auto chl = loop->searchChannel(_evlist[i].ident);
-            chl.get()->setRevents(evret(_evlist[i]));
+            chl->setRevents(evret(_evlist[i]));
             loop->fillActiveChannel(chl);
         }
     }

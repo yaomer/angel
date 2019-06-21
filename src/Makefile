@@ -27,6 +27,10 @@ COMMON_OBJS = Acceptor.o \
 			  TcpServer.o \
 			  TimeStamp.o \
 			  Timer.o \
+			  ThreadPool.o \
+			  EventLoopThread.o \
+			  SocketOps.o \
+			  TcpConnection.o \
 			  $(OPTION_OBJS)
 
 %.o : %.cc

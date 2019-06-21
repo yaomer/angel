@@ -6,12 +6,12 @@
 #include <vector>
 #include <queue>
 #include <atomic>
+#include "decls.h"
 
 namespace Angel {
 
 class ThreadPool {
 public:
-    typedef std::function<void()> TaskCallback;
     explicit ThreadPool(size_t nums);
     ~ThreadPool();
     void addTask(const TaskCallback _cb);
