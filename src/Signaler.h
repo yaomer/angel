@@ -6,14 +6,14 @@
 #include <memory>
 #include <mutex>
 #include "Channel.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 #include "decls.h"
 
 namespace Angel {
 
 class EventLoop;
 
-class Signaler : Noncopyable {
+class Signaler : noncopyable {
 public:
     explicit Signaler(EventLoop *);
     ~Signaler();

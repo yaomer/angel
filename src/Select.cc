@@ -5,6 +5,7 @@
 #include <sys/select.h>
 #include "EventLoop.h"
 #include "Select.h"
+#include "LogStream.h"
 
 using namespace Angel;
 
@@ -90,6 +91,9 @@ int Select::wait(EventLoop *loop, int64_t timeout)
             if (revs > 0 && --nevents == 0)
                 break;
         }
+    } else if (nevents < 0) {
+        if (errno != EINTR)
+            LOG_ERROR << "select(): " << strerrno();
     }
     return rets;
 }

@@ -8,6 +8,7 @@
 #include "Poll.h"
 #include "EventLoop.h"
 #include "Channel.h"
+#include "LogStream.h"
 
 using namespace Angel;
 
@@ -50,6 +51,9 @@ int Poll::wait(EventLoop *loop, int64_t timeout)
                     break;
             }
         }
+    } else if (nevents < 0) {
+        if (errno != EINTR)
+            LOG_ERROR << "poll(): " << strerrno();
     }
     return ret;
 }

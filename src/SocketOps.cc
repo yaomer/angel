@@ -35,12 +35,14 @@ int SocketOps::accept(int sockfd)
 {
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
-    return ::accept(sockfd, sockaddr_cast(&addr), &len);
+    int connfd = ::accept(sockfd, sockaddr_cast(&addr), &len);
+    return connfd;
 }
 
 int SocketOps::connect(int sockfd, struct sockaddr_in *addr)
 {
-    return ::connect(sockfd, sockaddr_cast(addr), sizeof(*addr));
+    int ret = ::connect(sockfd, sockaddr_cast(addr), sizeof(*addr));
+    return ret;
 }
 
 void SocketOps::setnonblock(int sockfd)

@@ -18,6 +18,7 @@ public:
     ~TcpClient();
     void start();
     void quit();
+    const TcpConnectionPtr& conn() const { return _conn; }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = _cb; }
     void setMessageCb(const MessageCallback _cb)
@@ -28,7 +29,7 @@ private:
 
     EventLoop *_loop;
     Connector _connector;
-    std::shared_ptr<TcpConnection> _connection;
+    std::shared_ptr<TcpConnection> _conn;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
 };

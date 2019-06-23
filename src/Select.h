@@ -5,11 +5,11 @@
 #include <vector>
 #include <map>
 #include "Poller.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
-class Select : public Poller, Noncopyable {
+class Select : public Poller, noncopyable {
 public:
     Select();
     ~Select();

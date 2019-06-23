@@ -1,4 +1,6 @@
 #include <iostream>
+#include <sstream>
+#include <thread>
 #include "TimeStamp.h"
 #include "LogStream.h"
 
@@ -26,14 +28,15 @@ LogStream::LogStream(int level, const char *file, int line, const char *func)
 {
     *this << levelStr[level]
           << TimeStamp::timeStr(TimeStamp::LOCAL_TIME)
-          // << " " << std::this_thread::get_id()
           << " " << _func << ": ";
 }
 
 LogStream::~LogStream()
 {
-    *this << " - " << _file << ":" << _line << "\n";
-    __logger.writeToBufferUnlocked(_buffer.c_str());
+    *this << " - " << _file << ":" << _line
+          << " - " << getThreadId()
+          << "\n";
+    __logger.writeToBuffer(_buffer.c_str());
     if (_level == FATAL)
         __logger.quit();
 }
@@ -155,4 +158,9 @@ LogStream& LogStream::operator<<(double v)
 void Angel::setLoggerLevel(int level)
 {
     __loggerLevel = level;
+}
+
+size_t Angel::getThreadId()
+{
+    return std::hash<std::thread::id>()(std::this_thread::get_id());
 }

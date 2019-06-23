@@ -5,6 +5,7 @@
 #include <set>
 #include "TimerTask.h"
 #include "TimeStamp.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
@@ -17,7 +18,7 @@ public:
     }
 };
 
-class Timer {
+class Timer : noncopyable {
 public:
     size_t add(TimerTask *_task);
     // 取出最小定时器

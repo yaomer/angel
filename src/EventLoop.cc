@@ -56,32 +56,33 @@ EventLoop::EventLoop()
         _signaler.reset(new Signaler(this));
         __signalerPtr = _signaler.get();
     }
+    LOG_INFO << "[EventLoop::ctor]";
 }
 
 EventLoop::~EventLoop()
 {
-
+    LOG_INFO << "[EventLoop::dtor]";
 }
 
-void EventLoop::addChannel(std::shared_ptr<Channel> chl)
+void EventLoop::addChannel(const ChannelPtr& chl)
 {
     runInLoop([this, chl]{ this->addChannelInLoop(chl); });
 }
 
-void EventLoop::removeChannel(std::shared_ptr<Channel> chl)
+void EventLoop::removeChannel(const ChannelPtr& chl)
 {
     runInLoop([this, chl]{ this->removeChannelInLoop(chl); });
 }
 
-void EventLoop::addChannelInLoop(std::shared_ptr<Channel> chl)
+void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 {
     chl->enableRead();
     _poller->add(chl->fd(), chl->events());
-    auto it = std::pair<int, std::shared_ptr<Channel>>(chl->fd(), chl);
+    auto it = std::pair<int, ChannelPtr>(chl->fd(), chl);
     _channelMaps.insert(it);
 }
 
-void EventLoop::removeChannelInLoop(std::shared_ptr<Channel> chl)
+void EventLoop::removeChannelInLoop(const ChannelPtr& chl)
 {
     _poller->remove(chl->fd());
     _channelMaps.erase(chl->fd());
@@ -101,9 +102,6 @@ void EventLoop::run()
             _activeChannels.clear();
         } else if (nevents == 0) {
             _timer->tick();
-        } else {
-            if (errno != EINTR)
-                LOG_ERROR << "Poller::wait(): " << strerrno();
         }
         doFunctors();
     }
@@ -111,22 +109,22 @@ void EventLoop::run()
 
 void EventLoop::doFunctors()
 {
-    std::vector<Functor> funcs;
+    std::vector<Functor> tfuncs;
     if (!_functors.empty()) {
-        LOG_INFO << "execute " << _functors.size() << " functors";
+        LOG_INFO << "executed " << _functors.size() << " functors";
         std::lock_guard<std::mutex> mlock(_mutex);
         for (auto& it : _functors) {
-            funcs.push_back(std::move(it));
+            tfuncs.push_back(std::move(it));
             _functors.pop_back();
         }
     }
-    for (auto& it : funcs)
+    for (auto& it : tfuncs)
         it();
 }
 
 void EventLoop::wakeupInit()
 {
-    auto chl = std::shared_ptr<Channel>(new Channel(this));
+    auto chl = ChannelPtr(new Channel(this));
     chl->setFd(_wakeFd[0]);
     chl->setEventReadCb([this]{ this->handleRead(); });
     addChannel(chl);
@@ -171,8 +169,8 @@ size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(timeout, 0, _cb);
     size_t id = _timer->add(task);
-    LOG_INFO << "added a timer after " << timeout << " ms"
-             << " timerId = " << id;
+    LOG_INFO << "Added a TimerTask after [" << timeout << " ms]"
+             << ", timerId = " << id;
     return id;
 }
 
@@ -180,13 +178,13 @@ size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(interval, interval, _cb);
     size_t id = _timer->add(task);
-    LOG_INFO << "added a timer every " << interval << " ms"
-             << " timerId = " << id;
+    LOG_INFO << "Added a TimerTask every [" << interval << " ms]"
+             << ", timerId = " << id;
     return id;
 }
 
 void EventLoop::cancelTimer(size_t id)
 {
-    LOG_INFO << "cancel a timer, timerId = " << id;
+    LOG_INFO << "Canceled a TimerTask, timerId = " << id;
     _timer->cancel(id);
 }

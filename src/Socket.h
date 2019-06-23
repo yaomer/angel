@@ -2,11 +2,11 @@
 #define _ANGEL_SOCKET_H
 
 #include "InetAddr.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
-class Socket : Noncopyable {
+class Socket : noncopyable {
 public:
     Socket(){  };
     explicit Socket(int fd) : _sockfd(fd) {  };

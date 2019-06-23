@@ -94,6 +94,7 @@ void TcpConnection::handleClose()
 void TcpConnection::handleError()
 {
     LOG_ERROR << "fd = " << _channel->fd() << " : " << strerrno();
+    handleClose();
 }
 
 void TcpConnection::sendInLoop(const std::string& s)

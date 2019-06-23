@@ -5,7 +5,6 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#include <atomic>
 
 namespace Angel {
 
@@ -17,13 +16,12 @@ public:
     EventLoopThread();
     ~EventLoopThread();
     EventLoop *getLoop();
-    void start();
+    EventLoop *getAssertTrueLoop() { return _loop; }
     void quit();
 private:
     void threadFunc();
 
     EventLoop *_loop;
-    std::atomic_bool _start;
     std::thread _thread;
     std::mutex _mutex;
     std::condition_variable _condVar;

@@ -52,7 +52,7 @@ void Kqueue::change(int fd, int events)
         evNums++;
     }
     if (kevent(_kqfd, ev, evNums, nullptr, 0, nullptr) < 0)
-        LOG_ERROR << "kevent: " << strerrno();
+        LOG_ERROR << "kevent(): " << strerrno();
 }
 
 void Kqueue::remove(int fd)
@@ -63,7 +63,7 @@ void Kqueue::remove(int fd)
     EV_SET(&ev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
     EV_SET(&ev[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
     if (kevent(_kqfd, ev, 2, nullptr, 0, nullptr) < 0)
-        LOG_ERROR << "kevent: " << strerrno();
+        LOG_ERROR << "kevent(): " << strerrno();
     _addFds--;
 }
 

@@ -3,13 +3,13 @@
 
 namespace Angel {
 
-class Noncopyable {
+class noncopyable {
 public:
-    Noncopyable() {  };
-    ~Noncopyable() {  };
+    noncopyable() = default; 
+    ~noncopyable() = default;
 private:
-    Noncopyable(const Noncopyable&);
-    const Noncopyable& operator=(const Noncopyable&);
+    noncopyable(const noncopyable&) = delete;
+    noncopyable& operator=(const noncopyable&) = delete;
 };
 }
 

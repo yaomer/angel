@@ -13,28 +13,27 @@
 #include "Channel.h"
 #include "Timer.h"
 #include "Signaler.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
+#include "decls.h"
 
 namespace Angel {
 
-typedef std::function<void()> Functor;
-
-class EventLoop : Noncopyable {
+class EventLoop : noncopyable {
 public:
     EventLoop();
     ~EventLoop();
-    void addChannel(std::shared_ptr<Channel> chl);
-    void removeChannel(std::shared_ptr<Channel> chl);
+    void addChannel(const ChannelPtr& chl);
+    void removeChannel(const ChannelPtr& chl);
     void changeEvent(int fd, int events)
     {
         _poller->change(fd, events);
     }
-    std::shared_ptr<Channel> searchChannel(int fd)
+    ChannelPtr searchChannel(int fd)
     {
         auto it = _channelMaps.find(fd);
         return it->second;
     }
-    void fillActiveChannel(std::shared_ptr<Channel> chl)
+    void fillActiveChannel(ChannelPtr& chl)
     {
         _activeChannels.push_back(chl);
     }
@@ -50,12 +49,13 @@ public:
     void cancelTimer(size_t id);
     void quit() { _quit = true; wakeup(); }
 private:
-    void addChannelInLoop(std::shared_ptr<Channel> chl);
-    void removeChannelInLoop(std::shared_ptr<Channel> chl);
+    void addChannelInLoop(const ChannelPtr& chl);
+    void removeChannelInLoop(const ChannelPtr& chl);
 
     std::unique_ptr<Poller> _poller;
     std::unique_ptr<Timer> _timer;
     std::unique_ptr<Signaler> _signaler;
+    // typedef std::shared_ptr<Channel> ChannelPtr
     std::map<int, std::shared_ptr<Channel>> _channelMaps;
     std::vector<std::shared_ptr<Channel>> _activeChannels;
     std::atomic_bool _quit;

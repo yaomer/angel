@@ -5,7 +5,7 @@
 #include <functional>
 #include <string>
 #include "Buffer.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 #include "decls.h"
 
 #include <boost/any.hpp>
@@ -14,7 +14,7 @@ namespace Angel {
 
 class EventLoop;
 
-class Channel : Noncopyable {
+class Channel : noncopyable {
 public:
     enum EventType {
         READ     = 0x01,

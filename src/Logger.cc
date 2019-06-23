@@ -96,6 +96,7 @@ void Logger::writeToFile()
     }
 }
 
+// 线程不安全
 void Logger::writeToBufferUnlocked(const std::string& s)
 {
     _writeBuf.append(s.data(), s.size());
@@ -103,6 +104,7 @@ void Logger::writeToBufferUnlocked(const std::string& s)
         wakeup();
 }
 
+// 线程安全
 void Logger::writeToBuffer(const std::string& s)
 {
     std::lock_guard<std::mutex> mlock(_mutex);
@@ -117,10 +119,10 @@ void Logger::wakeup()
 
 void Logger::flushToStdout()
 {
-    __logger._flag = Logger::FLUSH_TO_STDOUT;
+    __logger._flag = FLUSH_TO_STDOUT;
 }
 
 void Logger::flushToStderr()
 {
-    __logger._flag = Logger::FLUSH_TO_STDERR;
+    __logger._flag = FLUSH_TO_STDERR;
 }

@@ -5,13 +5,13 @@
 #include <vector>
 #include <map>
 #include "Poller.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
 class EventLoop;
 
-class Kqueue : public Poller, Noncopyable {
+class Kqueue : public Poller, noncopyable {
 public:
     Kqueue();
     ~Kqueue();

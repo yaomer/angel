@@ -11,6 +11,7 @@ using std::placeholders::_1;
 TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
     : _loop(loop),
     _acceptor(new Acceptor(loop, listenAddr)),
+    _threadPool(new EventLoopThreadPool),
     _connId(1)
 {
     _acceptor->setNewConnectionCb(
@@ -21,6 +22,11 @@ TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
 TcpServer::~TcpServer()
 {
     LOG_INFO << "[TcpServer::dtor]";
+}
+
+void TcpServer::setThreadNums(size_t threadNums)
+{
+    _threadPool->setThreadNums(threadNums);
 }
 
 size_t TcpServer::getId()
@@ -42,7 +48,10 @@ void TcpServer::putId(size_t id)
 
 EventLoop *TcpServer::getNextLoop()
 {
-    return _loop;
+    if (_threadPool->threadNums() > 0)
+        return _threadPool->getNextThread()->getAssertTrueLoop();
+    else
+        return _loop;
 }
 
 void TcpServer::newConnection(int fd)
@@ -58,6 +67,7 @@ void TcpServer::newConnection(int fd)
     conn->setCloseCb(
             std::bind(&TcpServer::removeConnection, this, _1));
     _connectionMaps[id] = std::move(conn);
+    LOG_INFO << "[fd:" << fd << "] is connected";
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)

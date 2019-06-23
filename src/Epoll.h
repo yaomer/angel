@@ -4,13 +4,13 @@
 #include <sys/epoll.h>
 #include <vector>
 #include "Poller.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
 class EventLoop;
 
-class Epoll : public Poller, Noncopyable {
+class Epoll : public Poller, noncopyable {
 public:
     Epoll();
     ~Epoll();

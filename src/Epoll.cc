@@ -60,6 +60,9 @@ int Epoll::wait(EventLoop *loop, int64_t timeout)
             chl->setRevents(evret(_evList[i].events));
             loop->fillActiveChannel(chl);
         }
+    } else if (nevents < 0) {
+        if (errno != EINTR)
+            LOG_ERROR << "epoll_wait(): " << strerrno();
     }
     return nevents;
 }

@@ -1,8 +1,6 @@
 PLATFORM = $(shell ./systype.sh)
 LIB = libangel.a
 CXXFLAGS = -std=c++11 -Wall -O2
-_GREEN = \033[32m
-GREEN_ = \033[0m
 
 ifeq "$(PLATFORM)" "linux"
 	CXX = g++
@@ -29,16 +27,17 @@ COMMON_OBJS = Acceptor.o \
 			  Timer.o \
 			  ThreadPool.o \
 			  EventLoopThread.o \
+			  EventLoopThreadPool.o \
 			  SocketOps.o \
 			  TcpConnection.o \
 			  $(OPTION_OBJS)
 
 %.o : %.cc
-	@echo "$(_GREEN)-- [Building CXX object $@]$(GREEN_)"
+	@echo "\033[32m-- [Building CXX object $@]\033[0m"
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(LIB) : $(COMMON_OBJS)
-	@echo "$(_GREEN)-- [Creating static library $(LIB)]$(GREEN_)"
+	@echo "\033[32m-- [Creating static library $(LIB)]\033[0m"
 	@ar -r $(LIB) $(COMMON_OBJS)
 
 .PHONY : clean

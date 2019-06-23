@@ -8,6 +8,7 @@
 #include "Acceptor.h"
 #include "TcpConnection.h"
 #include "InetAddr.h"
+#include "EventLoopThreadPool.h"
 #include "decls.h"
 
 namespace Angel {
@@ -21,6 +22,7 @@ public:
     // Set to TcpConnection::_newConnectionCb
     void newConnection(int fd);
     void removeConnection(const TcpConnectionPtr& conn);
+    void setThreadNums(size_t threadNums);
     void start();
     void quit();
     void setConnectionCb(const ConnectionCallback _cb)
@@ -34,6 +36,7 @@ private:
 
     EventLoop *_loop;
     std::unique_ptr<Acceptor> _acceptor;
+    std::unique_ptr<EventLoopThreadPool> _threadPool;
     std::map<size_t, TcpConnectionPtr> _connectionMaps;
     size_t _connId;
     std::set<size_t> _freeIdList;

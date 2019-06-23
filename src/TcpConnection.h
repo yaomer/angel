@@ -8,7 +8,7 @@
 #include "Buffer.h"
 #include "InetAddr.h"
 #include "Socket.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 #include "decls.h"
 
 #include <boost/any.hpp>
@@ -17,7 +17,7 @@ namespace Angel {
 
 class EventLoop;
 
-class TcpConnection : Noncopyable,
+class TcpConnection : noncopyable,
     public std::enable_shared_from_this<TcpConnection> {
 public:
     TcpConnection(size_t id,
@@ -35,7 +35,7 @@ public:
     size_t id() const { return _id; }
     void send(const std::string& s);
     EventLoop *getLoop() { return _loop; }
-    std::shared_ptr<Channel> getChannel() { return _channel; }
+    ChannelPtr getChannel() { return _channel; }
     InetAddr& localAddr() { return _localAddr; }
     InetAddr& peerAddr() { return _peerAddr; }
     void setState(char state) { _state = state; }

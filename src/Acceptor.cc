@@ -51,6 +51,7 @@ _again:
             LOG_ERROR << "accept(): " << strerrno();
             break;
         }
+        return;
     }
     if (_newConnectionCb)
         _newConnectionCb(connfd);

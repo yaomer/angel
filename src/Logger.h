@@ -7,11 +7,11 @@
 #include <atomic>
 #include "Buffer.h"
 #include "LogStream.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
-class Logger : Noncopyable {
+class Logger : noncopyable {
 public:
     Logger();
     ~Logger();

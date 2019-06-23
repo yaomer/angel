@@ -46,6 +46,8 @@ extern int __loggerLevel;
 // 如果设置为WARN，则只打印>=WARN级别的日志
 void setLoggerLevel(int level);
 
+size_t getThreadId();
+
 }
 
 // 每次调用LOG_XXX都会构造一个匿名LogStream对象，该对象只在

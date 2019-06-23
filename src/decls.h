@@ -6,6 +6,7 @@
 
 namespace Angel {
 
+class Channel;
 class TcpConnection;
 class Buffer;
 
@@ -19,6 +20,7 @@ typedef std::function<void()> ErrorCallback;
 // for Acceptor and Connector
 typedef std::function<void(int)> NewConnectionCallback;
 // for Channel
+typedef std::shared_ptr<Channel> ChannelPtr;
 typedef std::function<void()> EventReadCallback;
 typedef std::function<void()> EventWriteCallback;
 typedef std::function<void()> EventCloseCallback;
@@ -29,6 +31,8 @@ typedef std::function<void()> SignalerCallback;
 typedef std::function<void()> TimerCallback;
 // for ThreadPool
 typedef std::function<void()> TaskCallback;
+// for EventLoop
+typedef std::function<void()> Functor;
 
 }
 

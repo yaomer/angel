@@ -7,14 +7,14 @@
 #include "InetAddr.h"
 #include "Channel.h"
 #include "Buffer.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 #include "decls.h"
 
 namespace Angel {
 
 class EventLoop;
 
-class Connector : Noncopyable {
+class Connector : noncopyable {
 public:
     Connector(EventLoop *, InetAddr&);
     ~Connector();

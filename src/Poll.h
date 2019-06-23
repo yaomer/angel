@@ -5,13 +5,13 @@
 #include <vector>
 #include <map>
 #include "Poller.h"
-#include "Noncopyable.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
 class EventLoop;
 
-class Poll : public Poller, Noncopyable {
+class Poll : public Poller, noncopyable {
 public:
     int wait(EventLoop *loop, int64_t timeout);
     void add(int fd, int events);

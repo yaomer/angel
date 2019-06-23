@@ -6,16 +6,15 @@ using namespace Angel;
 
 EventLoopThread::EventLoopThread()
     : _loop(nullptr),
-    _start(false),
     _thread([this]{ this->threadFunc(); })
 {
-
+    LOG_INFO << "[EventLoopThread::ctor]";
 }
 
 EventLoopThread::~EventLoopThread()
 {
-    if (_loop)
-        _loop->quit();
+    if (_loop) _loop->quit();
+    LOG_INFO << "[EventLoopThread::dtor]";
 }
 
 EventLoop *EventLoopThread::getLoop()
@@ -25,14 +24,6 @@ EventLoop *EventLoopThread::getLoop()
     while (_loop == nullptr)
         _condVar.wait(mlock);
     return _loop;
-}
-
-void EventLoopThread::start()
-{
-    std::lock_guard<std::mutex> mlock(_mutex);
-    _start = true;
-    // let loop to run
-    _condVar.notify_one();
 }
 
 void EventLoopThread::quit()
@@ -49,11 +40,6 @@ void EventLoopThread::threadFunc()
         _loop = &loop;
         // let getLoop() to return
         _condVar.notify_one();
-    }
-    {
-        std::unique_lock<std::mutex> mlock(_mutex);
-        while (!_start)
-            _condVar.wait(mlock);
     }
     loop.run();
 }
