@@ -1,0 +1,4 @@
+#cmakedefine _ANGEL_HAVE_POLL
+#cmakedefine _ANGEL_HAVE_EPOLL
+#cmakedefine _ANGEL_HAVE_KQUEUE
+#cmakedefine _ANGEL_HAVE_SELECT
