@@ -34,13 +34,13 @@ EventLoop::EventLoop()
     : _timer(new Timer),
     _quit(false)
 {
-#if _ANGEL_HAVE_EPOLL
+#if defined (_ANGEL_HAVE_EPOLL)
     _poller.reset(new Epoll);
-#elif _ANGEL_HAVE_KQUEUE
+#elif defined (_ANGEL_HAVE_KQUEUE)
     _poller.reset(new Kqueue);
-#elif _ANGEL_HAVE_POLL
+#elif defined (_ANGEL_HAVE_POLL)
     _poller.reset(new Poll);
-#elif _ANGEL_HAVE_SELECT
+#elif defined (_ANGEL_HAVE_SELECT)
     _poller.reset(new Select);
 #else
     LOG_FATAL << "No supported I/O multiplexing";
@@ -168,7 +168,7 @@ void EventLoop::runInLoop(Functor _cb)
 size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(timeout, 0, _cb);
-    size_t id = _timer->add(task);
+    size_t id = _timer->addTask(task);
     LOG_INFO << "Added a TimerTask after [" << timeout << " ms]"
              << ", timerId = " << id;
     return id;
@@ -177,7 +177,7 @@ size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(interval, interval, _cb);
-    size_t id = _timer->add(task);
+    size_t id = _timer->addTask(task);
     LOG_INFO << "Added a TimerTask every [" << interval << " ms]"
              << ", timerId = " << id;
     return id;
@@ -186,5 +186,5 @@ size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 void EventLoop::cancelTimer(size_t id)
 {
     LOG_INFO << "Canceled a TimerTask, timerId = " << id;
-    _timer->cancel(id);
+    _timer->cancelTask(id);
 }

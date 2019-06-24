@@ -47,6 +47,7 @@ extern int __loggerLevel;
 void setLoggerLevel(int level);
 
 size_t getThreadId();
+const char *getThreadIdStr();
 
 }
 

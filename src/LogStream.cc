@@ -34,7 +34,7 @@ LogStream::LogStream(int level, const char *file, int line, const char *func)
 LogStream::~LogStream()
 {
     *this << " - " << _file << ":" << _line
-          << " - " << getThreadId()
+          << " - " << getThreadIdStr()
           << "\n";
     __logger.writeToBuffer(_buffer.c_str());
     if (_level == FATAL)
@@ -163,4 +163,17 @@ void Angel::setLoggerLevel(int level)
 size_t Angel::getThreadId()
 {
     return std::hash<std::thread::id>()(std::this_thread::get_id());
+}
+
+namespace Angel {
+
+    __thread char _tid_buf[32];
+}
+
+const char *Angel::getThreadIdStr()
+{
+    std::ostringstream oss;
+    oss << std::this_thread::get_id();
+    strncpy(_tid_buf, oss.str().c_str(), sizeof(_tid_buf) - 1);
+    return _tid_buf;
 }

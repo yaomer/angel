@@ -4,6 +4,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <string>
 #include <atomic>
 #include "Buffer.h"
 #include "LogStream.h"
@@ -24,16 +25,19 @@ public:
     void writeToBuffer(const std::string& s);
     void writeToBufferUnlocked(const std::string& s);
     void wakeup();
+    void quit()
+    { _quit = true; wakeup(); }
     static void flushToStdout();
     static void flushToStderr();
-    void quit() 
-    { 
-        _quit = true; 
-        wakeup();
-    }
 private:
     void writeToFile();
+    void setFlush();
     void flushToFile();
+    void setFilename();
+    void creatFile();
+    void rollFile();
+
+    static const size_t _ROLLFILE_MAX_SIZE = 1024;
 
     Buffer _writeBuf;
     Buffer _flushBuf;
@@ -42,7 +46,9 @@ private:
     std::condition_variable _condVar;
     std::atomic_bool _quit;
     int _flag;
-    int _fd = -1;
+    int _fd;
+    std::string _filename;
+    size_t _filesize;
 };
 
 extern Angel::Logger __logger;

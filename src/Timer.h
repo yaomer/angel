@@ -20,13 +20,15 @@ public:
 
 class Timer : noncopyable {
 public:
-    size_t add(TimerTask *_task);
+    Timer();
+    ~Timer();
+    size_t addTask(TimerTask *_task);
     // 取出最小定时器
-    const TimerTask *get() { return _timer.cbegin()->get(); };
+    const TimerTask *getTask() { return _timer.cbegin()->get(); };
     // 删除最小定时器事件
-    void pop() 
+    void popTask() 
     { 
-        _freeIdList.insert(get()->id());
+        _freeIdList.insert(getTask()->id());
         _timer.erase(_timer.begin()); 
     }
     // 返回最小超时值
@@ -34,12 +36,12 @@ public:
     {
         int64_t timeval;
         if (!_timer.empty()) {
-            timeval = llabs(get()->timeout() - TimeStamp::now());
+            timeval = llabs(getTask()->timeout() - TimeStamp::now());
         } else
             timeval = -1;
         return timeval == 0 ? 1 : timeval;
     }
-    void cancel(size_t id);
+    void cancelTask(size_t id);
     // 处理所有到期的定时事件
     void tick();
 private:

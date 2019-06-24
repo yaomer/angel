@@ -8,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
+#include "TimeStamp.h"
 #include "Logger.h"
 #include "LogStream.h"
 
@@ -37,22 +38,60 @@ namespace Angel {
 Logger::Logger()
     : _thread(std::thread([this]{ this->flushToFile(); })),
     _quit(false),
-    _flag(FLUSH_TO_FILE)
+    _flag(FLUSH_TO_FILE),
+    _fd(-1),
+    _filesize(0)
 {
     mkdir(".log", 0777);
+    LOG_INFO << "[Logger::ctor]";
 }
 
 Logger::~Logger()
 {
+    LOG_INFO << "[Logger::dtor]";
     quit();
-    _thread.join();
 }
 
-void Logger::flushToFile()
+void Logger::setFilename()
+{
+    _filename.clear();
+    _filename += "./.log/";
+    char *p = const_cast<char*>
+        (TimeStamp::timeStr(TimeStamp::LOCAL_TIME));
+    p[19] = '\0';
+    _filename += p;
+    _filename += ".log";
+}
+
+void Logger::creatFile()
+{
+    setFilename();
+    _fd = open(_filename.c_str(),
+            O_WRONLY | O_APPEND | O_CREAT, 0664);
+    if (_fd < 0) {
+        fprintf(stderr, "can't open %s: %s", _filename.c_str(),
+                strerrno());
+        abort();
+    }
+    struct stat st;
+    if (fstat(_fd, &st) < 0)
+        ;
+    _filesize = st.st_size;
+}
+
+void Logger::rollFile()
+{
+    if (_filesize >= _ROLLFILE_MAX_SIZE) {
+        ::close(_fd);
+        creatFile();
+    }
+}
+
+void Logger::setFlush()
 {
     switch (_flag) {
     case FLUSH_TO_FILE:
-        _fd = open("./.log/x.log", O_WRONLY | O_APPEND | O_CREAT, 0777);
+        creatFile();
         break;
     case FLUSH_TO_STDOUT:
         _fd = STDOUT_FILENO;
@@ -61,7 +100,12 @@ void Logger::flushToFile()
         _fd = STDERR_FILENO;
         break;
     }
+}
 
+void Logger::flushToFile()
+{
+    setFlush();
+    _thread.detach();
     while (1) {
         {
             std::unique_lock<std::mutex> mlock(_mutex);
@@ -91,9 +135,12 @@ void Logger::writeToFile()
             return;
         }
         _flushBuf.retrieve(n);
+        _filesize += n;
         if (_flushBuf.readable() == 0)
             break;
     }
+    if (_flag == FLUSH_TO_FILE)
+        rollFile();
 }
 
 // 线程不安全

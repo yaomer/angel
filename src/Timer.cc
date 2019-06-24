@@ -1,8 +1,18 @@
 #include "TimerTask.h"
 #include "Timer.h"
-#include "Logger.h"
+#include "LogStream.h"
 
 using namespace Angel;
+
+Timer::Timer()
+{
+    LOG_INFO << "[Timer::ctor]";
+}
+
+Timer::~Timer()
+{
+    LOG_INFO << "[Timer::dtor]";
+}
 
 size_t Timer::getId()
 {
@@ -22,7 +32,7 @@ void Timer::putId(size_t id)
 }
 
 // Add a TimerTask is Log(n)
-size_t Timer::add(TimerTask *_task)
+size_t Timer::addTask(TimerTask *_task)
 {
     size_t id = getId();
     _task->setId(id);
@@ -32,7 +42,7 @@ size_t Timer::add(TimerTask *_task)
 }
 
 // Cancel a TimerTask is O(n)
-void Timer::cancel(size_t id)
+void Timer::cancelTask(size_t id)
 {
     for (auto& it : _timer) {
         if (it->id() == id) {
@@ -48,17 +58,17 @@ void Timer::tick()
     if (_timer.empty())
         return;
 
-    int64_t timeout = get()->timeout();
+    int64_t timeout = getTask()->timeout();
     while (!_timer.empty()) {
-        const TimerTask *t = get();
+        const TimerTask *t = getTask();
         if (t->timeout() == timeout) {
             t->timerCb()();
             if (t->interval() > 0) {
                 TimerTask *_t = new TimerTask(t->interval(),
                         t->interval(), t->timerCb());
-                add(_t);
+                addTask(_t);
             }
-            pop();
+            popTask();
         } else {
             break;
         }
