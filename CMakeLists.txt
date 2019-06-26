@@ -27,7 +27,7 @@ set (SRC_FILES
     ${SRC_DIR}/TcpConnection.cc
     ${SRC_DIR}/InetAddr.cc
     ${SRC_DIR}/Socket.cc
-    ${SRC_DIR}/SocketOps.cc
+    ${SRC_DIR}/SockOps.cc
     ${SRC_DIR}/Acceptor.cc
     ${SRC_DIR}/Connector.cc
     ${SRC_DIR}/TcpServer.cc
