@@ -35,7 +35,7 @@ public:
     size_t id() const { return _id; }
     void send(const std::string& s);
     EventLoop *getLoop() { return _loop; }
-    ChannelPtr getChannel() { return _channel; }
+    ChannelPtr& getChannel() { return _channel; }
     InetAddr& localAddr() { return _localAddr; }
     InetAddr& peerAddr() { return _peerAddr; }
     void setState(char state) { _state = state; }

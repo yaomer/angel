@@ -44,11 +44,17 @@ LogStream::~LogStream()
 const char digits[] = "9876543210123456789";
 const char* zero = digits + 9;
 
+namespace Angel {
+
+    __thread char _itoa_buf[64];
+}
+
+// value -> str
 template<typename T>
-size_t convert(char *buf, T value)
+const char *convert(T value)
 {
     T n = value;
-    char *p = buf;
+    char *p = _itoa_buf;
 
     do {
         int lsd = static_cast<int>(n % 10);
@@ -59,17 +65,15 @@ size_t convert(char *buf, T value)
         *p++ = '-';
     *p = '\0';
 
-    std::reverse(buf, p);
+    std::reverse(_itoa_buf, p);
 
-    return p - buf;
+    return _itoa_buf;
 }
 
 template <typename V>
 void numberToStr(LogStream& stream, V v)
 {
-    char buf[32];
-    convert(buf, v);
-    stream << buf;
+    stream << convert(v);
 }
 
 LogStream& LogStream::operator<<(const char *s)
