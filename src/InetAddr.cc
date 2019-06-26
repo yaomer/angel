@@ -1,7 +1,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include "InetAddr.h"
-#include "SocketOps.h"
+#include "SockOps.h"
 #include "LogStream.h"
 
 using namespace Angel;
@@ -35,10 +35,10 @@ InetAddr::InetAddr(struct sockaddr_in addr)
 
 int InetAddr::toIpPort()
 {
-    return SocketOps::toHostIpPort(_sockaddr.sin_port);
+    return SockOps::toHostIpPort(_sockaddr.sin_port);
 }
 
 const char *InetAddr::toIpAddr()
 {
-    return SocketOps::toHostIpAddr(&_sockaddr.sin_addr);
+    return SockOps::toHostIpAddr(&_sockaddr.sin_addr);
 }

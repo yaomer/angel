@@ -92,12 +92,15 @@ void Logger::setFlush()
     switch (_flag) {
     case FLUSH_TO_FILE:
         creatFile();
+        LOG_INFO << "write logger to file";
         break;
     case FLUSH_TO_STDOUT:
         _fd = STDOUT_FILENO;
+        LOG_INFO << "write logger to stdout";
         break;
     case FLUSH_TO_STDERR:
         _fd = STDERR_FILENO;
+        LOG_INFO << "write logger to stderr";
         break;
     }
 }

@@ -1,8 +1,22 @@
-#include "TimerTask.h"
 #include "Timer.h"
 #include "LogStream.h"
 
 using namespace Angel;
+
+
+TimerTask::TimerTask(int64_t timeout, int64_t interval, const TimerCallback _cb)
+    : _id(0),
+    _timeout(timeout),
+    _interval(interval),
+    _timerCb(_cb)
+{
+
+}
+
+TimerTask::~TimerTask()
+{
+
+}
 
 Timer::Timer()
 {

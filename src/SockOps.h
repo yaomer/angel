@@ -1,11 +1,11 @@
-#ifndef _ANGEL_SOCKETOPS_H
-#define _ANGEL_SOCKETOPS_H
+#ifndef _ANGEL_SOCKOPS_H
+#define _ANGEL_SOCKOPS_H
 
 #include <arpa/inet.h>
 
 namespace Angel {
 
-namespace SocketOps {
+namespace SockOps {
 
 struct sockaddr *sockaddr_cast(struct sockaddr_in *addr);
 

@@ -8,20 +8,14 @@ namespace Angel {
 
 class Socket : noncopyable {
 public:
-    Socket(){  };
-    explicit Socket(int fd) : _sockfd(fd) {  };
+    explicit Socket(int fd);
     ~Socket();
     int fd() const { return _sockfd; }
-    void socket();
-    void bind(InetAddr&);
-    void listen();
-    int accept();
-    int connect(InetAddr&);
     void setNoDelay(bool on);
     void setReuseAddr(bool on);
     void setReusePort(bool on);
 private:
-    int _sockfd;
+    const int _sockfd;
 };
 }
 

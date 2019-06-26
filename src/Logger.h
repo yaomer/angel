@@ -37,7 +37,7 @@ private:
     void creatFile();
     void rollFile();
 
-    static const size_t _ROLLFILE_MAX_SIZE = 1024;
+    static const size_t _ROLLFILE_MAX_SIZE = 1024 * 1024 * 1024;
 
     Buffer _writeBuf;
     Buffer _flushBuf;

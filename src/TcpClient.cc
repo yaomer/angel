@@ -1,7 +1,7 @@
 #include "TcpClient.h"
 #include "EventLoop.h"
 #include "InetAddr.h"
-#include "SocketOps.h"
+#include "SockOps.h"
 #include "Connector.h"
 #include "TcpConnection.h"
 #include "Channel.h"
@@ -26,8 +26,8 @@ TcpClient::~TcpClient()
 
 void TcpClient::newConnection(int fd)
 {
-    InetAddr localAddr = InetAddr(SocketOps::getLocalAddr(fd));
-    InetAddr peerAddr = InetAddr(SocketOps::getPeerAddr(fd));
+    InetAddr localAddr = InetAddr(SockOps::getLocalAddr(fd));
+    InetAddr peerAddr = InetAddr(SockOps::getPeerAddr(fd));
     _conn = TcpConnectionPtr(new TcpConnection(1, _loop, fd,
                 localAddr, peerAddr));
     _conn->setMessageCb(_messageCb);

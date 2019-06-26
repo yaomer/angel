@@ -7,7 +7,7 @@
 #include "Channel.h"
 #include "Signaler.h"
 #include "Socket.h"
-#include "SocketOps.h"
+#include "SockOps.h"
 #include "LogStream.h"
 #include "decls.h"
 
@@ -28,7 +28,7 @@ Signaler::Signaler(EventLoop *loop)
 {
     if (_signalFd != -1)
         LOG_FATAL << "Only have one Signaler in one process";
-    SocketOps::socketpair(_pairFd);
+    SockOps::socketpair(_pairFd);
     _sigChannel->setFd(_pairFd[0]);
     _signalFd = _pairFd[1];
     _sigChannel->setEventReadCb([this]{ this->sigCatch(); });

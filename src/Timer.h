@@ -3,11 +3,31 @@
 
 #include <cinttypes>
 #include <set>
-#include "TimerTask.h"
 #include "TimeStamp.h"
 #include "noncopyable.h"
+#include "decls.h"
 
 namespace Angel {
+
+class TimerTask {
+public:
+    TimerTask(int64_t timeout, int64_t interval, const TimerCallback _cb);
+    ~TimerTask();
+    size_t id() const { return _id; }
+    int64_t timeout() const { return _timeout; }
+    int64_t interval() const { return _interval; }
+    const TimerCallback timerCb() const { return _timerCb; }
+    void setId(size_t id) { _id = id; } 
+    void setTimeout(int64_t timeout) { _timeout = timeout; }
+    void setInterval(int64_t interval) { _interval = interval; }
+    void setTimerCb(const TimerCallback _cb) 
+    { _timerCb = _cb; }
+private:
+    size_t _id;
+    int64_t _timeout;
+    int64_t _interval;
+    TimerCallback _timerCb;
+};
 
 class TimerTaskCmp {
 public:
@@ -57,4 +77,4 @@ private:
 };
 }
 
-#endif // _ANGEL_TIMER_H
+#endif // _ANGEL_TIMERTASK_H

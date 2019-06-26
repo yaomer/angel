@@ -9,9 +9,11 @@ namespace Angel {
 class Channel;
 class TcpConnection;
 class Buffer;
+class Entry;
 
 // for TcpConnection
 typedef std::shared_ptr<TcpConnection> TcpConnectionPtr;
+typedef std::weak_ptr<TcpConnection> WeakTcpConnectionPtr;
 typedef std::function<void(const TcpConnectionPtr&)> ConnectionCallback;
 typedef std::function<void(const TcpConnectionPtr&, Buffer&)> MessageCallback;
 typedef std::function<void(const TcpConnectionPtr&)> CloseCallback;
@@ -33,6 +35,9 @@ typedef std::function<void()> TimerCallback;
 typedef std::function<void()> TaskCallback;
 // for EventLoop
 typedef std::function<void()> Functor;
+// for TimeWheel
+typedef std::shared_ptr<Entry> EntryPtr;
+typedef std::weak_ptr<Entry> WeakEntryPtr;
 
 }
 

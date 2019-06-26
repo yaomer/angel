@@ -12,7 +12,7 @@ namespace Angel {
 
 class ThreadPool {
 public:
-    explicit ThreadPool(size_t nums);
+    explicit ThreadPool(size_t threadNums);
     ~ThreadPool();
     void addTask(const TaskCallback _cb);
     void quit();

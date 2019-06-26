@@ -20,7 +20,8 @@ EventLoopThreadPool::~EventLoopThreadPool()
 
 void EventLoopThreadPool::setThreadNums(size_t threadNums)
 {
-    LOG_INFO << "Started " << threadNums << " threads";
+    LOG_INFO << "[EventLoopThreadPool::Started "
+             << threadNums << " threads]";
     _threadNums = threadNums;
     start();
 }

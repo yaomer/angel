@@ -2,7 +2,7 @@
 #include "EventLoop.h"
 #include "Channel.h"
 #include "Socket.h"
-#include "SocketOps.h"
+#include "SockOps.h"
 #include "InetAddr.h"
 #include "Connector.h"
 #include "LogStream.h"
@@ -27,9 +27,9 @@ Connector::~Connector()
 
 void Connector::connect()
 {
-    int sockfd = SocketOps::socket();
-    SocketOps::setnonblock(sockfd);
-    int ret = SocketOps::connect(sockfd, &_peerAddr.inetAddr());
+    int sockfd = SockOps::socket();
+    SockOps::setnonblock(sockfd);
+    int ret = SockOps::connect(sockfd, &_peerAddr.inetAddr());
     _connectChannel->setFd(sockfd);
     _loop->addChannel(_connectChannel);
     if (ret == 0) {
@@ -81,7 +81,7 @@ void Connector::timeout()
 
 void Connector::check(int sockfd)
 {
-    int err = SocketOps::getSocketError(sockfd);
+    int err = SockOps::getSocketError(sockfd);
     if (err) {
         LOG_FATAL << "connect: " << strerr(err);
     }

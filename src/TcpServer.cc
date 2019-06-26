@@ -2,7 +2,7 @@
 #include "Acceptor.h"
 #include "EventLoop.h"
 #include "TcpConnection.h"
-#include "SocketOps.h"
+#include "SockOps.h"
 #include "LogStream.h"
 
 using namespace Angel;
@@ -58,8 +58,8 @@ void TcpServer::newConnection(int fd)
 {
     size_t id = getId();
     EventLoop *ioLoop = getNextLoop();
-    InetAddr localAddr = SocketOps::getLocalAddr(fd);
-    InetAddr peerAddr = SocketOps::getPeerAddr(fd);
+    InetAddr localAddr = SockOps::getLocalAddr(fd);
+    InetAddr peerAddr = SockOps::getPeerAddr(fd);
     TcpConnectionPtr conn(new TcpConnection(id, ioLoop, fd, localAddr, peerAddr));
     if (_connectionCb) _connectionCb(conn);
     // conn->setConnectionCb(_connectionCb);

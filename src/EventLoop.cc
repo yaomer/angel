@@ -10,7 +10,7 @@
 #include "Signaler.h"
 #include "LogStream.h"
 #include "Socket.h"
-#include "SocketOps.h"
+#include "SockOps.h"
 #include "config.h"
 
 #ifdef _ANGEL_HAVE_KQUEUE
@@ -50,7 +50,7 @@ EventLoop::EventLoop()
     } else
         _thisThreadLoop = this;
     _tid = std::this_thread::get_id();
-    SocketOps::socketpair(_wakeFd);
+    SockOps::socketpair(_wakeFd);
     std::lock_guard<std::mutex> mlock(_SYNC_INIT_LOCK);
     if (!__signalerPtr) {
         _signaler.reset(new Signaler(this));

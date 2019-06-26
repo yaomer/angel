@@ -2,7 +2,7 @@
 #include "EventLoop.h"
 #include "InetAddr.h"
 #include "Channel.h"
-#include "SocketOps.h"
+#include "SockOps.h"
 #include "LogStream.h"
 
 using namespace Angel;
@@ -10,13 +10,13 @@ using namespace Angel;
 Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     : _loop(loop),
     _acceptChannel(new Channel(loop)),
+    _socket(SockOps::socket()),
     _inetAddr(listenAddr)
 {
-    _socket.socket();
-    SocketOps::setnonblock(_socket.fd());
     _socket.setReuseAddr(true);
     _socket.setNoDelay(true);
-    _socket.bind(_inetAddr);
+    SockOps::setnonblock(_socket.fd());
+    SockOps::bind(_socket.fd(), &_inetAddr.inetAddr());
     _acceptChannel->setFd(_socket.fd());
     LOG_INFO << "[Acceptor::ctor], listenfd = " << _socket.fd();
 }
@@ -28,7 +28,7 @@ Acceptor::~Acceptor()
 
 void Acceptor::listen()
 {
-    _socket.listen();
+    SockOps::listen(_socket.fd());
     _acceptChannel->setEventReadCb([this]{ this->handleAccept(); });
     _loop->addChannel(_acceptChannel);
 }
@@ -36,7 +36,7 @@ void Acceptor::listen()
 void Acceptor::handleAccept()
 {
 _again:
-    int connfd = _socket.accept();
+    int connfd = SockOps::accept(_socket.fd());
     if (connfd < 0) {
         switch (errno) {
         case EINTR:

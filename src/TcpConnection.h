@@ -42,6 +42,7 @@ public:
     bool isConnected() { return _state == CONNECTED; }
     boost::any& context() { return _context; }
     void setContext(boost::any& context) { _context = context; }
+    void close() { handleClose(); }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = _cb; }
     void setMessageCb(const MessageCallback _cb)

@@ -1,42 +1,20 @@
 #include <unistd.h>
 #include <sys/socket.h>
-#include <fcntl.h>
 #include <netinet/tcp.h>
 #include "Socket.h"
-#include "SocketOps.h"
-#include "InetAddr.h"
 #include "LogStream.h"
 
 using namespace Angel;
 
+Socket::Socket(int fd)
+    : _sockfd(fd)
+{
+
+}
+
 Socket::~Socket()
 {
     ::close(_sockfd);
-}
-
-void Socket::socket()
-{
-    _sockfd = SocketOps::socket();
-}
-
-void Socket::bind(InetAddr& _inetAddr)
-{
-    SocketOps::bind(_sockfd, &_inetAddr.inetAddr());
-}
-
-void Socket::listen()
-{
-    SocketOps::listen(_sockfd);
-}
-
-int Socket::accept()
-{
-    return SocketOps::accept(_sockfd);
-}
-
-int Socket::connect(InetAddr& _inetAddr)
-{
-    return SocketOps::connect(_sockfd, &_inetAddr.inetAddr());
 }
 
 void Socket::setNoDelay(bool on)
