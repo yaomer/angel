@@ -24,12 +24,12 @@ Channel::Channel(EventLoop *loop)
     _events(0),
     _revents(0)
 {
-
+    LOG_INFO << "[Channel::ctor]";
 }
 
 Channel::~Channel()
 {
-
+    LOG_INFO << "[Channel::dtor]";
 }
 
 void Channel::enableRead()

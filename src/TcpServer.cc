@@ -29,23 +29,6 @@ void TcpServer::setThreadNums(size_t threadNums)
     _threadPool->setThreadNums(threadNums);
 }
 
-size_t TcpServer::getId()
-{
-    size_t id;
-    if (_freeIdList.empty()) {
-        id = _connId++;
-    } else {
-        id = *_freeIdList.begin();
-        _freeIdList.erase(_freeIdList.begin());
-    }
-    return id;
-}
-
-void TcpServer::putId(size_t id)
-{
-    _freeIdList.insert(id);
-}
-
 EventLoop *TcpServer::getNextLoop()
 {
     if (_threadPool->threadNums() > 0)
@@ -61,11 +44,12 @@ void TcpServer::newConnection(int fd)
     InetAddr localAddr = SockOps::getLocalAddr(fd);
     InetAddr peerAddr = SockOps::getPeerAddr(fd);
     TcpConnectionPtr conn(new TcpConnection(id, ioLoop, fd, localAddr, peerAddr));
-    if (_connectionCb) _connectionCb(conn);
-    // conn->setConnectionCb(_connectionCb);
+    conn->setState(TcpConnection::CONNECTED);
     conn->setMessageCb(_messageCb);
     conn->setCloseCb(
             std::bind(&TcpServer::removeConnection, this, _1));
+    if (_connectionCb)
+        ioLoop->runInLoop([this, conn]{ this->_connectionCb(conn); });
     _connectionMaps[id] = std::move(conn);
     LOG_INFO << "[fd:" << fd << "] is connected";
 }

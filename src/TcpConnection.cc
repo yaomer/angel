@@ -20,7 +20,8 @@ TcpConnection::TcpConnection(size_t id,
     _socket(new Socket(sockfd)),
     _localAddr(localAddr),
     _peerAddr(peerAddr),
-    _state(CONNECTING)
+    _state(CONNECTING),
+    _flag(0)
 {
     _channel->setFd(sockfd);
     _channel->setEventReadCb([this]{ this->handleRead(); });
@@ -60,6 +61,7 @@ void TcpConnection::handleWrite()
             _output.retrieve(n);
             if (_output.readable() == 0) {
                 _channel->disableWrite();
+                clearFlag(SENDING);
                 if (_writeCompleteCb)
                     _loop->runInLoop(
                             [this]{ this->_writeCompleteCb(); });
@@ -82,7 +84,7 @@ void TcpConnection::handleWrite()
 void TcpConnection::handleClose()
 {
     LOG_INFO << "[fd:" << _channel->fd() << "] is closing";
-    if (_channel->isWriting())
+    if (isSending())
         setWriteCompleteCb([this]{ this->handleClose(); });
     else {
         LOG_INFO << "[fd:" << _channel->fd() << "] is closed";
@@ -108,6 +110,7 @@ void TcpConnection::sendInLoop(const std::string& s)
                 _output.append(s.data() + n, s.size() - n);
                 _channel->enableWrite();
             } else {
+                clearFlag(SENDING);
                 if (_writeCompleteCb)
                     _loop->runInLoop(
                             [this]{ this->_writeCompleteCb(); });
@@ -130,5 +133,6 @@ void TcpConnection::sendInLoop(const std::string& s)
 
 void TcpConnection::send(const std::string& s)
 {
+    setFlag(SENDING);
     _loop->runInLoop([s, this]{ this->sendInLoop(s); });
 }

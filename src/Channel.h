@@ -1,14 +1,12 @@
 #ifndef _ANGEL_CHANNEL_H
 #define _ANGEL_CHANNEL_H
 
-#include <memory>
 #include <functional>
 #include <string>
+#include <atomic>
 #include "Buffer.h"
 #include "noncopyable.h"
 #include "decls.h"
-
-#include <boost/any.hpp>
 
 namespace Angel {
 

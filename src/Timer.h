@@ -4,6 +4,7 @@
 #include <cinttypes>
 #include <set>
 #include "TimeStamp.h"
+#include "Id.h"
 #include "noncopyable.h"
 #include "decls.h"
 
@@ -48,7 +49,7 @@ public:
     // 删除最小定时器事件
     void popTask() 
     { 
-        _freeIdList.insert(getTask()->id());
+        putId(getTask()->id());
         _timer.erase(_timer.begin()); 
     }
     // 返回最小超时值
@@ -65,15 +66,12 @@ public:
     // 处理所有到期的定时事件
     void tick();
 private:
-    size_t getId();
-    void putId(size_t id);
+    size_t getId() { return _timerId.getId(); }
+    void putId(size_t id) { _timerId.putId(id); }
 
-    // [0 : _timerId]之间的freeId
-    std::set<size_t> _freeIdList;
     // TimerTask中的timeout可能会有重复
     std::multiset<std::unique_ptr<TimerTask>, TimerTaskCmp> _timer;
-    // 唯一标识一个TimerTask
-    size_t _timerId = 1;
+    Id _timerId;
 };
 }
 

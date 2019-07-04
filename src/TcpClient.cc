@@ -28,14 +28,13 @@ void TcpClient::newConnection(int fd)
 {
     InetAddr localAddr = InetAddr(SockOps::getLocalAddr(fd));
     InetAddr peerAddr = InetAddr(SockOps::getPeerAddr(fd));
-    _conn = TcpConnectionPtr(new TcpConnection(1, _loop, fd,
-                localAddr, peerAddr));
+    _conn = TcpConnectionPtr(new TcpConnection(1, _loop, fd, localAddr, peerAddr));
     _conn->setMessageCb(_messageCb);
-    if (_connectionCb) _connectionCb(_conn);
-    // _conn->setConnectionCb(_conn);
     _conn->setCloseCb(
             std::bind(&TcpClient::handleClose, this, _1));
     _conn->setState(TcpConnection::CONNECTED);
+    if (_connectionCb)
+        _loop->runInLoop([this]{ this->_connectionCb(this->_conn); });
 }
 
 void TcpClient::handleClose(const TcpConnectionPtr& conn)

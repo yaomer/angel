@@ -28,23 +28,6 @@ Timer::~Timer()
     LOG_INFO << "[Timer::dtor]";
 }
 
-size_t Timer::getId()
-{
-    size_t id;
-    if (!_freeIdList.empty()) {
-        id = *_freeIdList.begin();
-        _freeIdList.erase(_freeIdList.begin());
-    } else {
-        id = _timerId++;
-    }
-    return id;
-}
-
-void Timer::putId(size_t id)
-{
-    _freeIdList.insert(id);
-}
-
 // Add a TimerTask is Log(n)
 size_t Timer::addTask(TimerTask *_task)
 {

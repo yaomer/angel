@@ -9,11 +9,12 @@ using namespace Angel;
 Socket::Socket(int fd)
     : _sockfd(fd)
 {
-
+    LOG_INFO << "[Socket::ctor, fd = " << _sockfd << "]";
 }
 
 Socket::~Socket()
 {
+    LOG_INFO << "[Socket::dtor, close(" << _sockfd << ")]";
     ::close(_sockfd);
 }
 

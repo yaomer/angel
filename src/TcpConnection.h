@@ -32,6 +32,9 @@ public:
         CLOSING,
         CLOSED,
     };
+    enum Flag {
+        SENDING = 01,
+    };
     size_t id() const { return _id; }
     void send(const std::string& s);
     EventLoop *getLoop() { return _loop; }
@@ -40,6 +43,9 @@ public:
     InetAddr& peerAddr() { return _peerAddr; }
     void setState(char state) { _state = state; }
     bool isConnected() { return _state == CONNECTED; }
+    void setFlag(char flag) { _flag |= flag; }
+    void clearFlag(char flag) { _flag &= ~flag; }
+    bool isSending() { return _flag & SENDING; }
     boost::any& context() { return _context; }
     void setContext(boost::any& context) { _context = context; }
     void close() { handleClose(); }
@@ -56,7 +62,6 @@ private:
     void handleWrite();
     void handleClose();
     void handleError();
-    
     void sendInLoop(const std::string& s);
 
     size_t _id;
@@ -69,6 +74,7 @@ private:
     InetAddr _peerAddr;
     boost::any _context;
     std::atomic_char _state;
+    std::atomic_char _flag;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     WriteCompleteCallback _writeCompleteCb;

@@ -9,6 +9,7 @@
 #include "TcpConnection.h"
 #include "InetAddr.h"
 #include "EventLoopThreadPool.h"
+#include "Id.h"
 #include "decls.h"
 
 namespace Angel {
@@ -30,16 +31,15 @@ public:
     void setMessageCb(const MessageCallback _cb)
     { _messageCb = _cb; }
 private:
-    size_t getId();
-    void putId(size_t id);
+    size_t getId() { return _connId.getId(); }
+    void putId(size_t id) { _connId.putId(id); }
     EventLoop* getNextLoop();
 
     EventLoop *_loop;
     std::unique_ptr<Acceptor> _acceptor;
     std::unique_ptr<EventLoopThreadPool> _threadPool;
     std::map<size_t, TcpConnectionPtr> _connectionMaps;
-    size_t _connId;
-    std::set<size_t> _freeIdList;
+    Id _connId;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
 };
