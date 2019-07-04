@@ -20,9 +20,9 @@ public:
     void quit();
     const TcpConnectionPtr& conn() const { return _conn; }
     void setConnectionCb(const ConnectionCallback _cb)
-    { _connectionCb = _cb; }
+    { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
-    { _messageCb = _cb; }
+    { _messageCb = std::move(_cb); }
 private:
     void newConnection(int fd);
     void handleClose(const TcpConnectionPtr&);

@@ -73,7 +73,7 @@ void Signaler::addInLoop(int signo, const SignalerCallback _cb)
     bzero(&sa, sizeof(sa));
     if (_cb) {
         sa.sa_handler = &sigHandler;
-        auto it = std::pair<int, SignalerCallback>(signo, _cb);
+        auto it = std::pair<int, SignalerCallback>(signo, std::move(_cb));
         _sigCallbackMaps.insert(it);
     } else {
         sa.sa_handler = SIG_IGN;
@@ -116,7 +116,7 @@ void Signaler::sigCatch()
 void Angel::addSignal(int signo, const SignalerCallback _cb)
 {
     if (__signalerPtr)
-        __signalerPtr->add(signo, _cb);
+        __signalerPtr->add(signo, std::move(_cb));
 }
 
 void Angel::cancelSignal(int signo)

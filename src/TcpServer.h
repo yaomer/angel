@@ -27,9 +27,9 @@ public:
     void start();
     void quit();
     void setConnectionCb(const ConnectionCallback _cb)
-    { _connectionCb = _cb; }
+    { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
-    { _messageCb = _cb; }
+    { _messageCb = std::move(_cb); }
 private:
     size_t getId() { return _connId.getId(); }
     void putId(size_t id) { _connId.putId(id); }

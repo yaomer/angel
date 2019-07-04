@@ -26,7 +26,7 @@ public:
     void handleClose();
     void handleError();
     void setNewConnectionCb(const NewConnectionCallback _cb)
-    { _newConnectionCb = _cb; }
+    { _newConnectionCb = std::move(_cb); }
 private:
     //  wait [2, 4, 8, 16]s = [30]s
     static const int _waitMaxTime = 16;

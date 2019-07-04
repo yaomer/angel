@@ -158,7 +158,7 @@ void EventLoop::runInLoop(Functor _cb)
 {
     if (!isInLoopThread()) {
         std::lock_guard<std::mutex> mlock(_mutex);
-        _functors.push_back(_cb);
+        _functors.push_back(std::move(_cb));
         wakeup();
     } else {
         _cb();
@@ -167,7 +167,7 @@ void EventLoop::runInLoop(Functor _cb)
 
 size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
-    TimerTask *task = new TimerTask(timeout, 0, _cb);
+    TimerTask *task = new TimerTask(timeout, 0, std::move(_cb));
     size_t id = _timer->addTask(task);
     LOG_INFO << "Added a TimerTask after [" << timeout << " ms]"
              << ", timerId = " << id;
@@ -176,7 +176,7 @@ size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 
 size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
-    TimerTask *task = new TimerTask(interval, interval, _cb);
+    TimerTask *task = new TimerTask(interval, interval, std::move(_cb));
     size_t id = _timer->addTask(task);
     LOG_INFO << "Added a TimerTask every [" << interval << " ms]"
              << ", timerId = " << id;

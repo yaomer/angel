@@ -50,13 +50,13 @@ public:
     void setContext(boost::any& context) { _context = context; }
     void close() { handleClose(); }
     void setConnectionCb(const ConnectionCallback _cb)
-    { _connectionCb = _cb; }
+    { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
-    { _messageCb = _cb; }
+    { _messageCb = std::move(_cb); }
     void setWriteCompleteCb(const WriteCompleteCallback _cb)
-    { _writeCompleteCb = _cb; }
+    { _writeCompleteCb = std::move(_cb); }
     void setCloseCb(const CloseCallback _cb)
-    { _closeCb = _cb; }
+    { _closeCb = std::move(_cb); }
 private:
     void handleRead();
     void handleWrite();

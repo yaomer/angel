@@ -21,7 +21,7 @@ public:
     void setTimeout(int64_t timeout) { _timeout = timeout; }
     void setInterval(int64_t interval) { _interval = interval; }
     void setTimerCb(const TimerCallback _cb) 
-    { _timerCb = _cb; }
+    { _timerCb = std::move(_cb); }
 private:
     size_t _id = 0;
     int64_t _timeout = 0;

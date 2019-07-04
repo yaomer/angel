@@ -20,7 +20,7 @@ public:
     ~Acceptor();
     void listen();
     void setNewConnectionCb(const NewConnectionCallback _cb)
-    { _newConnectionCb = _cb; }
+    { _newConnectionCb = std::move(_cb); }
 private:
     void handleAccept();
 

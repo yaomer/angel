@@ -35,13 +35,13 @@ public:
     void changeEvents();
     void handleEvent();
     void setEventReadCb(const EventReadCallback _cb)
-    { _readCb = _cb; }
+    { _readCb = std::move(_cb); }
     void setEventWriteCb(const EventWriteCallback _cb)
-    { _writeCb = _cb; }
+    { _writeCb = std::move(_cb); }
     void setEventCloseCb(const EventCloseCallback _cb)
-    { _closeCb = _cb; }
+    { _closeCb = std::move(_cb); }
     void setEventErrorCb(const EventErrorCallback _cb)
-    { _errorCb = _cb; }
+    { _errorCb = std::move(_cb); }
 private:
     EventLoop *_loop;
     int _fd;
