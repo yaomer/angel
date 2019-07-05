@@ -1,0 +1,24 @@
+#include "ChatServer.h"
+#include "../Angel.h"
+
+using namespace Angel;
+
+// 用telnet充当client，可以多人匿名聊天
+
+const char *ChatServer::_help = {
+    "usage:\n"
+    "-------------------------------------------------------------------------\n"
+    "|id 3 [msg]| send [msg] to [id 3]                                       |\n"
+    "|grp [msg] | broadcast [msg] to all clients                             |\n"
+    "|[msg]     | if ([last-id] is null) echo [msg]; else id [last-id] [msg] |\n"
+    "-------------------------------------------------------------------------\n"
+};
+
+int main()
+{
+    EventLoop loop;
+    InetAddr listenAddr(8000);
+    ChatServer server(&loop, listenAddr);
+    server.start();
+    loop.run();
+}

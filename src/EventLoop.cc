@@ -117,7 +117,7 @@ void EventLoop::doFunctors()
         _functors.clear();
     }
     for (auto& func : tfuncs)
-        func()
+        func();
 }
 
 void EventLoop::wakeupInit()

@@ -32,7 +32,7 @@ public:
     void removeConnection(const TcpConnectionPtr& conn);
 
     ConnectionMaps& connectionMaps() { return _connectionMaps; }
-    size_t connectionNums() const { return _connId.getIdNums(); }
+    size_t clients() const { return _connId.getIdNums(); };
     const TcpConnectionPtr& getConnection(size_t id) 
     { return _connectionMaps.find(id)->second; }
 
