@@ -11,6 +11,7 @@ public:
     Id() : _id(0) {  }
     explicit Id(size_t id) : _id(id) {  }
     ~Id() {  }
+    // 返回最小的未使用的id
     size_t getId()
     {
         size_t id;

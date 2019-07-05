@@ -11,7 +11,8 @@ using std::placeholders::_1;
 TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
     : _loop(loop),
     _acceptor(new Acceptor(loop, listenAddr)),
-    _threadPool(new EventLoopThreadPool),
+    _ioThreadPool(new EventLoopThreadPool),
+    _threadPool(new ThreadPool),
     _connId(1)
 {
     _acceptor->setNewConnectionCb(
@@ -24,15 +25,10 @@ TcpServer::~TcpServer()
     LOG_INFO << "[TcpServer::dtor]";
 }
 
-void TcpServer::setThreadNums(size_t threadNums)
-{
-    _threadPool->setThreadNums(threadNums);
-}
-
 EventLoop *TcpServer::getNextLoop()
 {
-    if (_threadPool->threadNums() > 0)
-        return _threadPool->getNextThread()->getAssertTrueLoop();
+    if (_ioThreadPool->threadNums() > 0)
+        return _ioThreadPool->getNextThread()->getAssertTrueLoop();
     else
         return _loop;
 }

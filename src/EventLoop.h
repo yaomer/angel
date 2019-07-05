@@ -24,33 +24,30 @@ public:
     ~EventLoop();
     void addChannel(const ChannelPtr& chl);
     void removeChannel(const ChannelPtr& chl);
+
     void changeEvent(int fd, int events)
-    {
-        _poller->change(fd, events);
-    }
+    { _poller->change(fd, events); }
+
     ChannelPtr searchChannel(int fd)
-    {
-        auto it = _channelMaps.find(fd);
-        return it->second;
-    }
+    { return _channelMaps.find(fd)->second; }
+
     void fillActiveChannel(ChannelPtr& chl)
-    {
-        _activeChannels.push_back(chl);
-    }
+    { _activeChannels.push_back(chl); }
+
     void run();
-    void wakeupInit();
     void wakeup();
-    void handleRead();
     bool isInLoopThread();
     void runInLoop(const Functor _cb);
-    void doFunctors();
     size_t runAfter(int64_t timeout, const TimerCallback _cb);
     size_t runEvery(int64_t interval, const TimerCallback _cb);
     void cancelTimer(size_t id);
     void quit() { _quit = true; wakeup(); }
 private:
+    void wakeupInit();
+    void handleRead();
     void addChannelInLoop(const ChannelPtr& chl);
     void removeChannelInLoop(const ChannelPtr& chl);
+    void doFunctors();
 
     std::unique_ptr<Poller> _poller;
     std::unique_ptr<Timer> _timer;

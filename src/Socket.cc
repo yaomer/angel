@@ -18,6 +18,14 @@ Socket::~Socket()
     ::close(_sockfd);
 }
 
+void Socket::setKeepAlive(bool on)
+{
+    socklen_t opt = on ? 1 : 0;
+    if (::setsockopt(_sockfd, SOL_SOCKET, TCP_KEEPALIVE, &opt, sizeof(opt)) < 0)
+        LOG_FATAL << "setsockopt(): " << strerrno();
+    LOG_INFO << (on ? "enable" : "disable") << " TCP_KEEPALIVE";
+}
+
 void Socket::setNoDelay(bool on)
 {
     socklen_t opt = on ? 1 : 0;

@@ -6,18 +6,22 @@
 #include <vector>
 #include <queue>
 #include <atomic>
+#include "noncopyable.h"
 #include "decls.h"
 
 namespace Angel {
 
-class ThreadPool {
+class ThreadPool : noncopyable {
 public:
+    ThreadPool();
     explicit ThreadPool(size_t threadNums);
     ~ThreadPool();
+    void setThreadNums(size_t threadNums);
     void addTask(const TaskCallback _cb);
     void quit();
 private:
-    void threadFunc(void);
+    void start();
+    void threadFunc();
 
     static const size_t _MAX_THREADS = 256;
 

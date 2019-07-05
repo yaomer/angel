@@ -22,7 +22,6 @@ public:
     }
     void start()
     {
-        _server.setThreadNums(6);
         _server.start();
     }
     void quit()

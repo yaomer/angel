@@ -11,6 +11,7 @@ public:
     explicit Socket(int fd);
     ~Socket();
     int fd() const { return _sockfd; }
+    void setKeepAlive(bool on);
     void setNoDelay(bool on);
     void setReuseAddr(bool on);
     void setReusePort(bool on);
