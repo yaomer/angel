@@ -136,3 +136,13 @@ void TcpConnection::send(const std::string& s)
     setFlag(SENDING);
     _loop->runInLoop([s, this]{ this->sendInLoop(s); });
 }
+
+void TcpConnection::send(const char *s)
+{
+    send(std::move(std::string(s)));
+}
+
+void TcpConnection::send(const char *s, size_t len)
+{
+    send(std::move(std::string(s, len)));
+}

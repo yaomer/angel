@@ -41,12 +41,16 @@ public:
         _writeindex--; 
         return peek(); 
     }
-    // 返回\r\n在Buffer中第一次出现的位置，没出现返回-1
-    int findCrlf(void)
+    int findStr(const char *s, size_t len)
     {
-        const char *crlf = std::search(peek(), begin() + _writeindex, _crlf, _crlf + 2);
-        return crlf == begin() + _writeindex ? -1 : crlf - peek();
+        const char *pattern = 
+            std::search(peek(), begin() + _writeindex, s, s + len);
+        return pattern == begin() + _writeindex ? 
+            -1 : pattern - peek();
     }
+    // 返回\r\n在Buffer中第一次出现的位置，没出现返回-1
+    int findCrlf() { return findStr("\r\n", 2); }
+    int findLf() { return findStr("\n", 1); }
     // 跳过已读的数据
     void retrieve(size_t len)
     {
@@ -63,6 +67,7 @@ public:
         std::swap(_readindex, _buffer._readindex);
         std::swap(_writeindex, _buffer._writeindex);
     }
+    char& operator[](size_t idx) { return _buf[idx]; }
 private:
     std::vector<char> _buf;
     size_t _readindex = 0;

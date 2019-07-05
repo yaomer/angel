@@ -36,7 +36,9 @@ public:
         SENDING = 01,
     };
     size_t id() const { return _id; }
+    void send(const char *s);
     void send(const std::string& s);
+    void send(const char *s, size_t len);
     EventLoop *getLoop() { return _loop; }
     ChannelPtr& getChannel() { return _channel; }
     InetAddr& localAddr() { return _localAddr; }
@@ -46,8 +48,8 @@ public:
     void setFlag(char flag) { _flag |= flag; }
     void clearFlag(char flag) { _flag &= ~flag; }
     bool isSending() { return _flag & SENDING; }
-    boost::any& context() { return _context; }
-    void setContext(boost::any& context) { _context = context; }
+    boost::any& getContext() { return _context; }
+    void setContext(boost::any context) { _context = std::move(context); }
     void close() { handleClose(); }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }

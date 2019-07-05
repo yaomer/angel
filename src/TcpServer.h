@@ -24,10 +24,17 @@ class EventLoop;
 // 4. [多线程reactor + thread pool](setIoThreadNums(N > 0), setTaskThreadNums(N > 0))
 class TcpServer {
 public:
+    typedef std::map<size_t, TcpConnectionPtr> ConnectionMaps;
+
     explicit TcpServer(EventLoop *, InetAddr&);
     ~TcpServer();
     void newConnection(int fd);
     void removeConnection(const TcpConnectionPtr& conn);
+
+    ConnectionMaps& connectionMaps() { return _connectionMaps; }
+    size_t connectionNums() const { return _connId.getIdNums(); }
+    const TcpConnectionPtr& getConnection(size_t id) 
+    { return _connectionMaps.find(id)->second; }
 
     void setIoThreadNums(size_t threadNums)
     { _ioThreadPool->setThreadNums(threadNums); }
@@ -52,7 +59,7 @@ private:
     EventLoop *_loop;
     std::unique_ptr<Acceptor> _acceptor;
     std::unique_ptr<EventLoopThreadPool> _ioThreadPool;
-    std::map<size_t, TcpConnectionPtr> _connectionMaps;
+    ConnectionMaps _connectionMaps;
     std::unique_ptr<ThreadPool> _threadPool;
     Id _connId;
     ConnectionCallback _connectionCb;

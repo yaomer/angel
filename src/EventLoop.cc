@@ -113,13 +113,11 @@ void EventLoop::doFunctors()
     if (!_functors.empty()) {
         LOG_INFO << "executed " << _functors.size() << " functors";
         std::lock_guard<std::mutex> mlock(_mutex);
-        for (auto& it : _functors) {
-            tfuncs.push_back(std::move(it));
-            _functors.pop_back();
-        }
+        tfuncs.swap(_functors);
+        _functors.clear();
     }
-    for (auto& it : tfuncs)
-        it();
+    for (auto& func : tfuncs)
+        func()
 }
 
 void EventLoop::wakeupInit()

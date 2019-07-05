@@ -20,7 +20,7 @@ public:
         _server.executor([this, n, conn]{ 
                 char s[64];
                 snprintf(s, sizeof(s), "%zu\n", this->fib(n));
-                conn->send(std::move(std::string(s)));
+                conn->send(s);
                 });
         buf.retrieveAll();
     }
