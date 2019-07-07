@@ -11,7 +11,6 @@ public:
     Buffer() : _buf(INIT_SIZE) {  }
     ~Buffer() {  }
     static const size_t INIT_SIZE = 1024;
-    static const char _crlf[];
     char *begin() { return &*_buf.begin(); }
     char *peek() { return begin() + _readindex; }
     size_t prependable() const { return _readindex; }
@@ -60,14 +59,6 @@ public:
             _readindex = _writeindex = 0;
     }
     void retrieveAll() { retrieve(readable()); }
-    // 回退数据
-    void back(size_t len)
-    {
-        if (len < prependable())
-            _readindex -= len;
-        else
-            _readindex = 0;
-    }
     int readFd(int fd);
     void swap(Buffer& _buffer)
     {

@@ -2,8 +2,6 @@
 #include <sys/uio.h>
 #include "Buffer.h"
 
-const char Angel::Buffer::_crlf[] = "\r\n";
-
 // 将fd中的数据读到Buffer中
 int Angel::Buffer::readFd(int fd)
 {

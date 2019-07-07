@@ -71,27 +71,53 @@ public:
         while (buf.readable() >= 1) {
             int lf = buf.findLf();
             if (lf >= 0) {
-                if (strncmp(buf.c_str(), "help\n", 5) == 0) {
-                    conn->send(_help);
+                if (strncmp(buf.c_str(), "help", 4) == 0) {
+                    int i = 4;
+                    while (isspace(buf[i])) {
+                        if (buf[i++] == '\n') {
+                            conn->send(_help);
+                            buf.retrieve(lf + 1);
+                        }
+                    }
                 } else if (strncmp(buf.c_str(), "grp ", 4) == 0) {
                     // broadcast msg to all clients
+                    int i = 4;
+                    while (isspace(buf[i])) {
+                        if (buf[i++] == '\n') {
+                            buf.retrieve(lf + 1);
+                            continue;
+                        }
+                    }
                     for (auto& it : _server.connectionMaps()) {
                         it.second->send(sbuf);
-                        it.second->send(&buf[4], lf + 1 - 4);
+                        it.second->send(&buf[i], lf + 1 - i);
                     }
                 } else if (strncmp(buf.c_str(), "id ", 3) == 0) {
                     // send msg to id
                     int i = 3;
-                    while (isalnum(buf[i]))
-                        i++;
-                    buf[i++] = '\0';
-                    size_t id = atol(&buf[3]);
+                    while (isspace(buf[i])) {
+                        if (buf[i++] == '\n') {
+                            buf.retrieve(lf + 1);
+                            continue;
+                        }
+                    }
+                    int j = i;
+                    while (isalnum(buf[j]))
+                        j++;
+                    buf[j++] = '\0';
+                    size_t id = atol(&buf[j]);
                     curUser->setChatId(id);
+                    while (isspace(buf[j])) {
+                        if (buf[j++] == '\n') {
+                            buf.retrieve(lf + 1);
+                            continue;
+                        }
+                    }
                     auto usr = getUser(id);
                     if (usr) {
                         auto it = _server.getConnection(usr->getConnId());
                         it->send(sbuf);
-                        it->send(&buf[i], lf + 1 - i);
+                        it->send(&buf[j], lf + 1 - j);
                     } else
                         conn->send("The user is gone\n");
                 } else {
