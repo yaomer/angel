@@ -8,7 +8,7 @@ using namespace Angel;
 const char *ChatServer::_help = {
     "usage:\n"
     "-------------------------------------------------------------------------\n"
-    "|id 3 [msg]| send [msg] to [id 3]                                       |\n"
+    "|id num [msg]| send [msg] to [id num]                                   |\n"
     "|grp [msg] | broadcast [msg] to all clients                             |\n"
     "|[msg]     | if ([last-id] is null) echo [msg]; else id [last-id] [msg] |\n"
     "-------------------------------------------------------------------------\n"

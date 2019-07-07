@@ -8,6 +8,7 @@ EventLoopThread::EventLoopThread()
     : _loop(nullptr),
     _thread([this]{ this->threadFunc(); })
 {
+    _thread.detach();
     LOG_INFO << "[EventLoopThread::ctor]";
 }
 
@@ -33,7 +34,6 @@ void EventLoopThread::quit()
 
 void EventLoopThread::threadFunc()
 {
-    _thread.detach();
     EventLoop loop;
     {
         std::lock_guard<std::mutex> mlock(_mutex);

@@ -60,12 +60,27 @@ public:
             _readindex = _writeindex = 0;
     }
     void retrieveAll() { retrieve(readable()); }
+    // 回退数据
+    void back(size_t len)
+    {
+        if (len < prependable())
+            _readindex -= len;
+        else
+            _readindex = 0;
+    }
     int readFd(int fd);
     void swap(Buffer& _buffer)
     {
         _buf.swap(_buffer._buf);
         std::swap(_readindex, _buffer._readindex);
         std::swap(_writeindex, _buffer._writeindex);
+    }
+    void skipSpaceOfStart()
+    {
+        int i = 0;
+        while (i < readable() && isspace(_buf[i]))
+            i++;
+        retrieve(i);
     }
     char& operator[](size_t idx) { return _buf[idx]; }
 private:

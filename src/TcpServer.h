@@ -33,8 +33,14 @@ public:
 
     ConnectionMaps& connectionMaps() { return _connectionMaps; }
     size_t clients() const { return _connId.getIdNums(); };
-    const TcpConnectionPtr& getConnection(size_t id) 
-    { return _connectionMaps.find(id)->second; }
+    TcpConnection *getConnection(size_t id)
+    {
+        auto it = _connectionMaps.find(id);
+        if (it != _connectionMaps.cend())
+            return it->second.get();
+        else
+            return nullptr;
+    }
 
     void setIoThreadNums(size_t threadNums)
     { _ioThreadPool->setThreadNums(threadNums); }
@@ -51,6 +57,8 @@ public:
     { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
     { _messageCb = std::move(_cb); }
+    void setCloseCb(const CloseCallback _cb)
+    { _closeCb = std::move(_cb); }
 private:
     size_t getId() { return _connId.getId(); }
     void putId(size_t id) { _connId.putId(id); }
@@ -64,6 +72,7 @@ private:
     Id _connId;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
+    CloseCallback _closeCb;
 };
 
 }

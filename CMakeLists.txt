@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.1)
 
 set (CMAKE_CXX_FLAGS "-std=c++11 -Wall")
 
+set (LIB_PATH "~/Angel/")
+
 set (CMAKE_DIR /usr/local/share/cmake/Modules)
 
 include (${CMAKE_DIR}/CheckFunctionExists.cmake)
@@ -57,3 +59,5 @@ if (_ANGEL_HAVE_SELECT)
 endif()
 
 add_library (angel STATIC ${SRC_FILES})
+
+set (LIBRARY_OUTPUT_PATH ${LIB_PATH})

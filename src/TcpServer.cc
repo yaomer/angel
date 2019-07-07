@@ -52,6 +52,7 @@ void TcpServer::newConnection(int fd)
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 {
+    if (_closeCb) _closeCb(conn);
     putId(conn->id());
     conn->getLoop()->removeChannel(conn->getChannel());
     _connectionMaps.erase(conn->id());
