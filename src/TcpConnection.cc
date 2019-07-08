@@ -148,3 +148,11 @@ void TcpConnection::send(const char *s, size_t len)
 {
     send(std::move(std::string(s, len)));
 }
+
+void TcpConnection::send(const void *v, size_t len)
+{
+    std::string s(len, 0);
+    const char *vptr = reinterpret_cast<const char*>(v);
+    std::copy(vptr, vptr + len, s.begin());
+    send(std::move(s));
+}

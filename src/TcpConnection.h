@@ -39,6 +39,7 @@ public:
     void send(const char *s);
     void send(const std::string& s);
     void send(const char *s, size_t len);
+    void send(const void *v, size_t len);
     EventLoop *getLoop() { return _loop; }
     ChannelPtr& getChannel() { return _channel; }
     InetAddr& localAddr() { return _localAddr; }

@@ -34,7 +34,8 @@ void TcpClient::newConnection(int fd)
             std::bind(&TcpClient::handleClose, this, _1));
     _conn->setState(TcpConnection::CONNECTED);
     if (_connectionCb)
-        _loop->runInLoop([this]{ this->_connectionCb(this->_conn); });
+        _loop->runInLoop(
+                [this]{ this->_connectionCb(this->_conn); });
 }
 
 void TcpClient::handleClose(const TcpConnectionPtr& conn)
