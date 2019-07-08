@@ -44,10 +44,10 @@ void TcpServer::newConnection(int fd)
     conn->setMessageCb(_messageCb);
     conn->setCloseCb(
             std::bind(&TcpServer::removeConnection, this, _1));
+    _connectionMaps[id] = conn;
     if (_connectionCb)
-        ioLoop->runInLoop([this, conn]{ this->_connectionCb(conn); });
-    _connectionMaps[id] = std::move(conn);
-    LOG_INFO << "[fd:" << fd << "] is connected";
+        ioLoop->runInLoop(
+                [this, conn]{ this->_connectionCb(conn); });
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)

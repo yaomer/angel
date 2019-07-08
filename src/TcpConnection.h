@@ -66,6 +66,9 @@ private:
     void handleError();
     void sendInLoop(const std::string& s);
 
+    static const char *stateStr[];
+    static const char *flagStr[];
+
     size_t _id;
     EventLoop *_loop;
     std::shared_ptr<Channel> _channel;
@@ -75,14 +78,15 @@ private:
     InetAddr _localAddr;
     InetAddr _peerAddr;
     boost::any _context;
-    std::atomic_char _state;
-    std::atomic_char _flag;
+    std::atomic_int8_t _state;
+    std::atomic_int8_t _flag;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     WriteCompleteCallback _writeCompleteCb;
     CloseCallback _closeCb;
     ErrorCallback _errorCb;
 };
+
 }
 
 #endif // _ANGEL_TCPCONNECTION_H

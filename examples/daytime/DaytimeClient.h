@@ -16,7 +16,7 @@ public:
     }
     void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
     {
-        std::cout << buf.c_str() << std::endl;
+        std::cout << buf.c_str();
         buf.retrieveAll();
     }
     void start()

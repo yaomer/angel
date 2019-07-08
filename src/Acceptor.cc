@@ -54,6 +54,7 @@ _again:
         }
         return;
     }
+    LOG_INFO << "[fd:" << connfd << "] is connected";
     if (_newConnectionCb)
         _newConnectionCb(connfd);
     else

@@ -1,6 +1,6 @@
 #include "config.h"
 
-#ifndef _ANGEL_HAVE_SELECT_H
+#ifdef _ANGEL_HAVE_SELECT
 
 #include <sys/select.h>
 #include "EventLoop.h"

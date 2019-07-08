@@ -45,6 +45,8 @@ void TcpConnection::handleRead()
     if (n > 0) {
         if (_messageCb)
             _messageCb(shared_from_this(), _input);
+        else
+            _input.retrieveAll();
     } else if (n == 0) {
         handleClose();
     } else {

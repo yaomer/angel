@@ -16,8 +16,12 @@ public:
     }
     void onConnection(const TcpConnectionPtr& conn)
     {
-        const char *time = TimeStamp::timeStr(TimeStamp::LOCAL_TIME);
-        conn->send(time);
+        struct tm tm;
+        time_t now = time(nullptr);
+        localtime_r(&now, &tm);
+        char buf[64];
+        strftime(buf, sizeof(buf), "%a, %b %d, %Y %X-%Z\n", &tm);
+        conn->send(buf);
         conn->close();
     }
     void start()

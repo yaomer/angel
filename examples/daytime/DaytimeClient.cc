@@ -1,6 +1,9 @@
 #include "DaytimeClient.h"
 #include "../Angel.h"
 
+// daytime协议：详见RFC867
+// 格式：WeekDay, Month Day, Year Time-Zone
+
 using namespace Angel;
 
 int main()
