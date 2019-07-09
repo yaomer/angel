@@ -46,7 +46,7 @@ void Select::change(int fd, int events)
         FD_SET(fd, &_wrset);
 }
 
-void Select::remove(int fd)
+void Select::remove(int fd, int events)
 {
     auto it = _indexs.find(fd);
     size_t end = _fds.size() - 1;

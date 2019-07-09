@@ -58,11 +58,12 @@ void Connector::connected(int sockfd)
 {
     LOG_INFO << "[connfd:" << sockfd << "] is connected";
     _loop->removeChannel(_connectChannel);
-    if (_newConnectionCb)
+    _connectChannel.reset();
+    if (_newConnectionCb) {
         _newConnectionCb(sockfd);
-    else
+        _connected = true;
+    } else
         _loop->quit();
-    _connected = true;
 }
 
 void Connector::timeout()
@@ -85,6 +86,5 @@ void Connector::check(int sockfd)
     if (err) {
         LOG_FATAL << "connect: " << strerr(err);
     }
-    _connectChannel->disableWrite();
     connected(sockfd);
 }

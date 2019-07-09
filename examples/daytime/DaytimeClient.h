@@ -9,7 +9,7 @@ class DaytimeClient {
 public:
     DaytimeClient(EventLoop *loop, InetAddr& inetAddr)
         : _loop(loop),
-        _client(loop, inetAddr)
+        _client(loop, inetAddr, "DaytimeClient")
     {
         _client.setMessageCb(
                 std::bind(&DaytimeClient::onMessage, this, _1, _2));

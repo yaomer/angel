@@ -28,7 +28,7 @@ void Poll::change(int fd, int events)
     evset(*pfd, fd, events);
 }
 
-void Poll::remove(int fd)
+void Poll::remove(int fd, int events)
 {
     auto it = _indexs.find(fd);
     size_t end = _pollfds.size() - 1;

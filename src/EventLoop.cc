@@ -84,7 +84,7 @@ void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 
 void EventLoop::removeChannelInLoop(const ChannelPtr& chl)
 {
-    _poller->remove(chl->fd());
+    _poller->remove(chl->fd(), chl->events());
     _channelMaps.erase(chl->fd());
 }
 
@@ -152,15 +152,14 @@ bool EventLoop::isInLoopThread()
 }
 
 // 在io线程执行用户回调
-void EventLoop::runInLoop(Functor _cb)
+void EventLoop::runInLoop(const Functor _cb)
 {
     if (!isInLoopThread()) {
         std::lock_guard<std::mutex> mlock(_mutex);
         _functors.push_back(std::move(_cb));
         wakeup();
-    } else {
+    } else
         _cb();
-    }
 }
 
 size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)

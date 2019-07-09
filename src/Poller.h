@@ -12,7 +12,8 @@ public:
     virtual int wait(EventLoop *loop, int64_t timeout) = 0;
     virtual void add(int fd, int events) = 0;
     virtual void change(int fd, int events) = 0;
-    virtual void remove(int fd) = 0;
+    // 为remove()添加events参数是出于Kqueue的需要
+    virtual void remove(int fd, int events) = 0;
 };
 }
 

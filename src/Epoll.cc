@@ -29,7 +29,7 @@ void Epoll::add(int fd, int events)
     struct epoll_event ev;
     evset(ev, fd, events);
     if (epoll_ctl(_epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
-        LOG_ERROR << "epoll_ctl: " << strerrno();
+        LOG_ERROR << "[epoll_ctl -> EPOLL_CTL_ADD]: " << strerrno();
     if (++_addFds >= _evListSize) {
         _evListSize *= 2;
         _evList.reserve(_evListSize);
@@ -41,13 +41,13 @@ void Epoll::change(int fd, int events)
     struct epoll_event ev;
     evset(ev, fd, events);
     if (epoll_ctl(_epfd, EPOLL_CTL_MOD, fd, &ev) < 0)
-        LOG_ERROR << "epoll_ctl: " << strerrno();
+        LOG_ERROR << "[epoll_ctl -> EPOLL_CTL_MOD]: " << strerrno();
 }
 
-void Epoll::remove(int fd)
+void Epoll::remove(int fd, int events)
 {
     if (epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL) < 0)
-        LOG_ERROR << "epoll_ctl: " << strerrno();
+        LOG_ERROR << "[epoll_ctl -> EPOLL_CTL_DEL]: " << strerrno();
     _addFds--;
 }
 

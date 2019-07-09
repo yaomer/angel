@@ -23,8 +23,6 @@ public:
     void connected(int fd);
     void timeout();
     void check(int fd);
-    void handleClose();
-    void handleError();
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }
 private:

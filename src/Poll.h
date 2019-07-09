@@ -16,7 +16,7 @@ public:
     int wait(EventLoop *loop, int64_t timeout);
     void add(int fd, int events);
     void change(int fd, int events);
-    void remove(int fd);
+    void remove(int fd, int events);
 private:
     void evset(struct pollfd& ev, int fd, int events);
     int evret(int events);

@@ -64,9 +64,7 @@ void TcpConnection::handleWrite()
             if (_output.readable() == 0) {
                 _channel->disableWrite();
                 clearFlag(SENDING);
-                if (_writeCompleteCb)
-                    _loop->runInLoop(
-                            [this]{ this->_writeCompleteCb(); });
+                if (_writeCompleteCb) _writeCompleteCb();
             }
         } else {
             switch (errno) {
@@ -98,7 +96,6 @@ void TcpConnection::handleClose()
 void TcpConnection::handleError()
 {
     LOG_ERROR << "fd = " << _channel->fd() << " : " << strerrno();
-    handleClose();
 }
 
 void TcpConnection::sendInLoop(const std::string& s)
@@ -113,9 +110,7 @@ void TcpConnection::sendInLoop(const std::string& s)
                 _channel->enableWrite();
             } else {
                 clearFlag(SENDING);
-                if (_writeCompleteCb)
-                    _loop->runInLoop(
-                            [this]{ this->_writeCompleteCb(); });
+                if (_writeCompleteCb) _writeCompleteCb();
             }
         } else {
             switch (errno) {

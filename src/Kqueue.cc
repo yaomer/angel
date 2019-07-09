@@ -27,8 +27,6 @@ Kqueue::~Kqueue()
 
 void Kqueue::add(int fd, int events)
 {
-    if (events == 0)
-        events = Channel::READ;
     change(fd, events);
     if (++_addFds >= _evlistSize) {
         _evlistSize *= 2;
@@ -38,49 +36,46 @@ void Kqueue::add(int fd, int events)
 
 void Kqueue::change(int fd, int events)
 {
-    struct kevent ev[2];
-    int evNums = 0;
-
-    if (events == 0)
-        return;
+    struct kevent kev;
     if (events & Channel::READ) {
-        EV_SET(&ev[0], fd, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, nullptr);
-        evNums++;
+        EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+        if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
+            LOG_ERROR << "[kevent -> EV_ADD]: " << strerrno();
     }
     if (events & Channel::WRITE) {
-        EV_SET(&ev[evNums], fd, EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, nullptr);
-        evNums++;
+        EV_SET(&kev, fd, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
+        if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
+            LOG_ERROR << "[kevent -> EV_ADD]: " << strerrno();
     }
-    if (kevent(_kqfd, ev, evNums, nullptr, 0, nullptr) < 0)
-        LOG_ERROR << "kevent(): " << strerrno();
 }
 
-void Kqueue::remove(int fd)
+void Kqueue::remove(int fd, int events)
 {
-    struct kevent ev[2];
+    struct kevent kev;
     // 删除fd上注册的所有事件，kqueue即会从内核事件列表中移除fd
-    change(fd, Channel::READ | Channel::WRITE);
-    EV_SET(&ev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
-    EV_SET(&ev[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
-    if (kevent(_kqfd, ev, 2, nullptr, 0, nullptr) < 0)
-        LOG_ERROR << "kevent(): " << strerrno();
+    if (events & Channel::READ) {
+        EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+        if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
+            LOG_ERROR << "[kevent -> EV_DELETE]: " << strerrno();
+    }
+    if (events & Channel::WRITE) {
+        EV_SET(&kev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
+        if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
+            LOG_ERROR << "[kevent -> EV_DELETE]: " << strerrno();
+    }
     _addFds--;
 }
 
 int Kqueue::wait(EventLoop *loop, int64_t timeout)
 {
     struct timespec tsp;
-    int nevents;
 
     if (timeout > 0) {
         tsp.tv_sec = timeout / 1000;
         tsp.tv_nsec = (timeout % 1000) * 1000 * 1000;
-        nevents = kevent(_kqfd, nullptr, 0, &_evlist[0], _evlist.capacity(), &tsp);
-    } else {
-        // 此时kqueue将会一直阻塞直到有事件发生
-        // 如果tsp.tv_sec = 0 && tsp.tv_nsec = 0则kqueue会立刻返回
-        nevents = kevent(_kqfd, nullptr, 0, &_evlist[0], _evlist.capacity(), nullptr);
     }
+    int nevents = kevent(_kqfd, nullptr, 0, &_evlist[0], _evlist.capacity(),
+            timeout > 0 ? &tsp : nullptr);
 
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {

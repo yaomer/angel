@@ -16,7 +16,7 @@ public:
     int wait(EventLoop *loop, int64_t timeout);
     void add(int fd, int events);
     void change(int fd, int events);
-    void remove(int fd);
+    void remove(int fd, int events);
 private:
     static const int _INIT_FDS_SIZE = 64;
 

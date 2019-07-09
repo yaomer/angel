@@ -17,7 +17,7 @@ public:
     int wait(EventLoop *loop, int64_t timeout);
     void add(int fd, int events)
     void change(int fd, int events)
-    void remove(int fd)
+    void remove(int fd, int events)
     const int _INIT_EVLIST_SIZE = 64;
 private:
     void evset(struct epoll_event& ev, int fd, int events);

@@ -38,7 +38,7 @@ namespace Angel {
 Logger::Logger()
     : _thread(std::thread([this]{ this->flushToFile(); })),
     _quit(false),
-    _flag(FLUSH_TO_FILE),
+    _flag(FLUSH_TO_STDOUT),
     _fd(-1),
     _filesize(0)
 {
@@ -71,7 +71,7 @@ void Logger::creatFile()
     if (_fd < 0) {
         fprintf(stderr, "can't open %s: %s", _filename.c_str(),
                 strerrno());
-        abort();
+        exit(1);
     }
     struct stat st;
     if (fstat(_fd, &st) < 0)
@@ -117,7 +117,7 @@ void Logger::flushToFile()
             if (_quit) {
                 _writeBuf.swap(_flushBuf);
                 writeToFile();
-                abort();
+                exit(1);
             }
             if (_writeBuf.readable() > 0)
                 _writeBuf.swap(_flushBuf);
