@@ -19,7 +19,7 @@ public:
     void append(const char *data, size_t len)
     {
         makeSpace(len);
-        _buf.insert(_buf.begin() + _writeindex, data, data + len);
+        std::copy(data, data + len, _buf.begin() + _writeindex);
         _writeindex += len;
     }
     // 内部腾挪
@@ -31,7 +31,8 @@ public:
             std::copy(peek(), peek() + readn, begin());
             _readindex = 0;
             _writeindex = _readindex + readn;
-        }
+        } else
+            _buf.reserve(_writeindex + len);
     }
     // 返回C风格字符串
     const char *c_str() 
