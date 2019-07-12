@@ -19,12 +19,12 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     SockOps::setnonblock(_socket.fd());
     SockOps::bind(_socket.fd(), &_inetAddr.inetAddr());
     _acceptChannel->setFd(_socket.fd());
-    LOG_INFO << "[Acceptor::ctor], listenfd = " << _socket.fd();
+    logInfo("[Acceptor::ctor, listenfd:%d]", _socket.fd());
 }
 
 Acceptor::~Acceptor()
 {
-    LOG_INFO << "[Acceptor::dtor]";
+    logInfo("[Acceptor::dtor]");
 }
 
 void Acceptor::listen()
@@ -46,15 +46,15 @@ _again:
         case EWOULDBLOCK: // BSD
         case EPROTO: // SVR4
         case ECONNABORTED: // POSIX
-            LOG_WARN << "accept(): " << strerrno();
+            logWarn("accept: %s", strerrno());
             break;
         default:
-            LOG_ERROR << "accept(): " << strerrno();
+            logError("accept: %s", strerrno());
             break;
         }
         return;
     }
-    LOG_INFO << "[fd:" << connfd << "] is connected";
+    logInfo("[fd:%d is connected]", connfd);
     if (_newConnectionCb)
         _newConnectionCb(connfd);
     else

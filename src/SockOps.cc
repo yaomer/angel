@@ -15,20 +15,20 @@ int SockOps::socket()
 {
     int sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
-        LOG_FATAL << "socket(): " << strerrno();
+        logFatal("socket: %s", strerrno());
     return sockfd;
 }
 
 void SockOps::bind(int sockfd, struct sockaddr_in *addr)
 {
     if (::bind(sockfd, sockaddr_cast(addr), sizeof(*addr)) < 0)
-        LOG_FATAL << "bind(): " << strerrno();
+        logFatal("bind: %s", strerrno());
 }
 
 void SockOps::listen(int sockfd)
 {
     if (::listen(sockfd, 1024) < 0)
-        LOG_FATAL << "listen(): " << strerrno();
+        logFatal("listen: %s", strerrno());
 }
 
 int SockOps::accept(int sockfd)
@@ -54,7 +54,7 @@ void SockOps::setnonblock(int sockfd)
 void SockOps::socketpair(int sockfd[])
 {
     if (::socketpair(AF_LOCAL, SOCK_STREAM, 0, sockfd) < 0)
-        LOG_FATAL << "socketpair(): " << strerrno();
+        logFatal("socketpair: %s", strerrno());
 }
 
 struct sockaddr_in SockOps::getLocalAddr(int sockfd)
@@ -63,7 +63,7 @@ struct sockaddr_in SockOps::getLocalAddr(int sockfd)
     bzero(&localAddr, sizeof(localAddr));
     socklen_t len = static_cast<socklen_t>(sizeof(localAddr));
     if (::getsockname(sockfd, sockaddr_cast(&localAddr), &len) < 0)
-        LOG_FATAL << "getsockname(): " << strerrno();
+        logError("getsockname: %s", strerrno());
     return localAddr;
 }
 
@@ -73,7 +73,7 @@ struct sockaddr_in SockOps::getPeerAddr(int sockfd)
     bzero(&peerAddr, sizeof(peerAddr));
     socklen_t len = static_cast<socklen_t>(sizeof(peerAddr));
     if (::getpeername(sockfd, sockaddr_cast(&peerAddr), &len) < 0)
-        LOG_FATAL << "getpeername(): " << strerrno();
+        logError("getpeername: %s", strerrno());
     return peerAddr;
 }
 
@@ -82,7 +82,7 @@ int SockOps::getSocketError(int sockfd)
     socklen_t err;
     socklen_t len = sizeof(err);
     if (::getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &err, &len) < 0)
-        LOG_FATAL << "getsockopt(): " << strerrno();
+        logError("[getsockopt -> SO_ERROR]: %s", strerrno());
     return static_cast<int>(err);
 }
 
@@ -99,6 +99,6 @@ namespace Angel {
 const char *SockOps::toHostIpAddr(struct in_addr *addr)
 {
     if (inet_ntop(AF_INET, addr, _ipaddr, sizeof(_ipaddr)) == nullptr)
-        LOG_FATAL << "inet_ntop(): " << strerrno();
+        logError("inet_ntop: %s", strerrno());
     return _ipaddr;
 }

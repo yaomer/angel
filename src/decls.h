@@ -17,7 +17,7 @@ typedef std::weak_ptr<TcpConnection> WeakTcpConnectionPtr;
 typedef std::function<void(const TcpConnectionPtr&)> ConnectionCallback;
 typedef std::function<void(const TcpConnectionPtr&, Buffer&)> MessageCallback;
 typedef std::function<void(const TcpConnectionPtr&)> CloseCallback;
-typedef std::function<void()> WriteCompleteCallback;
+typedef std::function<void(const TcpConnectionPtr&)> WriteCompleteCallback;
 typedef std::function<void()> ErrorCallback;
 // for Acceptor and Connector
 typedef std::function<void(int)> NewConnectionCallback;

@@ -32,7 +32,8 @@ __thread EventLoop *_thisThreadLoop = nullptr;
 
 EventLoop::EventLoop()
     : _timer(new Timer),
-    _quit(false)
+    _quit(false),
+    _nloops(0)
 {
 #if defined (_ANGEL_HAVE_EPOLL)
     _poller.reset(new Epoll);
@@ -43,10 +44,10 @@ EventLoop::EventLoop()
 #elif defined (_ANGEL_HAVE_SELECT)
     _poller.reset(new Select);
 #else
-    LOG_FATAL << "No supported I/O multiplexing";
+    logFatal("No supported I/O multiplexing");
 #endif
     if (_thisThreadLoop) {
-        LOG_FATAL << "Only have one EventLoop in this thread";
+        logFatal("Only have one EventLoop in this thread");
     } else
         _thisThreadLoop = this;
     _tid = std::this_thread::get_id();
@@ -56,12 +57,12 @@ EventLoop::EventLoop()
         _signaler.reset(new Signaler(this));
         __signalerPtr = _signaler.get();
     }
-    LOG_INFO << "[EventLoop::ctor]";
+    logInfo("[EventLoop::ctor]");
 }
 
 EventLoop::~EventLoop()
 {
-    LOG_INFO << "[EventLoop::dtor]";
+    logInfo("[EventLoop::dtor]");
 }
 
 void EventLoop::addChannel(const ChannelPtr& chl)
@@ -95,7 +96,7 @@ void EventLoop::run()
     while (!_quit) {
         int nevents = _poller->wait(this, _timer->timeout());
         if (nevents > 0) {
-            LOG_DEBUG << "[nevents = " << nevents << "]";
+            logDebug("nevents = %d", nevents);
             for (auto& it : _activeChannels) {
                 it->handleEvent();
             }
@@ -104,6 +105,7 @@ void EventLoop::run()
             _timer->tick();
         }
         doFunctors();
+        _nloops++;
     }
 }
 
@@ -111,7 +113,7 @@ void EventLoop::doFunctors()
 {
     std::vector<Functor> tfuncs;
     if (!_functors.empty()) {
-        LOG_INFO << "executed " << _functors.size() << " functors";
+        logDebug("executed %zu functors", _functors.size());
         std::lock_guard<std::mutex> mlock(_mutex);
         tfuncs.swap(_functors);
         _functors.clear();
@@ -134,7 +136,7 @@ void EventLoop::wakeup()
     uint64_t one = 1;
     ssize_t n = write(_wakeFd[1], &one, sizeof(one));
     if (n != sizeof(one))
-        LOG_ERROR << "write " << n << " bytes instead of 8";
+        logError("write %zd bytes instead of 8");
 }
 
 void EventLoop::handleRead()
@@ -142,7 +144,7 @@ void EventLoop::handleRead()
     uint64_t one;
     ssize_t n = read(_wakeFd[0], &one, sizeof(one));
     if (n != sizeof(one))
-        LOG_ERROR << "read " << n << " bytes instead of 8";
+        logError("read %zd bytes instead of 8");
 }
 
 // 判断当前线程是否是io线程
@@ -162,12 +164,18 @@ void EventLoop::runInLoop(const Functor _cb)
         _cb();
 }
 
+void EventLoop::queueInLoop(const Functor _cb)
+{
+    std::lock_guard<std::mutex> mlock(_mutex);
+    _functors.push_back(std::move(_cb));
+    wakeup();
+}
+
 size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(timeout, 0, std::move(_cb));
     size_t id = _timer->addTask(task);
-    LOG_INFO << "Added a TimerTask after [" << timeout << " ms]"
-             << ", timerId = " << id;
+    logInfo("Add a TimerTask after %zd ms, timerId = %zu", timeout, id);
     return id;
 }
 
@@ -175,13 +183,12 @@ size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
     TimerTask *task = new TimerTask(interval, interval, std::move(_cb));
     size_t id = _timer->addTask(task);
-    LOG_INFO << "Added a TimerTask every [" << interval << " ms]"
-             << ", timerId = " << id;
+    logInfo("Add a TimerTask every %zd ms, timerId = %zu", interval, id);
     return id;
 }
 
 void EventLoop::cancelTimer(size_t id)
 {
-    LOG_INFO << "Canceled a TimerTask, timerId = " << id;
+    logInfo("Cancel a TimerTask, timerId = %zu", id);
     _timer->cancelTask(id);
 }

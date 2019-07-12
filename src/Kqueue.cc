@@ -40,12 +40,12 @@ void Kqueue::change(int fd, int events)
     if (events & Channel::READ) {
         EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
         if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            LOG_ERROR << "[kevent -> EV_ADD]: " << strerrno();
+            logError("[kevent -> EV_ADD]: %s", strerrno());
     }
     if (events & Channel::WRITE) {
         EV_SET(&kev, fd, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
         if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            LOG_ERROR << "[kevent -> EV_ADD]: " << strerrno();
+            logError("[kevent -> EV_ADD]: %s", strerrno());
     }
 }
 
@@ -56,12 +56,12 @@ void Kqueue::remove(int fd, int events)
     if (events & Channel::READ) {
         EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
         if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            LOG_ERROR << "[kevent -> EV_DELETE]: " << strerrno();
+            logError("[kevent -> EV_DELETE]: %s", strerrno());
     }
     if (events & Channel::WRITE) {
         EV_SET(&kev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
         if (kevent(_kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            LOG_ERROR << "[kevent -> EV_DELETE]: " << strerrno();
+            logError("[kevent -> EV_DELETE]: %s", strerrno());
     }
     _addFds--;
 }

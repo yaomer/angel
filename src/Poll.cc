@@ -53,7 +53,7 @@ int Poll::wait(EventLoop *loop, int64_t timeout)
         }
     } else if (nevents < 0) {
         if (errno != EINTR)
-            LOG_ERROR << "poll(): " << strerrno();
+            logError("poll: %s", strerrno());
     }
     return ret;
 }

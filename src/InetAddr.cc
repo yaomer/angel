@@ -25,7 +25,7 @@ InetAddr::InetAddr(int port, const char *addr)
     _sockaddr.sin_family = AF_INET;
     _sockaddr.sin_port = htons(port);
     if (inet_pton(AF_INET, addr, &_sockaddr.sin_addr) <= 0)
-        LOG_FATAL << "inet_pton error: " << strerrno();
+        logFatal("inet_pton: %s", strerrno());
 }
 
 InetAddr::InetAddr(struct sockaddr_in addr)

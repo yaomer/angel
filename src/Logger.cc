@@ -36,19 +36,19 @@ namespace Angel {
 }
 
 Logger::Logger()
-    : _thread(std::thread([this]{ this->flushToFile(); })),
+    : _thread(std::thread([this]{ this->threadFunc(); })),
     _quit(false),
-    _flag(FLUSH_TO_STDOUT),
+    _flag(FLUSH_TO_FILE),
     _fd(-1),
     _filesize(0)
 {
     mkdir(".log", 0777);
-    LOG_INFO << "[Logger::ctor]";
+    logInfo("[Logger::ctor]");
 }
 
 Logger::~Logger()
 {
-    LOG_INFO << "[Logger::dtor]";
+    logInfo("[Logger::dtor]");
     quit();
 }
 
@@ -92,20 +92,20 @@ void Logger::setFlush()
     switch (_flag) {
     case FLUSH_TO_FILE:
         creatFile();
-        LOG_INFO << "write logger to file";
+        logInfo("write logger to file");
         break;
     case FLUSH_TO_STDOUT:
         _fd = STDOUT_FILENO;
-        LOG_INFO << "write logger to stdout";
+        logInfo("write logger to stdout");
         break;
     case FLUSH_TO_STDERR:
         _fd = STDERR_FILENO;
-        LOG_INFO << "write logger to stderr";
+        logInfo("write logger to stderr");
         break;
     }
 }
 
-void Logger::flushToFile()
+void Logger::threadFunc()
 {
     setFlush();
     _thread.detach();
@@ -116,49 +116,31 @@ void Logger::flushToFile()
                 _condVar.wait_for(mlock, std::chrono::seconds(1));
             if (_quit) {
                 _writeBuf.swap(_flushBuf);
-                writeToFile();
+                flush();
                 exit(1);
             }
             if (_writeBuf.readable() > 0)
                 _writeBuf.swap(_flushBuf);
         }
         if (_flushBuf.readable() > 0)
-            writeToFile();
+            flush();
     }
 }
 
-void Logger::writeToFile()
+void Logger::flush()
 {
-    while (1) {
-        // 一般情况下，一次肯定能写完
-        ssize_t n = write(_fd, _flushBuf.peek(), _flushBuf.readable());
-        if (n < 0) {
-            LOG_ERROR << "write error: " << strerrno();
-            _flushBuf.retrieveAll();
-            return;
-        }
-        _flushBuf.retrieve(n);
-        _filesize += n;
-        if (_flushBuf.readable() == 0)
-            break;
-    }
+    write(_fd, _flushBuf.peek(), _flushBuf.readable());
+    _flushBuf.retrieveAll();
     if (_flag == FLUSH_TO_FILE)
         rollFile();
 }
 
-// 线程不安全
-void Logger::writeToBufferUnlocked(const std::string& s)
-{
-    _writeBuf.append(s.data(), s.size());
-    if (_writeBuf.readable() > _writeBufMaxSize)
-        wakeup();
-}
-
-// 线程安全
-void Logger::writeToBuffer(const std::string& s)
+void Logger::writeToBuffer(const char *s, size_t len)
 {
     std::lock_guard<std::mutex> mlock(_mutex);
-    writeToBufferUnlocked(s);
+    _writeBuf.append(s, len);
+    if (_writeBuf.readable() > _writeBufMaxSize)
+        wakeup();
 }
 
 void Logger::wakeup()

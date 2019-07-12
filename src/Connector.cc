@@ -16,13 +16,14 @@ Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
     _connected(false),
     _waitTime(2)
 {
-    LOG_INFO << "[Connector::ctor] -> [" << _peerAddr.toIpAddr() << ":"
-             << _peerAddr.toIpPort() << "]";
+    logInfo("[Connector::ctor] -> [%s:%d]", _peerAddr.toIpAddr(),
+            _peerAddr.toIpPort());
 }
 
 Connector::~Connector()
 {
-    LOG_INFO << "[Connector::dtor]";
+    logInfo("[Connector::dtor] -> [%s:%d]", _peerAddr.toIpAddr(),
+            _peerAddr.toIpPort());
 }
 
 void Connector::connect()
@@ -45,7 +46,7 @@ void Connector::connect()
 
 void Connector::connecting(int sockfd)
 {
-    LOG_INFO << "[connfd:" << sockfd << "] is connecting";
+    logInfo("[connfd:%d] is connecting", sockfd);
     _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
     _connectChannel->setEventReadCb(
             [this, sockfd]{ this->check(sockfd); });
@@ -56,7 +57,7 @@ void Connector::connecting(int sockfd)
 
 void Connector::connected(int sockfd)
 {
-    LOG_INFO << "[connfd:" << sockfd << "] is connected";
+    logInfo("[connfd:%d] is connected", sockfd);
     _loop->removeChannel(_connectChannel);
     _connectChannel.reset();
     if (_newConnectionCb) {
@@ -70,8 +71,8 @@ void Connector::timeout()
 {
     if (!_connected) {
         if (_waitTime == _waitMaxTime)
-            LOG_FATAL << "connect timeout: " << _waitAllTime << " s";
-        LOG_INFO << "connect: waited " << _waitTime << " s";
+            logFatal("connect timeout: %d s", _waitAllTime);
+        logInfo("connect: waited %d s", _waitTime);
         _waitTime *= 2;
         _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
     }
@@ -84,7 +85,7 @@ void Connector::check(int sockfd)
 {
     int err = SockOps::getSocketError(sockfd);
     if (err) {
-        LOG_FATAL << "connect: " << strerr(err);
+        logFatal("connect: %s", strerr(err));
     }
     connected(sockfd);
 }

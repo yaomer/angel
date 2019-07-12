@@ -20,12 +20,12 @@ TimerTask::~TimerTask()
 
 Timer::Timer()
 {
-    LOG_INFO << "[Timer::ctor]";
+    logInfo("[Timer::ctor]");
 }
 
 Timer::~Timer()
 {
-    LOG_INFO << "[Timer::dtor]";
+    logInfo("[Timer::dtor]");
 }
 
 // Add a TimerTask is Log(n)

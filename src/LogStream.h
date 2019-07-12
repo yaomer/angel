@@ -9,8 +9,8 @@ namespace Angel {
 
 class LogStream {
 public:
-    LogStream(int level, const char *file, int line, const char *func);
-    ~LogStream();
+    // LogStream(int level, const char *file, int line, const char *func);
+    // ~LogStream();
     enum LEVEL {
         DEBUG,
         INFO,
@@ -19,26 +19,29 @@ public:
         FATAL,
         LEVEL_NUMS,
     };
-    LogStream& operator<<(const char *s);
-    LogStream& operator<<(const std::string& s);
-    LogStream& operator<<(char v);
-    LogStream& operator<<(short v);
-    LogStream& operator<<(unsigned short v);
-    LogStream& operator<<(int v);
-    LogStream& operator<<(unsigned int v);
-    LogStream& operator<<(long v);
-    LogStream& operator<<(unsigned long v);
-    LogStream& operator<<(long long v);
-    LogStream& operator<<(unsigned long long v);
-    LogStream& operator<<(float v);
-    LogStream& operator<<(double v);
+    // LogStream& operator<<(const char *s);
+    // LogStream& operator<<(const std::string& s);
+    // LogStream& operator<<(char v);
+    // LogStream& operator<<(short v);
+    // LogStream& operator<<(unsigned short v);
+    // LogStream& operator<<(int v);
+    // LogStream& operator<<(unsigned int v);
+    // LogStream& operator<<(long v);
+    // LogStream& operator<<(unsigned long v);
+    // LogStream& operator<<(long long v);
+    // LogStream& operator<<(unsigned long long v);
+    // LogStream& operator<<(float v);
+    // LogStream& operator<<(double v);
 private:
-    Buffer _buffer;
-    int _level;
-    const char *_file;
-    int _line;
-    const char *_func;
+    // Buffer _buffer;
+    // int _level;
+    // const char *_file;
+    // int _line;
+    // const char *_func;
 };
+
+void output(int level, const char *file, int line,
+        const char *func, const char *fmt, ...);
 
 extern int __loggerLevel;
 
@@ -51,24 +54,42 @@ const char *getThreadIdStr();
 
 }
 
+// c printf()风格的日志
+#define logDebug(...) \
+    if (Angel::LogStream::DEBUG >= Angel::__loggerLevel) \
+        Angel::output(Angel::LogStream::DEBUG, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define logInfo(...) \
+    if (Angel::LogStream::INFO >= Angel::__loggerLevel) \
+        Angel::output(Angel::LogStream::INFO, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define logWarn(...) \
+    if (Angel::LogStream::WARN >= Angel::__loggerLevel) \
+        Angel::output(Angel::LogStream::WARN, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define logError(...) \
+    if (Angel::LogStream::ERROR >= Angel::__loggerLevel) \
+        Angel::output(Angel::LogStream::ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define logFatal(...) \
+    if (Angel::LogStream::FATAL >= Angel::__loggerLevel) \
+        Angel::output(Angel::LogStream::FATAL, __FILE__, __LINE__, __func__, __VA_ARGS__)
+
 // 每次调用LOG_XXX都会构造一个匿名LogStream对象，该对象只在
 // 此次调用中有效，从而保证了线程安全
 // 当此次调用结束时，它就会被析构，所写的数据会被写入到Logger中，
 // Logger则会在合适的时机将数据flush到文件中
-#define LOG_DEBUG \
-    if (Angel::LogStream::DEBUG >= Angel::__loggerLevel) \
-        Angel::LogStream(Angel::LogStream::DEBUG, __FILE__, __LINE__, __func__)
-#define LOG_INFO \
-    if (Angel::LogStream::INFO >= Angel::__loggerLevel) \
-        Angel::LogStream(Angel::LogStream::INFO, __FILE__, __LINE__, __func__)
-#define LOG_WARN \
-    if (Angel::LogStream::WARN >= Angel::__loggerLevel) \
-        Angel::LogStream(Angel::LogStream::WARN, __FILE__, __LINE__, __func__)
-#define LOG_ERROR \
-    if (Angel::LogStream::ERROR >= Angel::__loggerLevel) \
-        Angel::LogStream(Angel::LogStream::ERROR, __FILE__, __LINE__, __func__)
-#define LOG_FATAL \
-    if (Angel::LogStream::FATAL >= Angel::__loggerLevel) \
-        Angel::LogStream(Angel::LogStream::FATAL, __FILE__, __LINE__, __func__)
+// c++ cout风格的日志
+// #define LOG_DEBUG \
+//     if (Angel::LogStream::DEBUG >= Angel::__loggerLevel) \
+//         Angel::LogStream(Angel::LogStream::DEBUG, __FILE__, __LINE__, __func__)
+// #define LOG_INFO \
+//     if (Angel::LogStream::INFO >= Angel::__loggerLevel) \
+//         Angel::LogStream(Angel::LogStream::INFO, __FILE__, __LINE__, __func__)
+// #define LOG_WARN \
+//     if (Angel::LogStream::WARN >= Angel::__loggerLevel) \
+//         Angel::LogStream(Angel::LogStream::WARN, __FILE__, __LINE__, __func__)
+// #define LOG_ERROR \
+//     if (Angel::LogStream::ERROR >= Angel::__loggerLevel) \
+//         Angel::LogStream(Angel::LogStream::ERROR, __FILE__, __LINE__, __func__)
+// #define LOG_FATAL \
+//     if (Angel::LogStream::FATAL >= Angel::__loggerLevel) \
+//         Angel::LogStream(Angel::LogStream::FATAL, __FILE__, __LINE__, __func__)
 
 #endif // _ANGEL_LOGSTREAM_H

@@ -38,6 +38,7 @@ public:
     void wakeup();
     bool isInLoopThread();
     void runInLoop(const Functor _cb);
+    void queueInLoop(const Functor _cb);
     size_t runAfter(int64_t timeout, const TimerCallback _cb);
     size_t runEvery(int64_t interval, const TimerCallback _cb);
     void cancelTimer(size_t id);
@@ -60,6 +61,7 @@ private:
     std::mutex _mutex;
     int _wakeFd[2];
     std::__thread_id _tid;
+    size_t _nloops;
 };
 
 } // Angel

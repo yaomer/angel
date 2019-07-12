@@ -10,18 +10,17 @@ EventLoopThreadPool::EventLoopThreadPool()
     : _threadNums(0),
     _nextIndex(0)
 {
-    LOG_INFO << "[EventLoopThreadPool::ctor]";
+    logInfo("[EventLoopThreadPool::ctor]");
 }
 
 EventLoopThreadPool::~EventLoopThreadPool()
 {
-    LOG_INFO << "[EventLoopThreadPool::dtor]";
+    logInfo("[EventLoopThreadPool::dtor]");
 }
 
 void EventLoopThreadPool::setThreadNums(size_t threadNums)
 {
-    LOG_INFO << "[EventLoopThreadPool::Started "
-             << threadNums << " threads]";
+    logInfo("[EventLoopThreadPool::started %zu threads]", threadNums);
     _threadNums = threadNums;
     start();
 }

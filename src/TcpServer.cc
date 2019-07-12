@@ -17,12 +17,12 @@ TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
 {
     _acceptor->setNewConnectionCb(
             std::bind(&TcpServer::newConnection, this, _1));
-    LOG_INFO << "[TcpServer::ctor]";
+    logInfo("[TcpServer::ctor]");
 }
 
 TcpServer::~TcpServer()
 {
-    LOG_INFO << "[TcpServer::dtor]";
+    logInfo("[TcpServer::dtor]");
 }
 
 EventLoop *TcpServer::getNextLoop()
@@ -42,6 +42,7 @@ void TcpServer::newConnection(int fd)
     TcpConnectionPtr conn(new TcpConnection(id, ioLoop, fd, localAddr, peerAddr));
     conn->setState(TcpConnection::CONNECTED);
     conn->setMessageCb(_messageCb);
+    conn->setWriteCompleteCb(_writeCompleteCb);
     conn->setCloseCb(
             std::bind(&TcpServer::removeConnection, this, _1));
     _connectionMaps[id] = conn;
@@ -53,6 +54,7 @@ void TcpServer::newConnection(int fd)
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 {
     if (_closeCb) _closeCb(conn);
+    conn->setState(TcpConnection::CLOSED);
     putId(conn->id());
     conn->getLoop()->removeChannel(conn->getChannel());
     _connectionMaps.erase(conn->id());
@@ -66,5 +68,4 @@ void TcpServer::start()
 void TcpServer::quit()
 {
     _loop->quit();
-    _loop->wakeup();
 }

@@ -24,7 +24,9 @@ public:
     ~Channel();
     int fd() const { return _fd; }
     int events() const { return _events; }
+    const char *evstr();
     int revents() const { return _revents; }
+    const char *revstr();
     void setFd(int fd) { _fd = fd; }
     void setRevents(int revents) { _revents = revents; }
     bool isReading() { return _events & READ; }

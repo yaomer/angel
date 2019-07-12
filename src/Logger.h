@@ -22,17 +22,16 @@ public:
         FLUSH_TO_STDERR,
     };
     const size_t _writeBufMaxSize = 1024 * 1024;
-    void writeToBuffer(const std::string& s);
-    void writeToBufferUnlocked(const std::string& s);
+    void writeToBuffer(const char *s, size_t len);
     void wakeup();
     void quit()
     { _quit = true; wakeup(); }
     static void flushToStdout();
     static void flushToStderr();
 private:
-    void writeToFile();
+    void flush();
     void setFlush();
-    void flushToFile();
+    void threadFunc();
     void setFilename();
     void creatFile();
     void rollFile();

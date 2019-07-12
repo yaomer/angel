@@ -21,7 +21,7 @@ namespace Angel {
 const char *TimeStamp::timeStr(int option)
 {
     struct tm tm;
-    int64_t ms = now();
+    long long ms = now();
     time_t seconds = ms / 1000;
 
     gmtime_r(&seconds, &tm);

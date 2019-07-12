@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.1)
 
-set (CMAKE_CXX_FLAGS "-std=c++11 -Wall")
+set (CMAKE_CXX_FLAGS "-std=c++11 -Wall -O2")
 
 set (LIB_PATH "~/Angel/")
 

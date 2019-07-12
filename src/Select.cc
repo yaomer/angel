@@ -93,7 +93,7 @@ int Select::wait(EventLoop *loop, int64_t timeout)
         }
     } else if (nevents < 0) {
         if (errno != EINTR)
-            LOG_ERROR << "select(): " << strerrno();
+            logError("select: %s", strerrno());
     }
     return rets;
 }

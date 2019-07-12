@@ -59,6 +59,8 @@ public:
     { _messageCb = std::move(_cb); }
     void setCloseCb(const CloseCallback _cb)
     { _closeCb = std::move(_cb); }
+    void setWriteCompleteCb(const WriteCompleteCallback _cb)
+    { _writeCompleteCb = std::move(_cb); }
 private:
     size_t getId() { return _connId.getId(); }
     void putId(size_t id) { _connId.putId(id); }
@@ -73,6 +75,7 @@ private:
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     CloseCallback _closeCb;
+    WriteCompleteCallback _writeCompleteCb;
 };
 
 }

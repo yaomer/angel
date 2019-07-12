@@ -29,7 +29,7 @@ void Epoll::add(int fd, int events)
     struct epoll_event ev;
     evset(ev, fd, events);
     if (epoll_ctl(_epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
-        LOG_ERROR << "[epoll_ctl -> EPOLL_CTL_ADD]: " << strerrno();
+        logError("[epoll_ctl -> EPOLL_CTL_ADD]: %s", strerrno());
     if (++_addFds >= _evListSize) {
         _evListSize *= 2;
         _evList.reserve(_evListSize);
@@ -41,13 +41,13 @@ void Epoll::change(int fd, int events)
     struct epoll_event ev;
     evset(ev, fd, events);
     if (epoll_ctl(_epfd, EPOLL_CTL_MOD, fd, &ev) < 0)
-        LOG_ERROR << "[epoll_ctl -> EPOLL_CTL_MOD]: " << strerrno();
+        logError("[epoll_ctl -> EPOLL_CTL_MOD]: %s", strerrno());
 }
 
 void Epoll::remove(int fd, int events)
 {
     if (epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL) < 0)
-        LOG_ERROR << "[epoll_ctl -> EPOLL_CTL_DEL]: " << strerrno();
+        logError("[epoll_ctl -> EPOLL_CTL_DEL]: %s", strerrno());
     _addFds--;
 }
 
@@ -62,7 +62,7 @@ int Epoll::wait(EventLoop *loop, int64_t timeout)
         }
     } else if (nevents < 0) {
         if (errno != EINTR)
-            LOG_ERROR << "epoll_wait(): " << strerrno();
+            logError("epoll_wait: %s", strerrno());
     }
     return nevents;
 }

@@ -24,38 +24,42 @@ Channel::Channel(EventLoop *loop)
     _events(0),
     _revents(0)
 {
-    LOG_INFO << "[Channel::ctor]";
+    logInfo("[Channel::ctor]");
 }
 
 Channel::~Channel()
 {
-    LOG_INFO << "[Channel::dtor]";
+    logInfo("[Channel::dtor]");
+}
+
+const char *Channel::evstr()
+{
+    return eventStr[_events];
+}
+
+const char *Channel::revstr()
+{
+    return eventStr[_revents];
 }
 
 void Channel::enableRead()
 {
-    int evbef = _events;
     _events |= READ;
-    LOG_DEBUG << "[fd:" << fd() << "]" << " events is [" << eventStr[evbef]
-              << " -> " << eventStr[_events] << "]";
+    logInfo("[fd:%d] enable READ", fd());
 }
 
 void Channel::enableWrite()
 {
-    int evbef = _events;
     _events |= WRITE;
     changeEvents();
-    LOG_DEBUG << "[fd:" << fd() << "]" << " events is [" << eventStr[evbef]
-              << " -> " << eventStr[_events] << "]";
+    logInfo("[fd:%d] enable WRITE", fd());
 }
 
 void Channel::disableWrite()
 {
-    int evbef = _events;
     _events &= ~WRITE;
     changeEvents();
-    LOG_DEBUG << "[fd:" << fd() << "]" << " events is [" << eventStr[evbef]
-              << " -> " << eventStr[_events] << "]";
+    logInfo("[fd:%d] disable WRITE", fd());
 }
 
 void Channel::changeEvents()
@@ -65,8 +69,7 @@ void Channel::changeEvents()
 
 void Channel::handleEvent()
 {
-    LOG_DEBUG << "[fd:" << fd() << "]" << " revents is ["
-              << eventStr[revents()] << "]";
+    logInfo("[fd:%d] revents is [%s]", fd(), revstr());
     if (revents() & ERROR)
         if (_errorCb) _errorCb();
     if (revents() & READ)
