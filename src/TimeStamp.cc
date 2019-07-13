@@ -14,7 +14,7 @@ int64_t TimeStamp::now()
 
 namespace Angel {
 
-    __thread char _timestr_buf[32];
+    thread_local char _timestr_buf[32];
 }
 
 // len >= 25

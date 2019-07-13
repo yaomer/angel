@@ -54,6 +54,7 @@ void TcpServer::newConnection(int fd)
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 {
     if (_closeCb) _closeCb(conn);
+    logInfo("[fd:%d] is closed", conn->getChannel()->fd());
     conn->setState(TcpConnection::CLOSED);
     putId(conn->id());
     conn->getLoop()->removeChannel(conn->getChannel());
@@ -62,6 +63,9 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 
 void TcpServer::start()
 {
+    // 必须忽略SIGPIPE信号，不然当向一个已关闭的连接发送消息时，
+    // 会导致服务端意外退出
+    addSignal(SIGPIPE, nullptr);
     _acceptor->listen();
 }
 

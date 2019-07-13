@@ -32,9 +32,6 @@ public:
         CLOSING,
         CLOSED,
     };
-    enum Flag {
-        SENDING = 01,
-    };
     size_t id() const { return _id; }
     void send(const char *s);
     void send(const std::string& s);
@@ -46,12 +43,9 @@ public:
     InetAddr& peerAddr() { return _peerAddr; }
     void setState(char state) { _state = state; }
     bool isConnected() { return _state == CONNECTED; }
-    void setFlag(char flag) { _flag |= flag; }
-    void clearFlag(char flag) { _flag &= ~flag; }
-    bool isSending() { return _flag & SENDING; }
     boost::any& getContext() { return _context; }
     void setContext(boost::any context) { _context = std::move(context); }
-    void close() { handleClose(); }
+    void close();
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
@@ -67,9 +61,6 @@ private:
     void handleError();
     void sendInLoop(const std::string& s);
 
-    static const char *stateStr[];
-    static const char *flagStr[];
-
     size_t _id;
     EventLoop *_loop;
     std::shared_ptr<Channel> _channel;
@@ -80,7 +71,6 @@ private:
     InetAddr _peerAddr;
     boost::any _context;
     std::atomic_int8_t _state;
-    std::atomic_int8_t _flag;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     WriteCompleteCallback _writeCompleteCb;

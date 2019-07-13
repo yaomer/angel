@@ -20,13 +20,11 @@ TcpConnection::TcpConnection(size_t id,
     _socket(new Socket(sockfd)),
     _localAddr(localAddr),
     _peerAddr(peerAddr),
-    _state(CONNECTING),
-    _flag(0)
+    _state(CONNECTING)
 {
     _channel->setFd(sockfd);
     _channel->setEventReadCb([this]{ this->handleRead(); });
     _channel->setEventWriteCb([this]{ this->handleWrite(); });
-    _channel->setEventCloseCb([this]{ this->handleClose(); });
     _channel->setEventErrorCb([this]{ this->handleError(); });
     _loop->addChannel(_channel);
     logInfo("[TcpConnection::ctor, id:%d]", _id);
@@ -59,6 +57,8 @@ void TcpConnection::handleRead()
 // 未发送完的数据发送过去
 void TcpConnection::handleWrite()
 {
+    if (_state == CLOSED)
+        return;
     if (_channel->isWriting()) {
         ssize_t n = write(_channel->fd(), _output.peek(),
                 _output.readable());
@@ -66,23 +66,17 @@ void TcpConnection::handleWrite()
             _output.retrieve(n);
             if (_output.readable() == 0) {
                 _channel->disableWrite();
-                clearFlag(SENDING);
                 if (_writeCompleteCb)
                     _loop->queueInLoop(
                             std::bind(_writeCompleteCb, shared_from_this()));
                 if (_state == CLOSING)
-                    _closeCb(shared_from_this());
+                    handleClose();
             }
         } else {
-            switch (errno) {
-            case EPIPE:
-            default:
+            logError("write: %s", strerrno());
+            if (errno == ECONNRESET || errno == EPIPE) {
                 handleClose();
-                break;
-            case EAGAIN:
-            // case EWOULDBLOCK: EAGAIN == EWOULDBLOCK
-            case EINTR:
-                break;
+                return;
             }
         }
     }
@@ -90,20 +84,29 @@ void TcpConnection::handleWrite()
 
 void TcpConnection::handleClose()
 {
-    logInfo("[fd:%d] is closing", _channel->fd());
-    if (isSending()) {
-        // 如果正在发送数据，就不能直接关闭连接，需要等数据发送完后再关闭
-        setState(CLOSING);
-    } else {
-        logInfo("[fd:%d] is closed", _channel->fd());
+    std::cout << "111\n";
+    logInfo("[fd:%d] is closed", _channel->fd());
+    setState(CLOSED);
+    if (_closeCb)
         _loop->runInLoop(
                 std::bind(_closeCb, shared_from_this()));
-    }
+    std::cout << "222\n";
 }
 
 void TcpConnection::handleError()
 {
     logError("[fd:%d]: %s", _channel->fd(), strerrno());
+    if (errno == ECONNRESET)
+        handleClose();
+}
+
+void TcpConnection::close()
+{
+    logInfo("[fd:%d] is closing", _channel->fd());
+    setState(CLOSING);
+    if (_closeCb)
+        _loop->runInLoop(
+                std::bind(_closeCb, shared_from_this()));
 }
 
 void TcpConnection::sendInLoop(const std::string& s)
@@ -119,22 +122,17 @@ void TcpConnection::sendInLoop(const std::string& s)
         if (n >= 0) {
             remainBytes = s.size() - n;
             if (remainBytes == 0) {
-                clearFlag(SENDING);
                 if (_writeCompleteCb)
                     _loop->queueInLoop(
                             std::bind(_writeCompleteCb, shared_from_this()));
                 if (_state == CLOSING)
-                    _closeCb(shared_from_this());
+                    handleClose();
             }
         } else {
-            switch (errno) {
-            case EAGAIN:
-            // case EWOULDBLOCK:
-            case EINTR:
-                break;
-            default:
+            logError("write: %s", strerrno());
+            if (errno == ECONNRESET || errno == EPIPE) {
                 handleClose();
-                break;
+                return;
             }
         }
     }
@@ -147,7 +145,6 @@ void TcpConnection::sendInLoop(const std::string& s)
 
 void TcpConnection::send(const std::string& s)
 {
-    setFlag(SENDING);
     if (_loop->isInLoopThread()) {
         // 在本线程直接发送即可
         sendInLoop(s);

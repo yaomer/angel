@@ -57,6 +57,7 @@ void Connector::connecting(int sockfd)
 
 void Connector::connected(int sockfd)
 {
+    if (_connected) return;
     logInfo("[connfd:%d] is connected", sockfd);
     _loop->removeChannel(_connectChannel);
     _connectChannel.reset();

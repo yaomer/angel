@@ -22,8 +22,8 @@ namespace Angel {
     thread_local const char *log_current_tid = getThreadIdStr();
     thread_local size_t log_current_tid_len = strlen(log_current_tid);
 
-    __thread char log_time_buf[32];
-    __thread time_t log_last_second = 0;
+    thread_local char log_time_buf[32];
+    thread_local time_t log_last_second = 0;
 
     const char *formatTime()
     {
@@ -46,7 +46,7 @@ namespace Angel {
         return log_time_buf;
     }
 
-    __thread char log_output_buf[65536];
+    thread_local char log_output_buf[65536];
 
     void output(int level, const char *file, int line,
             const char *func, const char *fmt, ...)
@@ -81,6 +81,7 @@ namespace Angel {
         memcpy(ptr, log_current_tid, log_current_tid_len);
         ptr += log_current_tid_len;
         *ptr++ = '\n';
+        *ptr = '\0';
         va_end(ap);
         __logger.writeToBuffer(log_output_buf, ptr - log_output_buf);
         if (level == LogStream::FATAL)
@@ -239,7 +240,7 @@ size_t Angel::getThreadId()
 
 namespace Angel {
 
-    __thread char _tid_buf[32];
+    thread_local char _tid_buf[32];
 }
 
 const char *Angel::getThreadIdStr()

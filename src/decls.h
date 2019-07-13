@@ -25,7 +25,6 @@ typedef std::function<void(int)> NewConnectionCallback;
 typedef std::shared_ptr<Channel> ChannelPtr;
 typedef std::function<void()> EventReadCallback;
 typedef std::function<void()> EventWriteCallback;
-typedef std::function<void()> EventCloseCallback;
 typedef std::function<void()> EventErrorCallback;
 // for Signaler
 typedef std::function<void()> SignalerCallback;

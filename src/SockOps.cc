@@ -93,7 +93,7 @@ int SockOps::toHostIpPort(in_port_t port)
 
 namespace Angel {
 
-    __thread char _ipaddr[32];
+    thread_local char _ipaddr[32];
 }
 
 const char *SockOps::toHostIpAddr(struct in_addr *addr)

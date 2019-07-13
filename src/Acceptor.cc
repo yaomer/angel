@@ -36,17 +36,13 @@ void Acceptor::listen()
 
 void Acceptor::handleAccept()
 {
-_again:
     int connfd = SockOps::accept(_socket.fd());
     if (connfd < 0) {
         switch (errno) {
         case EINTR:
-            goto _again;
-            break;
         case EWOULDBLOCK: // BSD
         case EPROTO: // SVR4
         case ECONNABORTED: // POSIX
-            logWarn("accept: %s", strerrno());
             break;
         default:
             logError("accept: %s", strerrno());

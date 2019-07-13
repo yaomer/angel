@@ -40,8 +40,6 @@ public:
     { _readCb = std::move(_cb); }
     void setEventWriteCb(const EventWriteCallback _cb)
     { _writeCb = std::move(_cb); }
-    void setEventCloseCb(const EventCloseCallback _cb)
-    { _closeCb = std::move(_cb); }
     void setEventErrorCb(const EventErrorCallback _cb)
     { _errorCb = std::move(_cb); }
 private:
@@ -51,7 +49,6 @@ private:
     int _revents;
     EventReadCallback _readCb;
     EventWriteCallback _writeCb;
-    EventCloseCallback _closeCb;
     EventErrorCallback _errorCb;
 };
 

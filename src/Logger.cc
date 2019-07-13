@@ -21,7 +21,7 @@ using namespace Angel;
 namespace Angel {
     Angel::Logger __logger;
 
-    __thread char _errnobuf[256];
+    thread_local char _errnobuf[256];
 
     // 线程安全的strerror
     const char *strerr(int err)

@@ -28,7 +28,7 @@
 
 using namespace Angel;
 
-__thread EventLoop *_thisThreadLoop = nullptr;
+thread_local EventLoop *_thisThreadLoop = nullptr;
 
 EventLoop::EventLoop()
     : _timer(new Timer),
