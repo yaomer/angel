@@ -25,14 +25,13 @@ public:
     // 内部腾挪
     void makeSpace(size_t len)
     {
-        // 有足够的腾挪空间
-        if (len < writeable() && writeable() + prependable() > len) {
-            size_t readn = readable();
-            std::copy(peek(), peek() + readn, begin());
+        if (len > writeable() && len <= writeable() + prependable()) {
+            size_t readBytes = readable();
+            std::copy(peek(), peek() + readBytes, begin());
             _readindex = 0;
-            _writeindex = _readindex + readn;
-        } else
-            _buf.reserve(_writeindex + len);
+            _writeindex = _readindex + readBytes;
+        }
+        _buf.resize(_writeindex + len);
     }
     // 返回C风格字符串
     const char *c_str() 
