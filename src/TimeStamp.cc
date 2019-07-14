@@ -14,7 +14,7 @@ int64_t TimeStamp::now()
 
 namespace Angel {
 
-    thread_local char _timestr_buf[32];
+    thread_local char tsp_timestr_buf[32];
 }
 
 // len >= 25
@@ -27,9 +27,9 @@ const char *TimeStamp::timeStr(int option)
     gmtime_r(&seconds, &tm);
     if (option == LOCAL_TIME)
         tm.tm_hour += 8;
-    snprintf(_timestr_buf, sizeof(_timestr_buf),
+    snprintf(tsp_timestr_buf, sizeof(tsp_timestr_buf),
             "%4d-%02d-%02d %02d:%02d:%02d.%04lld",
             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
             tm.tm_hour, tm.tm_min, tm.tm_sec, ms % 1000);
-    return _timestr_buf;
+    return tsp_timestr_buf;
 }

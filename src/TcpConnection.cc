@@ -84,13 +84,11 @@ void TcpConnection::handleWrite()
 
 void TcpConnection::handleClose()
 {
-    std::cout << "111\n";
     logInfo("[fd:%d] is closed", _channel->fd());
     setState(CLOSED);
     if (_closeCb)
         _loop->runInLoop(
                 std::bind(_closeCb, shared_from_this()));
-    std::cout << "222\n";
 }
 
 void TcpConnection::handleError()

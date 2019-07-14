@@ -8,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
+#include <csignal>
 #include "TimeStamp.h"
 #include "Logger.h"
 #include "LogStream.h"
@@ -35,6 +36,11 @@ namespace Angel {
     }
 }
 
+void flush_log_buf(int signo)
+{
+    __logger.quit();
+}
+
 Logger::Logger()
     : _thread(std::thread([this]{ this->threadFunc(); })),
     _quit(false),
@@ -43,6 +49,7 @@ Logger::Logger()
     _filesize(0)
 {
     mkdir(".log", 0777);
+    signal(SIGINT, flush_log_buf);
     logInfo("[Logger::ctor]");
 }
 
@@ -50,6 +57,7 @@ Logger::~Logger()
 {
     logInfo("[Logger::dtor]");
     quit();
+    _thread.join();
 }
 
 void Logger::setFilename()
@@ -69,14 +77,13 @@ void Logger::creatFile()
     _fd = open(_filename.c_str(),
             O_WRONLY | O_APPEND | O_CREAT, 0664);
     if (_fd < 0) {
-        fprintf(stderr, "can't open %s: %s", _filename.c_str(),
-                strerrno());
-        exit(1);
+        logWarn("can't open %s: %s, now write to stdout",
+                _filename.c_str(), strerrno());
+        _flag = FLUSH_TO_STDOUT;
+        _fd = _flag;
+        return;
     }
-    struct stat st;
-    if (fstat(_fd, &st) < 0)
-        ;
-    _filesize = st.st_size;
+    _filesize = 0;
 }
 
 void Logger::rollFile()
@@ -108,28 +115,26 @@ void Logger::setFlush()
 void Logger::threadFunc()
 {
     setFlush();
-    _thread.detach();
     while (1) {
         {
             std::unique_lock<std::mutex> mlock(_mutex);
-            if (!_quit)
-                _condVar.wait_for(mlock, std::chrono::seconds(1));
-            if (_quit) {
-                _writeBuf.swap(_flushBuf);
-                flush();
-                exit(1);
-            }
+            _condVar.wait_for(mlock, std::chrono::seconds(1));
             if (_writeBuf.readable() > 0)
                 _writeBuf.swap(_flushBuf);
         }
         if (_flushBuf.readable() > 0)
             flush();
+        if (_quit) {
+            fprintf(stderr, "loggerAbort\n");
+            abort();
+        }
     }
 }
 
 void Logger::flush()
 {
     write(_fd, _flushBuf.peek(), _flushBuf.readable());
+    _filesize += _flushBuf.readable();
     _flushBuf.retrieveAll();
     if (_flag == FLUSH_TO_FILE)
         rollFile();
@@ -145,8 +150,7 @@ void Logger::writeToBuffer(const char *s, size_t len)
 
 void Logger::wakeup()
 {
-    if (_writeBuf.readable() > 0)
-        _condVar.notify_one();
+    _condVar.notify_one();
 }
 
 void Logger::flushToStdout()

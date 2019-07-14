@@ -240,13 +240,13 @@ size_t Angel::getThreadId()
 
 namespace Angel {
 
-    thread_local char _tid_buf[32];
+    thread_local char log_tid_buf[32];
 }
 
 const char *Angel::getThreadIdStr()
 {
     std::ostringstream oss;
     oss << std::this_thread::get_id();
-    strncpy(_tid_buf, oss.str().c_str(), sizeof(_tid_buf));
-    return _tid_buf;
+    strncpy(log_tid_buf, oss.str().c_str(), sizeof(log_tid_buf));
+    return log_tid_buf;
 }

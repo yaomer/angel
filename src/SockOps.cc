@@ -93,12 +93,12 @@ int SockOps::toHostIpPort(in_port_t port)
 
 namespace Angel {
 
-    thread_local char _ipaddr[32];
+    thread_local char sockops_ipaddr[32];
 }
 
 const char *SockOps::toHostIpAddr(struct in_addr *addr)
 {
-    if (inet_ntop(AF_INET, addr, _ipaddr, sizeof(_ipaddr)) == nullptr)
+    if (inet_ntop(AF_INET, addr, sockops_ipaddr, sizeof(sockops_ipaddr)) == nullptr)
         logError("inet_ntop: %s", strerrno());
-    return _ipaddr;
+    return sockops_ipaddr;
 }
