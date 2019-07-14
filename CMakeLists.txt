@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.1)
 
 set (CMAKE_CXX_FLAGS "-std=c++11 -Wall -O2")
 
-set (LIB_PATH "~/Angel/")
-
 set (CMAKE_DIR /usr/local/share/cmake/Modules)
 
 include (${CMAKE_DIR}/CheckFunctionExists.cmake)
@@ -18,6 +16,31 @@ set (SRC_DIR ./src)
 configure_file (
     "${SRC_DIR}/config.h.in"
     "${SRC_DIR}/config.h"
+)
+
+set (SRC_HEADERS
+    ${SRC_DIR}/Acceptor.h
+    ${SRC_DIR}/Connector.h
+    ${SRC_DIR}/Buffer.h
+    ${SRC_DIR}/Channel.h
+    ${SRC_DIR}/EventLoop.h
+    ${SRC_DIR}/EventLoopThread.h
+    ${SRC_DIR}/EventLoopThreadPool.h
+    ${SRC_DIR}/TcpConnection.h
+    ${SRC_DIR}/InetAddr.h
+    ${SRC_DIR}/Socket.h
+    ${SRC_DIR}/SockOps.h
+    ${SRC_DIR}/TcpServer.h
+    ${SRC_DIR}/TcpClient.h
+    ${SRC_DIR}/TimeStamp.h
+    ${SRC_DIR}/Timer.h
+    ${SRC_DIR}/Signaler.h
+    ${SRC_DIR}/ThreadPool.h
+    ${SRC_DIR}/LogStream.h
+    ${SRC_DIR}/Poller.h
+    ${SRC_DIR}/Id.h
+    ${SRC_DIR}/noncopyable.h
+    ${SRC_DIR}/decls.h
 )
 
 set (SRC_FILES 
@@ -44,20 +67,28 @@ set (SRC_FILES
 
 if (_ANGEL_HAVE_POLL)
     list(APPEND SRC_FILES ${SRC_DIR}/Poll.cc)
+    list(APPEND SRC_HEADERS ${SRC_DIR}/Poll.h)
 endif()
 
 if (_ANGEL_HAVE_EPOLL)
     list(APPEND SRC_FILES ${SRC_DIR}/Epoll.cc)
+    list(APPEND SRC_HEADERS ${SRC_DIR}/Epoll.h)
 endif()
 
 if (_ANGEL_HAVE_KQUEUE)
     list(APPEND SRC_FILES ${SRC_DIR}/Kqueue.cc)
+    list(APPEND SRC_HEADERS ${SRC_DIR}/Kqueue.h)
 endif()
 
 if (_ANGEL_HAVE_SELECT)
     list(APPEND SRC_FILES ${SRC_DIR}/Select.cc)
+    list(APPEND SRC_HEADERS ${SRC_DIR}/Select.h)
 endif()
 
 add_library (angel STATIC ${SRC_FILES})
 
-set (LIBRARY_OUTPUT_PATH ${LIB_PATH})
+install(TARGETS angel
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib)
+
+install(FILES ${SRC_HEADERS} DESTINATION include/Angel)
