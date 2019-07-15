@@ -1,5 +1,6 @@
+#include <Angel/EventLoop.h>
+#include <Angel/TcpClient.h>
 #include "TimeClient.h"
-#include "../Angel.h"
 
 using namespace Angel;
 

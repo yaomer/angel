@@ -9,4 +9,4 @@ elif [ "$PLATFORM" == "Linux" ]; then
     CXX=g++
 fi
 
-$CXX $CXXFLAGS ChatServer.cc -L ../../ -langel -o server
+$CXX $CXXFLAGS ChatServer.cc -langel -o server

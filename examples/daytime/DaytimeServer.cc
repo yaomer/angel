@@ -1,5 +1,6 @@
+#include <Angel/EventLoop.h>
+#include <Angel/TcpServer.h>
 #include "DaytimeServer.h"
-#include "../Angel.h"
 
 using namespace Angel;
 

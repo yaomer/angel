@@ -1,9 +1,11 @@
 #ifndef _ANGEL_DAYTIMESERVER_H
 #define _ANGEL_DAYTIMESERVER_H
 
-#include "../Angel.h"
+#include <Angel/EventLoop.h>
+#include <Angel/TcpServer.h>
 
 using namespace Angel;
+using std::placeholders::_1;
 
 class DaytimeServer {
 public:
@@ -24,14 +26,8 @@ public:
         conn->send(buf);
         conn->close();
     }
-    void start()
-    {
-        _server.start();
-    }
-    void quit()
-    {
-        _loop->quit();
-    }
+    void start() { _server.start(); }
+    void quit() { _loop->quit(); }
 private:
     EventLoop *_loop;
     TcpServer _server;

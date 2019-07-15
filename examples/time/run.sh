@@ -9,5 +9,5 @@ elif [ "$PLATFORM" == "Linux" ]; then
     CXX=g++
 fi
 
-$CXX $CXXFLAGS TimeServer.cc -L ../../ -langel -o server
-$CXX $CXXFLAGS TimeClient.cc -L ../../ -langel -o client
+$CXX $CXXFLAGS TimeServer.cc -langel -o server
+$CXX $CXXFLAGS TimeClient.cc -langel -o client

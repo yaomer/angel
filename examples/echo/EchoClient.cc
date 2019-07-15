@@ -1,5 +1,5 @@
+#include <Angel/TcpServer.h>
 #include "EchoClient.h"
-#include "../Angel.h"
 
 using namespace Angel;
 

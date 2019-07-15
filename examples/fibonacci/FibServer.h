@@ -1,9 +1,12 @@
 #ifndef _ANGEL_FIBSERVER_H
 #define _ANGEL_FIBSERVER_H
 
-#include "../Angel.h"
+#include <Angel/EventLoop.h>
+#include <Angel/TcpServer.h>
 
 using namespace Angel;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 class FibServer {
 public:
@@ -13,6 +16,8 @@ public:
     {
         _server.setMessageCb(
                 std::bind(&FibServer::onMessage, this, _1, _2));
+        // 用一个thread pool来计算fibonacci
+        _server.setTaskThreadNums(4);
     }
     void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
     {
@@ -32,16 +37,8 @@ public:
             return n;
         return fib(n - 1) + fib(n - 2);
     }
-    void start()
-    {
-        // 用一个thread pool来计算fibonacci
-        _server.setTaskThreadNums(4);
-        _server.start();
-    }
-    void quit()
-    {
-        _loop->quit();
-    }
+    void start() { _server.start(); }
+    void quit() { _loop->quit(); }
 private:
     EventLoop *_loop;
     TcpServer _server;

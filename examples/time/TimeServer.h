@@ -1,9 +1,11 @@
 #ifndef _ANGEL_TIME_SERVER_H
 #define _ANGEL_TIME_SERVER_H
 
-#include "../Angel.h"
+#include <Angel/EventLoop.h>
+#include <Angel/TcpServer.h>
 
 using namespace Angel;
+using std::placeholders::_1;
 
 class TimeServer {
 public:

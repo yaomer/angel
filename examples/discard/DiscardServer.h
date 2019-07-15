@@ -1,11 +1,14 @@
 #ifndef _ANGEL_DISCARD_SERVER_H
 #define _ANGEL_DISCARD_SERVER_H
 
-#include "../Angel.h"
+#include <Angel/EventLoop.h>
+#include <Angel/TcpServer.h>
 #include <iostream>
 #include <mutex>
 
 using namespace Angel;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 class DiscardServer {
 public:

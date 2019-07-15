@@ -1,9 +1,12 @@
 #ifndef _ANGEL_DAYTIMECLIENT_H
 #define _ANGEL_DAYTIMECLIENT_H
 
-#include "../Angel.h"
+#include <Angel/EventLoop.h>
+#include <Angel/TcpClient.h>
 
 using namespace Angel;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 class DaytimeClient {
 public:
@@ -19,14 +22,8 @@ public:
         std::cout << buf.c_str();
         buf.retrieveAll();
     }
-    void start()
-    {
-        _client.start();
-    }
-    void quit()
-    {
-        _loop->quit();
-    }
+    void start() { _client.start(); }
+    void quit() { _loop->quit(); }
 private:
     EventLoop *_loop;
     TcpClient _client;
