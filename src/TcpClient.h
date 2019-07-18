@@ -19,6 +19,7 @@ public:
     TcpClient(EventLoop *, InetAddr&, const char *);
     ~TcpClient();
     void start();
+    const char *name() { return _name.c_str(); }
     void quitLoop(bool on);
     const TcpConnectionPtr& conn() const { return _conn; }
     void setConnectionCb(const ConnectionCallback _cb)

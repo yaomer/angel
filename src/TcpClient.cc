@@ -20,12 +20,12 @@ TcpClient::TcpClient(EventLoop *loop,
 {
     _connector.setNewConnectionCb(
             std::bind(&TcpClient::newConnection, this, _1));
-    logInfo("TcpClient[%s]::ctor", _name.c_str());
+    logInfo("TcpClient[%s]::ctor", name);
 }
 
 TcpClient::~TcpClient()
 {
-    logInfo("TcpClient[%s]::dtor", _name.c_str());
+    logInfo("TcpClient[%s]::dtor", name());
 }
 
 void TcpClient::newConnection(int fd)
@@ -47,7 +47,7 @@ void TcpClient::handleClose(const TcpConnectionPtr& conn)
     if (_closeCb) _closeCb(conn);
     _loop->removeChannel(conn->getChannel());
     _conn.reset();
-    logInfo("TcpClient[%s] break the connection", _name.c_str());
+    logInfo("TcpClient[%s] break the connection", name());
     if (_quitLoop) _loop->quit();
 }
 

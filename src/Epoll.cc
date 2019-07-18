@@ -16,7 +16,7 @@ Epoll::Epoll()
     _evListSize(_INIT_EVLIST_SIZE)
 {
     _epfd = epoll_create(1);
-    _evList.reserve(_evListSize);
+    _evList.resize(_evListSize);
 }
 
 Epoll::~Epoll()
@@ -32,7 +32,7 @@ void Epoll::add(int fd, int events)
         logError("[epoll_ctl -> EPOLL_CTL_ADD]: %s", strerrno());
     if (++_addFds >= _evListSize) {
         _evListSize *= 2;
-        _evList.reserve(_evListSize);
+        _evList.resize(_evListSize);
     }
 }
 
@@ -53,7 +53,7 @@ void Epoll::remove(int fd, int events)
 
 int Epoll::wait(EventLoop *loop, int64_t timeout)
 {
-    int nevents = epoll_wait(_epfd, &_evList[0], _evList.capacity(), timeout);
+    int nevents = epoll_wait(_epfd, &_evList[0], _evList.size(), timeout);
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
             auto chl = loop->search(_evList[i].data.fd);

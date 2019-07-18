@@ -37,6 +37,7 @@ set (SRC_HEADERS
     ${SRC_DIR}/Signaler.h
     ${SRC_DIR}/ThreadPool.h
     ${SRC_DIR}/LogStream.h
+    ${SRC_DIR}/Logger.h
     ${SRC_DIR}/Poller.h
     ${SRC_DIR}/Id.h
     ${SRC_DIR}/noncopyable.h

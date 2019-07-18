@@ -36,7 +36,6 @@ extern std::mutex _SYNC_INIT_LOCK;
 
 extern Angel::Signaler *__signalerPtr;
 
-
 void addSignal(int signo, const SignalerCallback _cb);
 void cancelSignal(int signo);
 

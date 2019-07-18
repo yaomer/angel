@@ -45,21 +45,21 @@ const char *Channel::revstr()
 void Channel::enableRead()
 {
     _events |= READ;
-    logInfo("[fd:%d] enable READ", fd());
+    logInfo("[fd = %d] enable READ", fd());
 }
 
 void Channel::enableWrite()
 {
     _events |= WRITE;
     changeEvents();
-    logInfo("[fd:%d] enable WRITE", fd());
+    logInfo("[fd = %d] enable WRITE", fd());
 }
 
 void Channel::disableWrite()
 {
     _events &= ~WRITE;
     changeEvents();
-    logInfo("[fd:%d] disable WRITE", fd());
+    logInfo("[fd = %d] disable WRITE", fd());
 }
 
 void Channel::changeEvents()
@@ -69,7 +69,7 @@ void Channel::changeEvents()
 
 void Channel::handleEvent()
 {
-    logInfo("[fd:%d] revents is [%s]", fd(), revstr());
+    logInfo("[fd = %d] revents is [%s]", fd(), revstr());
     if (revents() & ERROR)
         if (_errorCb) _errorCb();
     if (revents() & READ)

@@ -46,7 +46,7 @@ void Connector::connect()
 
 void Connector::connecting(int sockfd)
 {
-    logInfo("[connfd:%d] is connecting", sockfd);
+    logInfo("[connfd = %d] is connecting", sockfd);
     _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
     _connectChannel->setEventReadCb(
             [this, sockfd]{ this->check(sockfd); });
@@ -58,7 +58,7 @@ void Connector::connecting(int sockfd)
 void Connector::connected(int sockfd)
 {
     if (_connected) return;
-    logInfo("[connfd:%d] is connected", sockfd);
+    logInfo("[connfd = %d] is connected", sockfd);
     _loop->removeChannel(_connectChannel);
     _connectChannel.reset();
     if (_newConnectionCb) {

@@ -4,6 +4,7 @@
 
 #include <sys/event.h>
 #include <unistd.h>
+#include <string.h>
 #include <vector>
 #include "Kqueue.h"
 #include "EventLoop.h"
@@ -17,7 +18,7 @@ Kqueue::Kqueue()
     _evlistSize(_INIT_EVLIST_SIZE)
 {
     _kqfd = kqueue();
-    _evlist.reserve(_evlistSize);
+    _evlist.resize(_evlistSize);
 }
 
 Kqueue::~Kqueue()
@@ -30,7 +31,7 @@ void Kqueue::add(int fd, int events)
     change(fd, events);
     if (++_addFds >= _evlistSize) {
         _evlistSize *= 2;
-        _evlist.reserve(_evlistSize);
+        _evlist.resize(_evlistSize);
     }
 }
 
@@ -69,13 +70,14 @@ void Kqueue::remove(int fd, int events)
 int Kqueue::wait(EventLoop *loop, int64_t timeout)
 {
     struct timespec tsp;
+    memset(&tsp, 0, sizeof(tsp));
 
     if (timeout > 0) {
         tsp.tv_sec = timeout / 1000;
         tsp.tv_nsec = (timeout % 1000) * 1000 * 1000;
     }
-    int nevents = kevent(_kqfd, nullptr, 0, &_evlist[0], _evlist.capacity(),
-            timeout > 0 ? &tsp : nullptr);
+    int nevents = kevent(_kqfd, nullptr, 0, &_evlist[0], _evlist.size(),
+            timeout >= 0 ? &tsp : nullptr);
 
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {

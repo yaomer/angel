@@ -125,7 +125,6 @@ void Logger::threadFunc()
         if (_flushBuf.readable() > 0)
             flush();
         if (_quit) {
-            fprintf(stderr, "loggerAbort\n");
             abort();
         }
     }

@@ -31,7 +31,7 @@ using namespace Angel;
 thread_local EventLoop *_thisThreadLoop = nullptr;
 
 EventLoop::EventLoop()
-    : _timer(new Timer),
+    : _timer(new Timer(this)),
     _quit(false),
     _nloops(0)
 {
@@ -94,7 +94,9 @@ void EventLoop::run()
     wakeupInit();
     if (_signaler) _signaler->start();
     while (!_quit) {
-        int nevents = _poller->wait(this, _timer->timeout());
+        int64_t timeout = _timer->timeout();
+        logDebug("timeout = %zd", timeout);
+        int nevents = _poller->wait(this, timeout);
         if (nevents > 0) {
             logDebug("nevents = %d", nevents);
             for (auto& it : _activeChannels) {
@@ -173,22 +175,21 @@ void EventLoop::queueInLoop(const Functor _cb)
 
 size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
-    TimerTask *task = new TimerTask(timeout, 0, std::move(_cb));
-    size_t id = _timer->addTask(task);
-    logInfo("Add a TimerTask after %zd ms, timerId = %zu", timeout, id);
+    int64_t expire = TimeStamp::now() + timeout;
+    TimerTask *task = new TimerTask(expire, 0, std::move(_cb));
+    size_t id = _timer->addTimer(task);
     return id;
 }
 
 size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
-    TimerTask *task = new TimerTask(interval, interval, std::move(_cb));
-    size_t id = _timer->addTask(task);
-    logInfo("Add a TimerTask every %zd ms, timerId = %zu", interval, id);
+    int64_t expire = TimeStamp::now() + interval;
+    TimerTask *task = new TimerTask(expire, interval, std::move(_cb));
+    size_t id = _timer->addTimer(task);
     return id;
 }
 
 void EventLoop::cancelTimer(size_t id)
 {
-    logInfo("Cancel a TimerTask, timerId = %zu", id);
-    _timer->cancelTask(id);
+    _timer->cancelTimer(id);
 }

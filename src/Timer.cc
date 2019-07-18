@@ -1,24 +1,11 @@
+#include "EventLoop.h"
 #include "Timer.h"
 #include "LogStream.h"
 
 using namespace Angel;
 
-
-TimerTask::TimerTask(int64_t timeout, int64_t interval, const TimerCallback _cb)
-    : _id(0),
-    _timeout(timeout),
-    _interval(interval),
-    _timerCb(_cb)
-{
-
-}
-
-TimerTask::~TimerTask()
-{
-
-}
-
-Timer::Timer()
+Timer::Timer(EventLoop *loop)
+    : _loop(loop)
 {
     logInfo("[Timer::ctor]");
 }
@@ -28,23 +15,36 @@ Timer::~Timer()
     logInfo("[Timer::dtor]");
 }
 
-// Add a TimerTask is Log(n)
-size_t Timer::addTask(TimerTask *_task)
+size_t Timer::addTimer(TimerTask *_task)
 {
     size_t id = getId();
-    _task->setId(id);
-    _task->setTimeout(_task->timeout() + TimeStamp::now());
-    _timer.insert(std::unique_ptr<TimerTask>(_task));
+    _loop->runInLoop(
+            [this, _task, id]{ this->addTimerInLoop(_task, id); });
     return id;
 }
 
-// Cancel a TimerTask is O(n)
-void Timer::cancelTask(size_t id)
+void Timer::cancelTimer(size_t id)
 {
-    for (auto& it : _timer) {
-        if (it->id() == id) {
+    _loop->runInLoop(
+            [this, id]{ this->cancelTimerInLoop(id); });
+}
+
+// Add a TimerTask is O(log n)
+void Timer::addTimerInLoop(TimerTask *_task, size_t id)
+{
+    _task->setId(id);
+    _timer.insert(std::shared_ptr<TimerTask>(_task));
+    logInfo("Add a timer, id = %zu", id);
+}
+
+// Cancel a TimerTask is O(nlogn)
+void Timer::cancelTimerInLoop(size_t id)
+{
+    for (auto it = _timer.begin(); it != _timer.end(); it++) {
+        if ((*it)->id() == id) {
             _timer.erase(it);
             putId(id);
+            logInfo("Cancel a timer, id = %zu", id);
             break;
         }
     }
@@ -52,22 +52,23 @@ void Timer::cancelTask(size_t id)
 
 void Timer::tick()
 {
-    if (_timer.empty())
-        return;
-
-    int64_t timeout = getTask()->timeout();
+    logDebug("timer size = %zu", _timer.size());
+    int64_t now = TimeStamp::now();
     while (!_timer.empty()) {
-        const TimerTask *t = getTask();
-        if (t->timeout() == timeout) {
-            t->timerCb()();
-            if (t->interval() > 0) {
-                TimerTask *_t = new TimerTask(t->interval(),
-                        t->interval(), t->timerCb());
-                addTask(_t);
+        auto task = *_timer.begin();
+        if (task->expire() <= now) {
+            task->timerCb()();
+            if (task->interval() > 0) {
+                TimerTask *newTask = new TimerTask(now + task->interval(),
+                        task->interval(), task->timerCb());
+                newTask->setId(task->id());
+                _timer.erase(_timer.begin());
+                _timer.insert(std::shared_ptr<TimerTask>(newTask));
+            } else {
+                _timer.erase(_timer.begin());
+                putId(task->id());
             }
-            popTask();
-        } else {
+        } else
             break;
-        }
     }
 }

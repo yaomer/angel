@@ -9,7 +9,7 @@ using namespace Angel;
 Socket::Socket(int fd)
     : _sockfd(fd)
 {
-    logInfo("[Socket::ctor, fd:%d]", fd);
+    logInfo("[Socket::ctor, fd = %d]", fd);
 }
 
 Socket::~Socket()

@@ -38,7 +38,8 @@ TcpConnection::~TcpConnection()
 void TcpConnection::handleRead()
 {
     ssize_t n = _input.readFd(_channel->fd());
-    logInfo("read %zd bytes: [%s] from [fd:%d]", n, _input.c_str(), _channel->fd());
+    logInfo("read %zd bytes: [%s] from [fd = %d]", n, _input.c_str(),
+            _channel->fd());
     if (n > 0) {
         if (_messageCb)
             _messageCb(shared_from_this(), _input);
@@ -84,7 +85,7 @@ void TcpConnection::handleWrite()
 
 void TcpConnection::handleClose()
 {
-    logInfo("[fd:%d] is closed", _channel->fd());
+    logInfo("[fd = %d] is closed", _channel->fd());
     setState(CLOSED);
     if (_closeCb)
         _loop->runInLoop(
@@ -93,14 +94,14 @@ void TcpConnection::handleClose()
 
 void TcpConnection::handleError()
 {
-    logError("[fd:%d]: %s", _channel->fd(), strerrno());
+    logError("[fd = %d]: %s", _channel->fd(), strerrno());
     if (errno == ECONNRESET)
         handleClose();
 }
 
 void TcpConnection::close()
 {
-    logInfo("[fd:%d] is closing", _channel->fd());
+    logInfo("[fd = %d] is closing", _channel->fd());
     setState(CLOSING);
     if (_closeCb)
         _loop->runInLoop(
@@ -116,7 +117,8 @@ void TcpConnection::sendInLoop(const std::string& s)
         return;
     if (!_channel->isWriting() && _output.readable() == 0) {
         n = write(_channel->fd(), s.data(), s.size());
-        logInfo("write %zd bytes: [%s] to [fd:%d]", n, s.c_str(), _channel->fd());
+        logInfo("write %zd bytes: [%s] to [fd = %d]", n, s.c_str(),
+                _channel->fd());
         if (n >= 0) {
             remainBytes = s.size() - n;
             if (remainBytes == 0) {

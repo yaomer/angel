@@ -15,7 +15,7 @@ public:
     char *peek() { return begin() + _readindex; }
     size_t prependable() const { return _readindex; }
     size_t readable() const { return _writeindex - _readindex; }
-    size_t writeable() const { return _buf.capacity() - _writeindex; }
+    size_t writeable() const { return _buf.size() - _writeindex; }
     void append(const char *data, size_t len)
     {
         makeSpace(len);
@@ -25,20 +25,22 @@ public:
     // 内部腾挪
     void makeSpace(size_t len)
     {
-        if (len > writeable() && len <= writeable() + prependable()) {
-            size_t readBytes = readable();
-            std::copy(peek(), peek() + readBytes, begin());
-            _readindex = 0;
-            _writeindex = _readindex + readBytes;
+        if (len > writeable()) {
+            if (len <= writeable() + prependable()) {
+                size_t readBytes = readable();
+                std::copy(peek(), peek() + readBytes, begin());
+                _readindex = 0;
+                _writeindex = _readindex + readBytes;
+            } else
+                _buf.resize(_writeindex + len);
         }
-        _buf.resize(_writeindex + len);
     }
     // 返回C风格字符串
     const char *c_str() 
     { 
-        append("\0", 1); 
-        _writeindex--; 
-        return peek(); 
+        makeSpace(1);
+        _buf[_writeindex] = '\0';
+        return peek();
     }
     int findStr(const char *s, size_t len)
     {
@@ -65,13 +67,6 @@ public:
         _buf.swap(_buffer._buf);
         std::swap(_readindex, _buffer._readindex);
         std::swap(_writeindex, _buffer._writeindex);
-    }
-    void skipSpaceOfStart()
-    {
-        int i = 0;
-        while (i < readable() && isspace(_buf[i]))
-            i++;
-        retrieve(i);
     }
     char& operator[](size_t idx) { return _buf[idx]; }
 private:

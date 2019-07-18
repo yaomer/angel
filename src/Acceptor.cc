@@ -19,7 +19,7 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     SockOps::setnonblock(_socket.fd());
     SockOps::bind(_socket.fd(), &_inetAddr.inetAddr());
     _acceptChannel->setFd(_socket.fd());
-    logInfo("[Acceptor::ctor, listenfd:%d]", _socket.fd());
+    logInfo("[Acceptor::ctor, listenfd = %d]", _socket.fd());
 }
 
 Acceptor::~Acceptor()
@@ -50,7 +50,7 @@ void Acceptor::handleAccept()
         }
         return;
     }
-    logInfo("[fd:%d is connected]", connfd);
+    logInfo("[fd = %d is connected]", connfd);
     if (_newConnectionCb)
         _newConnectionCb(connfd);
     else

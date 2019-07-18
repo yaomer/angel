@@ -54,7 +54,7 @@ void TcpServer::newConnection(int fd)
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 {
     if (_closeCb) _closeCb(conn);
-    logInfo("[fd:%d] is closed", conn->getChannel()->fd());
+    logInfo("[fd = %d] is closed", conn->getChannel()->fd());
     conn->setState(TcpConnection::CLOSED);
     putId(conn->id());
     conn->getLoop()->removeChannel(conn->getChannel());
