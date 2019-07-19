@@ -36,7 +36,7 @@ EventLoop *TcpServer::getNextLoop()
 
 void TcpServer::newConnection(int fd)
 {
-    size_t id = getId();
+    size_t id = _connId++;
     EventLoop *ioLoop = getNextLoop();
     InetAddr localAddr = SockOps::getLocalAddr(fd);
     InetAddr peerAddr = SockOps::getPeerAddr(fd);
@@ -62,7 +62,6 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn)
     if (_closeCb) _closeCb(conn);
     logInfo("[fd = %d] is closed", conn->getChannel()->fd());
     conn->setState(TcpConnection::CLOSED);
-    putId(conn->id());
     conn->getLoop()->removeChannel(conn->getChannel());
     _connectionMaps.erase(conn->id());
 }

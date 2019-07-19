@@ -21,13 +21,23 @@ public:
         FLUSH_TO_STDOUT,
         FLUSH_TO_STDERR,
     };
-    const size_t _writeBufMaxSize = 1024 * 1024;
+    enum LEVEL {
+        DEBUG,
+        INFO,
+        WARN,
+        ERROR,
+        FATAL,
+        LEVEL_NUMS,
+    };
     void writeToBuffer(const char *s, size_t len);
     void wakeup();
-    void quit()
-    { _quit = true; wakeup(); }
-    static void flushToStdout();
-    static void flushToStderr();
+
+    static void quit();
+
+    static int log_flush;
+    static const size_t log_buffer_max_size = 512 * 1024;
+    static const size_t log_roll_filesize = 1024 * 1024 * 1024;
+    static const int log_flush_interval = 1;
 private:
     void flush();
     void setFlush();
@@ -36,24 +46,18 @@ private:
     void creatFile();
     void rollFile();
 
-    static const size_t _ROLLFILE_MAX_SIZE = 1024 * 1024 * 1024;
-
     Buffer _writeBuf;
     Buffer _flushBuf;
     std::thread _thread;
     std::mutex _mutex;
     std::condition_variable _condVar;
     std::atomic_bool _quit;
-    int _flag;
     int _fd;
     std::string _filename;
     size_t _filesize;
 };
 
 extern Angel::Logger __logger;
-
-const char *strerrno();
-const char *strerr(int err);
 
 }
 

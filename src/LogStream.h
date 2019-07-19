@@ -4,6 +4,7 @@
 #include <string>
 #include "Buffer.h"
 #include "Logger.h"
+#include "util.h"
 
 namespace Angel {
 
@@ -15,9 +16,6 @@ extern int __loggerLevel;
 // 设置打印的日志级别
 // 如果设置为WARN，则只打印>=WARN级别的日志
 void setLoggerLevel(int level);
-
-size_t getThreadId();
-const char *getThreadIdStr();
 
 }
 

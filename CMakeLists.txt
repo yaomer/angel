@@ -39,9 +39,9 @@ set (SRC_HEADERS
     ${SRC_DIR}/LogStream.h
     ${SRC_DIR}/Logger.h
     ${SRC_DIR}/Poller.h
-    ${SRC_DIR}/Id.h
     ${SRC_DIR}/noncopyable.h
     ${SRC_DIR}/decls.h
+    ${SRC_DIR}/util.h
 )
 
 set (SRC_FILES 
@@ -64,6 +64,7 @@ set (SRC_FILES
     ${SRC_DIR}/ThreadPool.cc
     ${SRC_DIR}/LogStream.cc
     ${SRC_DIR}/Logger.cc
+    ${SRC_DIR}/util.cc
 )
 
 if (_ANGEL_HAVE_POLL)

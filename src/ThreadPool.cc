@@ -63,14 +63,14 @@ void ThreadPool::threadFunc()
     while (true) {
         TaskCallback cb;
         {
-            std::unique_lock<std::mutex> mlock(_mutex);
-            while (!_quit && _qtask.empty())
-                _condVar.wait(mlock);
-            if (_quit) {
-                break;
-            }
-            cb = std::move(_qtask.front());
-            _qtask.pop();
+        std::unique_lock<std::mutex> mlock(_mutex);
+        while (!_quit && _qtask.empty())
+            _condVar.wait(mlock);
+        if (_quit) {
+            break;
+        }
+        cb = std::move(_qtask.front());
+        _qtask.pop();
         }
         if (cb) cb();
     }

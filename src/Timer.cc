@@ -18,7 +18,7 @@ Timer::~Timer()
 
 size_t Timer::addTimer(TimerTask *task)
 {
-    size_t id = getId();
+    size_t id = _timerId++;
     _loop->runInLoop(
             [this, task, id]{ this->addTimerInLoop(task, id); });
     return id;
@@ -49,7 +49,6 @@ void Timer::cancelTimerInLoop(size_t id)
         for (auto it = range.first; it != range.second; it++) {
             if ((*it)->id() == id) {
                 delTimer(it, id);
-                putId(id);
                 logInfo("Cancel a timer, id = %zu", id);
                 break;
             }
@@ -79,7 +78,6 @@ void Timer::tick()
                 addTimerInLoop(newTask, newTask->id());
             } else {
                 delTimer(_timer.begin(), task->id());
-                putId(task->id());
             }
         } else
             break;

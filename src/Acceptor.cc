@@ -14,6 +14,7 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     _socket(SockOps::socket()),
     _inetAddr(listenAddr)
 {
+    _socket.setKeepAlive(true);
     _socket.setReuseAddr(true);
     _socket.setNoDelay(true);
     SockOps::setnonblock(_socket.fd());

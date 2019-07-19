@@ -36,10 +36,10 @@ void EventLoopThread::threadFunc()
 {
     EventLoop loop;
     {
-        std::lock_guard<std::mutex> mlock(_mutex);
-        _loop = &loop;
-        // let getLoop() to return
-        _condVar.notify_one();
+    std::lock_guard<std::mutex> mlock(_mutex);
+    _loop = &loop;
+    // let getLoop() to return
+    _condVar.notify_one();
     }
     loop.run();
 }

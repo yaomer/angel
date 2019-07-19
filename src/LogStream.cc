@@ -1,6 +1,4 @@
 #include <iostream>
-#include <sstream>
-#include <thread>
 #include "TimeStamp.h"
 #include "LogStream.h"
 
@@ -93,22 +91,4 @@ namespace Angel {
 void Angel::setLoggerLevel(int level)
 {
     __loggerLevel = level;
-}
-
-size_t Angel::getThreadId()
-{
-    return std::hash<std::thread::id>()(std::this_thread::get_id());
-}
-
-namespace Angel {
-
-    thread_local char log_tid_buf[32];
-}
-
-const char *Angel::getThreadIdStr()
-{
-    std::ostringstream oss;
-    oss << std::this_thread::get_id();
-    strncpy(log_tid_buf, oss.str().c_str(), sizeof(log_tid_buf));
-    return log_tid_buf;
 }

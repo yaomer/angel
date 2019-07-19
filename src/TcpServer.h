@@ -10,7 +10,6 @@
 #include "InetAddr.h"
 #include "EventLoopThreadPool.h"
 #include "ThreadPool.h"
-#include "Id.h"
 #include "decls.h"
 
 namespace Angel {
@@ -32,7 +31,7 @@ public:
     void removeConnection(const TcpConnectionPtr& conn);
 
     ConnectionMaps& connectionMaps() { return _connectionMaps; }
-    size_t clients() const { return _connId.getIdNums(); };
+    size_t clients() const { return _connectionMaps.size(); };
     TcpConnection *getConnection(size_t id)
     {
         auto it = _connectionMaps.find(id);
@@ -65,8 +64,6 @@ public:
     void setWriteCompleteCb(const WriteCompleteCallback _cb)
     { _writeCompleteCb = std::move(_cb); }
 private:
-    size_t getId() { return _connId.getId(); }
-    void putId(size_t id) { _connId.putId(id); }
     EventLoop* getNextLoop();
 
     EventLoop *_loop;
@@ -74,7 +71,7 @@ private:
     std::unique_ptr<EventLoopThreadPool> _ioThreadPool;
     ConnectionMaps _connectionMaps;
     std::unique_ptr<ThreadPool> _threadPool;
-    Id _connId;
+    size_t _connId;
     int64_t _connTimeout;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;

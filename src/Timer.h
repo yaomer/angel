@@ -5,7 +5,6 @@
 #include <set>
 #include <unordered_map>
 #include "TimeStamp.h"
-#include "Id.h"
 #include "noncopyable.h"
 #include "decls.h"
 
@@ -68,8 +67,6 @@ public:
     // 处理所有到期的定时事件
     void tick();
 private:
-    size_t getId() { return _timerId.getId(); }
-    void putId(size_t id) { _timerId.putId(id); }
     void addTimerInLoop(TimerTask *_task, size_t id);
     void cancelTimerInLoop(size_t id);
     
@@ -80,7 +77,7 @@ private:
     // TimerTask中的expire可能会有重复
     std::multiset<std::shared_ptr<TimerTask>, TimerTaskCmp> _timer;
     std::unordered_map<size_t, std::shared_ptr<TimerTask>> _idMaps;
-    Id _timerId;
+    size_t _timerId;
 };
 }
 
