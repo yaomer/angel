@@ -72,10 +72,14 @@ private:
     void putId(size_t id) { _timerId.putId(id); }
     void addTimerInLoop(TimerTask *_task, size_t id);
     void cancelTimerInLoop(size_t id);
+    
+    typedef std::multiset<std::shared_ptr<TimerTask>, TimerTaskCmp>::iterator TimerIterator;
+    void delTimer(const TimerIterator it, size_t id);
 
     EventLoop *_loop;
     // TimerTask中的expire可能会有重复
     std::multiset<std::shared_ptr<TimerTask>, TimerTaskCmp> _timer;
+    std::unordered_map<size_t, std::shared_ptr<TimerTask>> _idMaps;
     Id _timerId;
 };
 }
