@@ -45,6 +45,8 @@ public:
     bool isConnected() { return _state == CONNECTED; }
     boost::any& getContext() { return _context; }
     void setContext(boost::any context) { _context = std::move(context); }
+    void setTimeoutTimerId(size_t id) { _timeoutTimerId = id; }
+    void setConnTimeout(int64_t timeout) { _connTimeout = timeout; }
     void close();
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
@@ -60,6 +62,7 @@ private:
     void handleClose();
     void handleError();
     void sendInLoop(const std::string& s);
+    void updateTimeoutTimer();
 
     size_t _id;
     EventLoop *_loop;
@@ -71,6 +74,8 @@ private:
     InetAddr _peerAddr;
     boost::any _context;
     std::atomic_int8_t _state;
+    size_t _timeoutTimerId;
+    int64_t _connTimeout;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     WriteCompleteCallback _writeCompleteCb;

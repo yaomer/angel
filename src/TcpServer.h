@@ -51,6 +51,9 @@ public:
     void executor(const TaskCallback _cb)
     { _threadPool->addTask(std::move(_cb)); }
 
+    void setConnectionTimeout(int64_t timeout)
+    { _connTimeout = timeout; }
+
     void start();
     void quit();
     void setConnectionCb(const ConnectionCallback _cb)
@@ -72,6 +75,7 @@ private:
     ConnectionMaps _connectionMaps;
     std::unique_ptr<ThreadPool> _threadPool;
     Id _connId;
+    int64_t _connTimeout;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     CloseCallback _closeCb;

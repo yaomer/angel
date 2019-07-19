@@ -95,7 +95,7 @@ void EventLoop::run()
     if (_signaler) _signaler->start();
     while (!_quit) {
         int64_t timeout = _timer->timeout();
-        logDebug("timeout = %zd", timeout);
+        logDebug("timeout = %zd ms", timeout);
         int nevents = _poller->wait(this, timeout);
         if (nevents > 0) {
             logDebug("nevents = %d", nevents);

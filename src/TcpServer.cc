@@ -13,7 +13,8 @@ TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
     _acceptor(new Acceptor(loop, listenAddr)),
     _ioThreadPool(new EventLoopThreadPool),
     _threadPool(new ThreadPool),
-    _connId(1)
+    _connId(1),
+    _connTimeout(-1)
 {
     _acceptor->setNewConnectionCb(
             std::bind(&TcpServer::newConnection, this, _1));
@@ -49,6 +50,11 @@ void TcpServer::newConnection(int fd)
     if (_connectionCb)
         ioLoop->runInLoop(
                 [this, conn]{ this->_connectionCb(conn); });
+    if (_connTimeout > 0) {
+        size_t id = ioLoop->runAfter(_connTimeout, [conn]{ conn->close(); });
+        conn->setTimeoutTimerId(id);
+        conn->setConnTimeout(_connTimeout);
+    }
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)

@@ -20,7 +20,9 @@ TcpConnection::TcpConnection(size_t id,
     _socket(new Socket(sockfd)),
     _localAddr(localAddr),
     _peerAddr(peerAddr),
-    _state(CONNECTING)
+    _state(CONNECTING),
+    _timeoutTimerId(0),
+    _connTimeout(0)
 {
     _channel->setFd(sockfd);
     _channel->setEventReadCb([this]{ this->handleRead(); });
@@ -52,6 +54,7 @@ void TcpConnection::handleRead()
     } else {
         handleError();
     }
+    updateTimeoutTimer();
 }
 
 // 每当关注的sockfd可写时，由handleWrite()负责将
@@ -86,6 +89,7 @@ void TcpConnection::handleWrite()
 void TcpConnection::handleClose()
 {
     logInfo("[fd = %d] is closed", _channel->fd());
+    if (_state == CLOSED) return;
     setState(CLOSED);
     if (_closeCb)
         _loop->runInLoop(
@@ -102,6 +106,7 @@ void TcpConnection::handleError()
 void TcpConnection::close()
 {
     logInfo("[fd = %d] is closing", _channel->fd());
+    if (_state == CLOSED) return;
     setState(CLOSING);
     if (_closeCb)
         _loop->runInLoop(
@@ -153,6 +158,7 @@ void TcpConnection::send(const std::string& s)
         _loop->runInLoop(
                 std::bind(&TcpConnection::sendInLoop, this, std::string(s)));
     }
+    updateTimeoutTimer();
 }
 
 void TcpConnection::send(const char *s)
@@ -171,4 +177,11 @@ void TcpConnection::send(const void *v, size_t len)
     const char *vptr = reinterpret_cast<const char*>(v);
     std::copy(vptr, vptr + len, s.begin());
     send(std::move(s));
+}
+
+void TcpConnection::updateTimeoutTimer()
+{
+    _loop->cancelTimer(_timeoutTimerId);
+    _timeoutTimerId = _loop->runAfter(
+            _connTimeout, [this]{ shared_from_this()->close(); });
 }
