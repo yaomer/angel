@@ -15,6 +15,7 @@ Select::Select()
     FD_ZERO(&_wrset);
     _fds.reserve(_INIT_FDS_SIZE);
     _maxFd = -1;
+    setName("select");
 }
 
 Select::~Select()

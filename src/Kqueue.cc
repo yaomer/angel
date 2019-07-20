@@ -19,6 +19,7 @@ Kqueue::Kqueue()
 {
     _kqfd = kqueue();
     _evlist.resize(_evlistSize);
+    setName("kqueue");
 }
 
 Kqueue::~Kqueue()

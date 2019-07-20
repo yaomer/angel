@@ -2,6 +2,7 @@
 #define _ANGEL_POLLER_H
 
 #include <cinttypes>
+#include <string>
 
 namespace Angel {
 class EventLoop;
@@ -14,6 +15,11 @@ public:
     virtual void change(int fd, int events) = 0;
     // 为remove()添加events参数是出于Kqueue的需要
     virtual void remove(int fd, int events) = 0;
+
+    void setName(const char *name) { _name = name; }
+    const char *name() { return _name.c_str(); }
+private:
+    std::string _name;
 };
 }
 

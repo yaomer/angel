@@ -34,9 +34,6 @@ typedef std::function<void()> TimerCallback;
 typedef std::function<void()> TaskCallback;
 // for EventLoop
 typedef std::function<void()> Functor;
-// for TimeWheel
-typedef std::shared_ptr<Entry> EntryPtr;
-typedef std::weak_ptr<Entry> WeakEntryPtr;
 
 }
 

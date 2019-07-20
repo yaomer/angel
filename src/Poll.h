@@ -13,6 +13,8 @@ class EventLoop;
 
 class Poll : public Poller, noncopyable {
 public:
+    Poll() { setName("poll"); }
+    ~Poll() {  }
     int wait(EventLoop *loop, int64_t timeout);
     void add(int fd, int events);
     void change(int fd, int events);

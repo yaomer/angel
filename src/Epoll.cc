@@ -17,6 +17,7 @@ Epoll::Epoll()
 {
     _epfd = epoll_create(1);
     _evList.resize(_evListSize);
+    setName("epoll");
 }
 
 Epoll::~Epoll()
