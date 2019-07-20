@@ -1,46 +1,21 @@
 #ifndef _ANGEL_CHATSERVER_H
 #define _ANGEL_CHATSERVER_H
 
-#include <Angel/EventLoop.h>
-#include <Angel/TcpServer.h>
-#include <map>
-#include <memory>
+#include "../Angel.h"
 
 using namespace Angel;
-using std::placeholders::_1;
-using std::placeholders::_2;
-
-class User {
-public:
-    User(size_t userId, size_t connId) 
-        : _userId(userId), _connId(connId), _chatId(0) {  }
-    ~User() {  }
-    size_t getUserId() const { return _userId; }
-    size_t getConnId() const { return _connId; }
-    size_t getChatId() const { return _chatId; }
-    void setChatId(size_t chatId) { _chatId = chatId; }
-private:
-    size_t _userId;
-    size_t _connId;
-    size_t _chatId;
-};
 
 // 一个简单的聊天服务
 class ChatServer {
 public:
-    typedef std::shared_ptr<User> UserPtr;
-
     ChatServer(EventLoop *loop, InetAddr& inetAddr)
         : _loop(loop),
-        _server(loop, inetAddr),
-        _userId(1)
+        _server(loop, inetAddr)
     {
         _server.setConnectionCb(
                 std::bind(&ChatServer::onConnection, this, _1));
         _server.setMessageCb(
                 std::bind(&ChatServer::onMessage, this, _1, _2));
-        _server.setCloseCb(
-                std::bind(&ChatServer::onClose, this, _1));
     }
     void onConnection(const TcpConnectionPtr& conn)
     {
@@ -49,128 +24,78 @@ public:
         snprintf(buf, sizeof(buf), 
                 "Welcome to chat-room, your chat-id is %zu, "
                 "there %s %zu people is online\n", 
-                _userId, 
+                conn->id(), 
                 clients > 1 ? "are" : "is",
                 clients);
         conn->send(buf);
         conn->send("Online Ids: ");
-        for (auto it : _userMaps) {
-            snprintf(buf, sizeof(buf), "%lu ", it.first);
+        for (auto& it : _server.connectionMaps()) {
+            snprintf(buf, sizeof(buf), "%zu ", it.second->id());
             conn->send(buf);
         }
         conn->send("\n");
-        auto usr = new User(_userId, conn->id());
-        conn->setContext(UserPtr(usr));
-        _userMaps.insert(std::make_pair(_userId, usr));
-        _userId++;
     }
     void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
     {
         char sbuf[256];
-        auto curUser = boost::any_cast<UserPtr>(conn->getContext());
-        snprintf(sbuf, sizeof(sbuf), "[id %zu]: ", curUser->getUserId());
-        buf.skipSpaceOfStart();
+        snprintf(sbuf, sizeof(sbuf), "[id %zu]: ", conn->id());
         // buf.readable() >= strlen("\n")
         while (buf.readable() >= 1) {
             int lf = buf.findLf();
             if (lf >= 0) {
                 if (strncmp(buf.c_str(), "help", 4) == 0) {
-                    int i = 4;
-                    while (isspace(buf[i])) {
-                        if (buf[i++] == '\n') {
-                            conn->send(_help);
-                            buf.retrieve(lf + 1);
-                        }
-                    }
+                    conn->send(_help);
+                    buf.retrieveAll();
                 } else if (strncmp(buf.c_str(), "grp ", 4) == 0) {
                     // broadcast msg to all clients
-                    int i = 4;
-                    while (isspace(buf[i])) {
-                        if (buf[i++] == '\n') {
-                            buf.retrieve(lf + 1);
-                            continue;
-                        }
-                    }
+                    buf.retrieve(4);
                     for (auto& it : _server.connectionMaps()) {
                         it.second->send(sbuf);
-                        it.second->send(&buf[i], lf + 1 - i);
+                        it.second->send(buf.c_str(), lf + 1 - 4);
                     }
+                    buf.retrieve(lf + 1 - 4);
                 } else if (strncmp(buf.c_str(), "id ", 3) == 0) {
                     // send msg to id
-                    int i = 3;
-                    while (isspace(buf[i])) {
-                        if (buf[i++] == '\n') {
-                            buf.retrieve(lf + 1);
-                            continue;
-                        }
-                    }
-                    int j = i;
-                    while (isalnum(buf[j]))
-                        j++;
-                    buf[j++] = '\0';
-                    size_t id = atol(&buf[j]);
-                    curUser->setChatId(id);
-                    while (isspace(buf[j])) {
-                        if (buf[j++] == '\n') {
-                            buf.retrieve(lf + 1);
-                            continue;
-                        }
-                    }
-                    auto usr = getUser(id);
-                    if (usr) {
-                        auto it = _server.getConnection(usr->getConnId());
-                        it->send(sbuf);
-                        it->send(&buf[j], lf + 1 - j);
-                    } else
-                        conn->send("The user is gone\n");
+                    buf.retrieve(3);
+                    int i = 0;
+                    while (isalnum(buf[i]))
+                        i++;
+                    buf[i] = '\0';
+                    size_t id = atol(buf.c_str());
+                    conn->setContext(id);
+                    buf.retrieve(i);
+                    auto it = _server.getConnection(id);
+                    it->send(sbuf);
+                    it->send(buf.c_str(), lf + 1 - (i + 3));
+                    buf.retrieve(lf + 1 - (i + 3));
                 } else {
-                    if (curUser->getChatId() == 0) {
+                    if (conn->getContext().empty()) {
                         // echo msg
+                        conn->send(sbuf);
                         conn->send(buf.c_str(), lf + 1);
                         buf.retrieve(lf + 1);
                         continue;
                     }
                     // continue chat with id
-                    auto c = getUser(curUser->getChatId());
-                    if (c) {
-                        auto it = _server.getConnection(c->getConnId());
-                        it->send(sbuf);
-                        it->send(buf.c_str(), lf + 1);
-                    } else
-                        conn->send("The user is gone\n");
+                    size_t id = boost::any_cast<size_t>(conn->getContext());
+                    auto it = _server.getConnection(id);
+                    it->send(sbuf);
+                    it->send(buf.c_str(), lf + 1);
+                    buf.retrieve(lf + 1);
                 }
             } else
                 break;
-            buf.retrieve(lf + 1);
         }
-    }
-    void onClose(const TcpConnectionPtr& conn)
-    {
-        auto it = boost::any_cast<UserPtr>(conn->getContext());
-        _userMaps.erase(it->getUserId());
-    }
-    User *getUser(size_t id)
-    {
-        auto it = _userMaps.find(id);
-        if (it != _userMaps.cend())
-            return it->second;
-        else
-            return nullptr;
     }
     void start()
     {
-        // 开启4个IO线程
         _server.setIoThreadNums(4);
         _server.start();
     }
-    void quit() { _loop->quit(); }
 private:
     static const char *_help;
     EventLoop *_loop;
     TcpServer _server;
-    size_t _userId;
-    // 直接使用conn->id()可能会导致串话
-    std::map<size_t, User*> _userMaps;
 };
 
 #endif // _ANGEL_CHATSERVER_H

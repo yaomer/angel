@@ -40,8 +40,7 @@ TcpConnection::~TcpConnection()
 void TcpConnection::handleRead()
 {
     ssize_t n = _input.readFd(_channel->fd());
-    logInfo("read %zd bytes: [%s] from [fd = %d]", n, _input.c_str(),
-            _channel->fd());
+    logInfo("read %zd bytes from [fd = %d]", n, _channel->fd());
     if (n > 0) {
         if (_messageCb)
             _messageCb(shared_from_this(), _input);
@@ -113,19 +112,18 @@ void TcpConnection::close()
                 std::bind(_closeCb, shared_from_this()));
 }
 
-void TcpConnection::sendInLoop(const std::string& s)
+void TcpConnection::sendInLoop(const char *data, size_t len)
 {
     ssize_t n = 0;
-    size_t remainBytes = s.size();
+    size_t remainBytes = len;
 
     if (_state == CLOSED)
         return;
     if (!_channel->isWriting() && _output.readable() == 0) {
-        n = write(_channel->fd(), s.data(), s.size());
-        logInfo("write %zd bytes: [%s] to [fd = %d]", n, s.c_str(),
-                _channel->fd());
+        n = write(_channel->fd(), data, len);
+        logInfo("write %zd bytes to [fd = %d]", n, _channel->fd());
         if (n >= 0) {
-            remainBytes = s.size() - n;
+            remainBytes = len - n;
             if (remainBytes == 0) {
                 if (_writeCompleteCb)
                     _loop->queueInLoop(
@@ -142,45 +140,49 @@ void TcpConnection::sendInLoop(const std::string& s)
         }
     }
     if (remainBytes > 0) {
-        _output.append(s.data() + n, s.size() - n);
+        _output.append(data + n, len - n);
         if (!_channel->isWriting())
             _channel->enableWrite();
     }
 }
 
-void TcpConnection::send(const std::string& s)
+void TcpConnection::sendInNotIoThread(const std::string& data)
+{
+    sendInLoop(data.data(), data.size());
+}
+
+void TcpConnection::send(const char *s, size_t len)
 {
     if (_loop->isInLoopThread()) {
         // 在本线程直接发送即可
-        sendInLoop(s);
+        sendInLoop(s, len);
     } else {
         // 跨线程必须将数据拷贝一份，防止数据失效
         _loop->runInLoop(
-                std::bind(&TcpConnection::sendInLoop, this, std::string(s)));
+                std::bind(&TcpConnection::sendInNotIoThread, this, std::string(s, len)));
     }
     updateTimeoutTimer();
 }
 
 void TcpConnection::send(const char *s)
 {
-    send(std::move(std::string(s)));
+    send(s, strlen(s));
 }
 
-void TcpConnection::send(const char *s, size_t len)
+void TcpConnection::send(const std::string& s)
 {
-    send(std::move(std::string(s, len)));
+    send(s.data(), s.size());
 }
 
 void TcpConnection::send(const void *v, size_t len)
 {
-    std::string s(len, 0);
-    const char *vptr = reinterpret_cast<const char*>(v);
-    std::copy(vptr, vptr + len, s.begin());
-    send(std::move(s));
+    send(reinterpret_cast<const char*>(v), len);
 }
 
 void TcpConnection::updateTimeoutTimer()
 {
+    if (_timeoutTimerId == 0)
+        return;
     _loop->cancelTimer(_timeoutTimerId);
     _timeoutTimerId = _loop->runAfter(
             _connTimeout, [this]{ shared_from_this()->close(); });

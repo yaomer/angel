@@ -61,7 +61,8 @@ private:
     void handleWrite();
     void handleClose();
     void handleError();
-    void sendInLoop(const std::string& s);
+    void sendInLoop(const char *data, size_t len);
+    void sendInNotIoThread(const std::string& data);
     void updateTimeoutTimer();
 
     size_t _id;
