@@ -45,6 +45,14 @@ void Timer::cancelTimerInLoop(size_t id)
 {
     auto it = _idMaps.find(id);
     if (it != _idMaps.end()) {
+        // 对于multiset来说，由于它存储的值可重复，所以它不能简单的
+        // 用find()来查找，因为如果存在多个相同的元素，这无法确定
+        // 到底返回哪个，而我们则需要返回所有相同的元素，有两种方法
+        // 可以做到：
+        // 1. 使用equal_range()，它返回一个pair，[first, second)区间
+        // 表示所有匹配的元素
+        // 2. [lower_bound(), upper_bound()) <==> [first, second)
+        // 这两种方法实际上是大同小异的，看个人喜好了
         auto range = _timer.equal_range(it->second);
         for (auto it = range.first; it != range.second; it++) {
             if ((*it)->id() == id) {

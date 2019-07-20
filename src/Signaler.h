@@ -13,6 +13,13 @@ namespace Angel {
 
 class EventLoop;
 
+// Signaler用来处理信号事件，但我们实际上是用socketpair将其转化为
+// I/O事件来处理的，这就将信号的异步转化为了同步，从而简化了处理
+//
+// 我们将管道的一端(fd[0])注册到eventloop中，然后每当有信号被捕获时，
+// 我们就向fd[1]中写入1 byte，这1 byte实际上就是该信号的信号值，
+// 然后当我们在loop中监听到有sigChannel的可读事件发生时，我们就会
+// 根据读到的信号值去调用用户注册的不同的信号处理函数
 class Signaler : noncopyable {
 public:
     explicit Signaler(EventLoop *);

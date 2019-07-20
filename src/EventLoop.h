@@ -18,13 +18,17 @@
 
 namespace Angel {
 
+// reactor模式的核心，事件循环的驱动
 class EventLoop : noncopyable {
 public:
     EventLoop();
     ~EventLoop();
+    // 向loop中注册一个事件
     void addChannel(const ChannelPtr& chl);
+    // 从loop中删除一个事件
     void removeChannel(const ChannelPtr& chl);
 
+    // 修改关联到fd上的事件
     void changeEvent(int fd, int events)
     { _poller->change(fd, events); }
 
@@ -57,6 +61,7 @@ private:
     std::map<int, std::shared_ptr<Channel>> _channelMaps;
     std::vector<std::shared_ptr<Channel>> _activeChannels;
     std::atomic_bool _quit;
+    // 一个任务队列，用于将非io线程的任务转到io线程执行
     std::vector<Functor> _functors;
     std::mutex _mutex;
     int _wakeFd[2];

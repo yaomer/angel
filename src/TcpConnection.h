@@ -17,6 +17,8 @@ namespace Angel {
 
 class EventLoop;
 
+// TcpConnection抽象一个Tcp连接，它是不可再生的，连接到来时
+// 被构造，连接断开时被析构
 class TcpConnection : noncopyable,
     public std::enable_shared_from_this<TcpConnection> {
 public:
@@ -73,14 +75,23 @@ private:
     Buffer _output;
     InetAddr _localAddr;
     InetAddr _peerAddr;
+    // 保存连接所需的上下文
     boost::any _context;
+    // 标识一个连接所处的状态
     std::atomic_int8_t _state;
+    // 连接的超时定时器的id
     size_t _timeoutTimerId;
+    // 连接的超时值
     int64_t _connTimeout;
+    // 接受一个新连接后调用
     ConnectionCallback _connectionCb;
+    // 正常的消息通讯使用
     MessageCallback _messageCb;
+    // 数据发送完成后调用
     WriteCompleteCallback _writeCompleteCb;
+    // 关闭连接时调用
     CloseCallback _closeCb;
+    // 连接出错时调用
     ErrorCallback _errorCb;
 };
 

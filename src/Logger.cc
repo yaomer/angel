@@ -22,9 +22,11 @@ namespace Angel {
     int Logger::log_flush = Logger::FLUSH_TO_FILE;
 }
 
+// 用户键入Ctr+C后，flush logger
 void flush_log_buf(int signo)
 {
     Logger::quit();
+    fprintf(stderr, "\n");
 }
 
 Logger::Logger()

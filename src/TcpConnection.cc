@@ -53,6 +53,7 @@ void TcpConnection::handleRead()
     } else {
         handleError();
     }
+    // 有事件发生后，更新相应的超时定时器
     updateTimeoutTimer();
 }
 
@@ -77,6 +78,7 @@ void TcpConnection::handleWrite()
             }
         } else {
             logError("write: %s", strerrno());
+            // 对端尚未与我们建立连接或者对端已关闭连接
             if (errno == ECONNRESET || errno == EPIPE) {
                 handleClose();
                 return;
@@ -85,6 +87,8 @@ void TcpConnection::handleWrite()
     }
 }
 
+// 对端关闭连接或连接出错时调用，强制关闭一个连接，
+// 未发送完的数据将会被丢弃
 void TcpConnection::handleClose()
 {
     logInfo("[fd = %d] is closed", _channel->fd());
@@ -98,10 +102,13 @@ void TcpConnection::handleClose()
 void TcpConnection::handleError()
 {
     logError("[fd = %d]: %s", _channel->fd(), strerrno());
+    // 对端已关闭连接
     if (errno == ECONNRESET)
         handleClose();
 }
 
+// 服务端主动关闭一个连接时调用，保证停留在缓冲区中的数据
+// 发送完后才真正断开连接
 void TcpConnection::close()
 {
     logInfo("[fd = %d] is closing", _channel->fd());
@@ -159,7 +166,8 @@ void TcpConnection::send(const char *s, size_t len)
     } else {
         // 跨线程必须将数据拷贝一份，防止数据失效
         _loop->runInLoop(
-                std::bind(&TcpConnection::sendInNotIoThread, this, std::string(s, len)));
+                std::bind(&TcpConnection::sendInNotIoThread, this,
+                    std::string(s, len)));
     }
     updateTimeoutTimer();
 }

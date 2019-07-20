@@ -16,6 +16,8 @@ using namespace std::placeholders;
 
 namespace Angel{
     // 保护__signalerPtr，使之正确初始化
+    // 由于信号的特殊性，所以每个进程只能存在一个Signaler实例，
+    // 即它只能绑定在一个eventloop上
     std::mutex _SYNC_INIT_LOCK;
     Angel::Signaler *__signalerPtr = nullptr;
 
@@ -45,6 +47,8 @@ void Signaler::start()
     _loop->addChannel(_sigChannel);
 }
 
+// 每当有信号发生时被调用，用于将完全异步信号事件转换为
+// 同步的I/O事件
 void Signaler::sigHandler(int signo)
 {
     ssize_t n = write(_signalFd,
@@ -99,6 +103,7 @@ void Signaler::cancelInLoop(int signo)
         logError("sigaction: %s", strerrno());
 }
 
+// 信号捕获函数，根据读到的信号值调用对应的信号处理函数
 void Signaler::sigCatch()
 {
     static char buf[1024];

@@ -166,6 +166,7 @@ void EventLoop::runInLoop(const Functor _cb)
         _cb();
 }
 
+// 向任务队列中添加一个任务
 void EventLoop::queueInLoop(const Functor _cb)
 {
     std::lock_guard<std::mutex> mlock(_mutex);
@@ -173,6 +174,7 @@ void EventLoop::queueInLoop(const Functor _cb)
     wakeup();
 }
 
+// [timeout ms]后执行一次_cb
 size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
     int64_t expire = TimeStamp::now() + timeout;
@@ -181,6 +183,7 @@ size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
     return id;
 }
 
+// 每隔[interval ms]执行一次_cb
 size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
     int64_t expire = TimeStamp::now() + interval;

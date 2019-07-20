@@ -8,6 +8,7 @@
 #include <atomic>
 #include "Buffer.h"
 #include "LogStream.h"
+#include "EventLoop.h"
 #include "noncopyable.h"
 
 namespace Angel {

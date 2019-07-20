@@ -67,6 +67,8 @@ void Channel::changeEvents()
     _loop->changeEvent(fd(), events());
 }
 
+// 事件多路分发器，如果Channel上有事件发生，则根据
+// 不同的事件触发不同的回调
 void Channel::handleEvent()
 {
     logInfo("[fd = %d] revents is [%s]", fd(), revstr());
