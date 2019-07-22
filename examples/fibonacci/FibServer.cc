@@ -1,5 +1,6 @@
+#include <Angel/EventLoop.h>
+#include <Angel/TcpServer.h>
 #include "FibServer.h"
-#include "../Angel.h"
 
 // 这里我们用telnet充当client来测试FibServer
 // 在本机上测试如下：
