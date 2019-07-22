@@ -42,12 +42,14 @@ public:
         _buf[_writeindex] = '\0';
         return peek();
     }
+    int findStr(char *s, const char *p, size_t plen)
+    {
+        const char *pattern = std::search(s, begin() + _writeindex, p, p + plen);
+        return pattern == begin() + _writeindex ? -1 : pattern - s;
+    }
     int findStr(const char *s, size_t len)
     {
-        const char *pattern = 
-            std::search(peek(), begin() + _writeindex, s, s + len);
-        return pattern == begin() + _writeindex ? 
-            -1 : pattern - peek();
+        return findStr(peek(), s, len);
     }
     // 返回\r\n在Buffer中第一次出现的位置，没出现返回-1
     int findCrlf() { return findStr("\r\n", 2); }
