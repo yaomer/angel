@@ -1,6 +1,5 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpServer.h>
-#include <Angel/InetAddr.h>
 #include "ChargenServer.h"
 
 // chargen协议：详见RFC864

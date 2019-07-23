@@ -1,5 +1,4 @@
 #include <Angel/EventLoop.h>
-#include <Angel/InetAddr.h>
 #include <Angel/TcpClient.h>
 #include "ChargenClient.h"
 

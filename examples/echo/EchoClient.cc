@@ -1,4 +1,5 @@
-#include <Angel/TcpServer.h>
+#include <Angel/EventLoopThread.h>
+#include <Angel/TcpClient.h>
 #include "EchoClient.h"
 
 using namespace Angel;

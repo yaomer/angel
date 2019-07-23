@@ -1,9 +1,12 @@
 #ifndef _ANGEL_CHATSERVER_H
 #define _ANGEL_CHATSERVER_H
 
-#include "../Angel.h"
+#include <Angel/EventLoop.h>
+#include <Angel/TcpServer.h>
 
 using namespace Angel;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 // 一个简单的聊天服务
 class ChatServer {
