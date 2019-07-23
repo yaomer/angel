@@ -1,4 +1,0 @@
-#define _ANGEL_HAVE_POLL
-/* #undef _ANGEL_HAVE_EPOLL */
-#define _ANGEL_HAVE_KQUEUE
-#define _ANGEL_HAVE_SELECT
