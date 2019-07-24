@@ -25,7 +25,7 @@ void Socket::setKeepAlive(bool on)
     socklen_t opt = on ? 1 : 0;
 #ifdef _ANGEL_HAVE_TCP_KEEPALIVE
     int optval = TCP_KEEPALIVE;
-#elif _ANGEL_HAVE_SO_KEEPALIVE
+#elif defined (_ANGEL_HAVE_SO_KEEPALIVE)
     int optval = SO_KEEPALIVE;
 #endif
     if (::setsockopt(_sockfd, SOL_SOCKET, optval, &opt, sizeof(opt)) < 0)
