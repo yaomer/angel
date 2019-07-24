@@ -10,8 +10,8 @@
 
 int main()
 {
-    EventLoop loop;
-    InetAddr listenAddr(8000);
+    Angel::EventLoop loop;
+    Angel::InetAddr listenAddr(8000);
     FibServer server(&loop, listenAddr);
     server.start();
     loop.run();

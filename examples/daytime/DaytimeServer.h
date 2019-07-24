@@ -4,19 +4,18 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpServer.h>
 
-using namespace Angel;
 using std::placeholders::_1;
 
 class DaytimeServer {
 public:
-    DaytimeServer(EventLoop *loop, InetAddr& inetAddr)
+    DaytimeServer(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _server(loop, inetAddr)
     {
         _server.setConnectionCb(
                 std::bind(&DaytimeServer::onConnection, this, _1));
     }
-    void onConnection(const TcpConnectionPtr& conn)
+    void onConnection(const Angel::TcpConnectionPtr& conn)
     {
         struct tm tm;
         time_t now = time(nullptr);
@@ -27,10 +26,9 @@ public:
         conn->close();
     }
     void start() { _server.start(); }
-    void quit() { _loop->quit(); }
 private:
-    EventLoop *_loop;
-    TcpServer _server;
+    Angel::EventLoop *_loop;
+    Angel::TcpServer _server;
 };
 
 #endif // _ANGEL_DAYTIMESERVER_H

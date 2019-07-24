@@ -2,8 +2,6 @@
 #include <Angel/TcpServer.h>
 #include "ChatServer.h"
 
-using namespace Angel;
-
 // 用telnet充当client，可以多人匿名聊天
 
 const char *ChatServer::_help = {
@@ -17,8 +15,8 @@ const char *ChatServer::_help = {
 
 int main()
 {
-    EventLoop loop;
-    InetAddr listenAddr(8000);
+    Angel::EventLoop loop;
+    Angel::InetAddr listenAddr(8000);
     ChatServer server(&loop, listenAddr);
     server.start();
     loop.run();

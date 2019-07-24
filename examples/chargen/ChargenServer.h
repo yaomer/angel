@@ -5,12 +5,11 @@
 #include <Angel/TcpServer.h>
 #include <string>
 
-using namespace Angel;
 using std::placeholders::_1;
 
 class ChargenServer {
 public:
-    ChargenServer(EventLoop *loop, InetAddr& inetAddr)
+    ChargenServer(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _server(loop, inetAddr)
     {
@@ -21,11 +20,11 @@ public:
         _server.setIoThreadNums(3);
         creatChargenMsg();
     }
-    void onConnection(const TcpConnectionPtr& conn)
+    void onConnection(const Angel::TcpConnectionPtr& conn)
     {
         conn->send(_msg);
     }
-    void onWriteComplete(const TcpConnectionPtr& conn)
+    void onWriteComplete(const Angel::TcpConnectionPtr& conn)
     {
         conn->send(_msg);
     }
@@ -41,10 +40,9 @@ public:
             _msg += s.substr(i, 72) + "\n";
     }
     void start() { _server.start(); }
-    void quit() { _loop->quit(); }
 private:
-    EventLoop *_loop;
-    TcpServer _server;
+    Angel::EventLoop *_loop;
+    Angel::TcpServer _server;
     std::string _msg;
 };
 

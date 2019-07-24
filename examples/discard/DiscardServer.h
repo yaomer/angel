@@ -6,13 +6,12 @@
 #include <iostream>
 #include <mutex>
 
-using namespace Angel;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 class DiscardServer {
 public:
-    DiscardServer(EventLoop *loop, InetAddr& inetAddr)
+    DiscardServer(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _server(loop, inetAddr)
     {
@@ -21,7 +20,7 @@ public:
         // 统计每秒的流量
         _loop->runEvery(1000, [this]{ this->printFlow(); });
     }
-    void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
+    void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
         // 对于目前是单线程的server来说是可以不用加锁的
         std::lock_guard<std::mutex> mlock(_mutex);
@@ -38,8 +37,8 @@ public:
     }
     void start() { _server.start(); }
 private:
-    EventLoop *_loop;
-    TcpServer _server;
+    Angel::EventLoop *_loop;
+    Angel::TcpServer _server;
     std::mutex _mutex;
     size_t _recvBytes;
 };

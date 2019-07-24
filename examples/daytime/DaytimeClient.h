@@ -4,29 +4,27 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpClient.h>
 
-using namespace Angel;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 class DaytimeClient {
 public:
-    DaytimeClient(EventLoop *loop, InetAddr& inetAddr)
+    DaytimeClient(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _client(loop, inetAddr, "DaytimeClient")
     {
         _client.setMessageCb(
                 std::bind(&DaytimeClient::onMessage, this, _1, _2));
     }
-    void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
+    void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
         std::cout << buf.c_str();
         buf.retrieveAll();
     }
     void start() { _client.start(); }
-    void quit() { _loop->quit(); }
 private:
-    EventLoop *_loop;
-    TcpClient _client;
+    Angel::EventLoop *_loop;
+    Angel::TcpClient _client;
 };
 
 #endif

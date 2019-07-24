@@ -4,20 +4,19 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpClient.h>
 
-using namespace Angel;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 class TimeClient {
 public:
-    TimeClient(EventLoop *loop, InetAddr& inetAddr)
+    TimeClient(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _client(loop, inetAddr, "TimeClient")
     {
         _client.setMessageCb(
                 std::bind(&TimeClient::onMessage, this, _1, _2));
     }
-    void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
+    void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
         if (buf.readable() >= sizeof(int32_t)) {
             char time[32];
@@ -28,10 +27,9 @@ public:
         }
     }
     void start() { _client.start(); }
-    void quit() { _loop->quit(); }
 private:
-    EventLoop *_loop;
-    TcpClient _client;
+    Angel::EventLoop *_loop;
+    Angel::TcpClient _client;
 };
 
 #endif // _ANGEL_TIME_CLIENT_H

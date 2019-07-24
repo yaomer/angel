@@ -4,13 +4,12 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpServer.h>
 
-using namespace Angel;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 class FibServer {
 public:
-    FibServer(EventLoop *loop, InetAddr& inetAddr)
+    FibServer(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _server(loop, inetAddr)
     {
@@ -19,7 +18,7 @@ public:
         // 用一个thread pool来计算fibonacci
         _server.setTaskThreadNums(4);
     }
-    void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
+    void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
         size_t n = atol(buf.c_str());
         _server.executor([this, n, conn]{ 
@@ -38,10 +37,9 @@ public:
         return fib(n - 1) + fib(n - 2);
     }
     void start() { _server.start(); }
-    void quit() { _loop->quit(); }
 private:
-    EventLoop *_loop;
-    TcpServer _server;
+    Angel::EventLoop *_loop;
+    Angel::TcpServer _server;
 };
 
 #endif // _ANGEL_FIBSERVER_H

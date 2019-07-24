@@ -6,12 +6,10 @@
 // 连接建立后，服务端不断发送任意字符序列到客户端，
 // 直到客户端关闭连接
 
-using namespace Angel;
-
 int main()
 {
-    EventLoop loop;
-    InetAddr listenAddr(8000);
+    Angel::EventLoop loop;
+    Angel::InetAddr listenAddr(8000);
     ChargenServer server(&loop, listenAddr);
     server.start();
     loop.run();

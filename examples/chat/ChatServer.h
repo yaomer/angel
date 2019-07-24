@@ -4,14 +4,13 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpServer.h>
 
-using namespace Angel;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 // 一个简单的聊天服务
 class ChatServer {
 public:
-    ChatServer(EventLoop *loop, InetAddr& inetAddr)
+    ChatServer(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _server(loop, inetAddr)
     {
@@ -20,7 +19,7 @@ public:
         _server.setMessageCb(
                 std::bind(&ChatServer::onMessage, this, _1, _2));
     }
-    void onConnection(const TcpConnectionPtr& conn)
+    void onConnection(const Angel::TcpConnectionPtr& conn)
     {
         char buf[256];
         size_t clients = _server.clients();
@@ -38,7 +37,7 @@ public:
         }
         conn->send("\n");
     }
-    void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
+    void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
         char sbuf[256];
         snprintf(sbuf, sizeof(sbuf), "[id %zu]: ", conn->id());
@@ -97,8 +96,8 @@ public:
     }
 private:
     static const char *_help;
-    EventLoop *_loop;
-    TcpServer _server;
+    Angel::EventLoop *_loop;
+    Angel::TcpServer _server;
 };
 
 #endif // _ANGEL_CHATSERVER_H

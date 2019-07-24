@@ -3,38 +3,32 @@
 
 #include <Angel/EventLoop.h>
 #include <Angel/TcpClient.h>
-#include <Angel/LogStream.h>
 
-using namespace Angel;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 class EchoClient {
 public:
-    EchoClient(EventLoop *loop, InetAddr& inetAddr)
+    EchoClient(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
         _client(loop, inetAddr, "EchoClient")
     {
         _client.setMessageCb(
                 std::bind(&EchoClient::onMessage, this, _1, _2));
     }
-    void write(char *buf)
-    {
-        ssize_t n = ::write(_client.conn()->getChannel()->fd(), 
-                buf, strlen(buf));
-        if (n < 0)
-            logError("write: %s", strerrno());
-    }
-    void onMessage(const TcpConnectionPtr& conn, Buffer& buf)
+    void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
         std::cout << buf.c_str() << std::endl;
         buf.retrieveAll();
     }
+    void send(char *buf)
+    {
+        _client.conn()->send(buf);
+    }
     void start() { _client.start(); }
-    void quit() { _loop->quit(); }
 private:
-    EventLoop *_loop;
-    TcpClient _client;
+    Angel::EventLoop *_loop;
+    Angel::TcpClient _client;
 };
 
 #endif

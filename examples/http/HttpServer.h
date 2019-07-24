@@ -44,7 +44,6 @@ public:
         }
     }
     void start() { _server.start(); }
-    void quit() { _loop->quit(); }
 private:
     Angel::EventLoop *_loop;
     Angel::TcpServer _server;
