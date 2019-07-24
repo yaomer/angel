@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <string.h>
 #include "EventLoop.h"
 #include "InetAddr.h"
 #include "Socket.h"
