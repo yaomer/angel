@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <string.h>
 #include "SockOps.h"
 #include "LogStream.h"
 

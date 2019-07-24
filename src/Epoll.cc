@@ -2,6 +2,7 @@
 
 #ifdef _ANGEL_HAVE_EPOLL
 
+#include <unistd.h>
 #include <sys/epoll.h>
 #include <vector>
 #include "EventLoop.h"
@@ -57,7 +58,7 @@ int Epoll::wait(EventLoop *loop, int64_t timeout)
     int nevents = epoll_wait(_epfd, &_evList[0], _evList.size(), timeout);
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
-            auto chl = loop->search(_evList[i].data.fd);
+            auto chl = loop->searchChannel(_evList[i].data.fd);
             chl->setRevents(evret(_evList[i].events));
             loop->fillActiveChannel(chl);
         }

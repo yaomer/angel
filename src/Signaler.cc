@@ -1,5 +1,6 @@
 #include <signal.h>
 #include <unistd.h>
+#include <string.h>
 #include <functional>
 #include <mutex>
 #include <memory>
@@ -53,7 +54,7 @@ void Signaler::sigHandler(int signo)
 {
     ssize_t n = write(_signalFd,
                       reinterpret_cast<void *>(&signo), 1);
-    logInfo("Sig%s is triggered", sys_signame[signo]);
+    logInfo("Sig[%d] is triggered", signo);
     if (n != 1)
         logError("write %zd bytes instead of 1");
 }

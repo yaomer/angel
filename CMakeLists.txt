@@ -2,14 +2,24 @@ cmake_minimum_required (VERSION 3.1)
 
 project (Angel)
 
-set (CMAKE_CXX_FLAGS "-std=c++11 -Wall -O2")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang$")
+    set (CMAKE_CXX_FLAGS "-std=c++11 -Wall -O2")
+endif()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    set (CMAKE_CXX_FLAGS "-std=c++11 -Wall -O2 -Wno-sign-compare")
+endif()
 
 include (CheckFunctionExists)
+include (CheckSymbolExists)
 
 CHECK_FUNCTION_EXISTS (poll _ANGEL_HAVE_POLL)
 CHECK_FUNCTION_EXISTS (epoll_wait _ANGEL_HAVE_EPOLL)
 CHECK_FUNCTION_EXISTS (kqueue _ANGEL_HAVE_KQUEUE)
 CHECK_FUNCTION_EXISTS (select _ANGEL_HAVE_SELECT)
+
+CHECK_SYMBOL_EXISTS (TCP_KEEPALIVE netinet/tcp.h _ANGEL_HAVE_TCP_KEEPALIVE)
+CHECK_SYMBOL_EXISTS (SO_KEEPALIVE netinet/tcp.h _ANGEL_HAVE_SO_KEEPALIVE)
 
 set (PROJECT_SRC_DIR "${PROJECT_SOURCE_DIR}/src")
 

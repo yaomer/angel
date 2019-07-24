@@ -78,7 +78,7 @@ private:
     // 保存连接所需的上下文
     boost::any _context;
     // 标识一个连接所处的状态
-    std::atomic_int8_t _state;
+    std::atomic_int _state;
     // 连接的超时定时器的id
     size_t _timeoutTimerId;
     // 连接的超时值

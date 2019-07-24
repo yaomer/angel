@@ -1,3 +1,4 @@
+#include <signal.h>
 #include "TcpServer.h"
 #include "Acceptor.h"
 #include "EventLoop.h"

@@ -1,8 +1,10 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
+#include <string.h>
 #include "Socket.h"
 #include "LogStream.h"
+#include "config.h"
 
 using namespace Angel;
 
@@ -21,7 +23,12 @@ Socket::~Socket()
 void Socket::setKeepAlive(bool on)
 {
     socklen_t opt = on ? 1 : 0;
-    if (::setsockopt(_sockfd, SOL_SOCKET, TCP_KEEPALIVE, &opt, sizeof(opt)) < 0)
+#ifdef _ANGEL_HAVE_TCP_KEEPALIVE
+    int optval = TCP_KEEPALIVE;
+#elif _ANGEL_HAVE_SO_KEEPALIVE
+    int optval = SO_KEEPALIVE;
+#endif
+    if (::setsockopt(_sockfd, SOL_SOCKET, optval, &opt, sizeof(opt)) < 0)
         logError("[setsockopt -> TCP_KEEPALIVE]: %s", strerrno());
     logInfo("%s TCP_KEEPALIVE", (on ? "enable" : "disable"));
 }

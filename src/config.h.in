@@ -2,3 +2,5 @@
 #cmakedefine _ANGEL_HAVE_EPOLL
 #cmakedefine _ANGEL_HAVE_KQUEUE
 #cmakedefine _ANGEL_HAVE_SELECT
+#cmakedefine _ANGEL_HAVE_TCP_KEEPALIVE
+#cmakedefine _ANGEL_HAVE_SO_KEEPALIVE

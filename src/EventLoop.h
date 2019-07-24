@@ -65,7 +65,7 @@ private:
     std::vector<Functor> _functors;
     std::mutex _mutex;
     int _wakeFd[2];
-    std::__thread_id _tid;
+    std::thread::id _tid;
     size_t _nloops;
 };
 
