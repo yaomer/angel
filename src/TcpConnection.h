@@ -4,14 +4,13 @@
 #include <functional>
 #include <memory>
 #include <atomic>
+#include <any>
 #include "Channel.h"
 #include "Buffer.h"
 #include "InetAddr.h"
 #include "Socket.h"
 #include "noncopyable.h"
 #include "decls.h"
-
-#include <boost/any.hpp>
 
 namespace Angel {
 
@@ -45,8 +44,8 @@ public:
     InetAddr& peerAddr() { return _peerAddr; }
     void setState(char state) { _state = state; }
     bool isConnected() { return _state == CONNECTED; }
-    boost::any& getContext() { return _context; }
-    void setContext(boost::any context) { _context = std::move(context); }
+    std::any& getContext() { return _context; }
+    void setContext(std::any context) { _context = std::move(context); }
     void setTimeoutTimerId(size_t id) { _timeoutTimerId = id; }
     void setConnTimeout(int64_t timeout) { _connTimeout = timeout; }
     void close();
@@ -76,7 +75,7 @@ private:
     InetAddr _localAddr;
     InetAddr _peerAddr;
     // 保存连接所需的上下文
-    boost::any _context;
+    std::any _context;
     // 标识一个连接所处的状态
     std::atomic_int _state;
     // 连接的超时定时器的id

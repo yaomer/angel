@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PLATFORM=$(uname -s)
-CXXFLAGS="-std=c++11 -Wall -O2"
+CXXFLAGS="-std=c++17 -Wall -O2"
 
 if [ "$PLATFORM" == "Darwin" ]; then
     CXX=clang++

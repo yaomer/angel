@@ -71,7 +71,7 @@ public:
                     it->send(buf.c_str(), lf + 1 - (i + 3));
                     buf.retrieve(lf + 1 - (i + 3));
                 } else {
-                    if (conn->getContext().empty()) {
+                    if (!conn->getContext().has_value()) {
                         // echo msg
                         conn->send(sbuf);
                         conn->send(buf.c_str(), lf + 1);
@@ -79,7 +79,7 @@ public:
                         continue;
                     }
                     // continue chat with id
-                    size_t id = boost::any_cast<size_t>(conn->getContext());
+                    size_t id = std::any_cast<size_t>(conn->getContext());
                     auto it = _server.getConnection(id);
                     it->send(sbuf);
                     it->send(buf.c_str(), lf + 1);

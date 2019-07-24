@@ -3,11 +3,11 @@ cmake_minimum_required (VERSION 3.1)
 project (Angel)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang$")
-    set (CMAKE_CXX_FLAGS "-std=c++11 -Wall -O2")
+    set (CMAKE_CXX_FLAGS "-std=c++17 -Wall -O2")
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    set (CMAKE_CXX_FLAGS "-std=c++11 -Wall -O2 -Wno-sign-compare")
+    set (CMAKE_CXX_FLAGS "-std=c++17 -Wall -O2 -Wno-sign-compare")
 endif()
 
 include (CheckFunctionExists)
