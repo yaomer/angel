@@ -24,7 +24,7 @@ private:
     int evret(int events);
 
     int _epfd;
-    int _addFds;
+    size_t _addFds;
     std::vector<struct epoll_event> _evList;
     size_t _evListSize;
 };

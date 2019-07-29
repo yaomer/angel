@@ -7,7 +7,7 @@ int Angel::Buffer::readFd(int fd)
 {
     char extrabuf[65536];
     struct iovec iov[2];
-    size_t writen = writeable();
+    ssize_t writen = writeable();
     ssize_t n;
 
     iov[0].iov_base = begin() + _writeindex;

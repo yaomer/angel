@@ -39,7 +39,7 @@ void ThreadPool::setThreadNums(size_t threadNums)
 
 void ThreadPool::start()
 {
-    for (auto i = 0; i < _threadNums; i++) {
+    for (size_t i = 0; i < _threadNums; i++) {
         std::thread thread([this]{ this->threadFunc(); });
         thread.detach();
         _workers.push_back(std::move(thread));

@@ -27,12 +27,12 @@ void EventLoopThreadPool::setThreadNums(size_t threadNums)
 
 void EventLoopThreadPool::start()
 {
-    for (auto i = 0; i < _threadNums; i++) {
+    for (size_t i = 0; i < _threadNums; i++) {
         auto it = std::unique_ptr<EventLoopThread>(new EventLoopThread);
         _threadPool.push_back(std::move(it));
     }
     // 等待所有线程初始化完成
-    for (auto i = 0; i < _threadNums; i++) {
+    for (size_t i = 0; i < _threadNums; i++) {
         while (!_threadPool[i]->getLoop())
             ;
     }
