@@ -29,3 +29,10 @@ void HttpResponse::fillResponse()
     _buffer.append("\r\n");
     _buffer.append(_body);
 }
+
+void HttpResponse::clear()
+{
+    _body.clear();
+    _headers.clear();
+    _buffer.clear();
+}

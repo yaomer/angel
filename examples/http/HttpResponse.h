@@ -12,7 +12,7 @@ public:
         UNIMPLEMENTED = 501,
     };
     HttpResponse() : _statusCode(0) {  }
-    const std::string& buffer() { return _buffer; }
+    std::string& buffer() { return _buffer; }
     void setStatusCode(int statusCode)
     { _statusCode = statusCode; }
     void setStatusMessage(const std::string& statusMessage)
@@ -26,6 +26,7 @@ public:
     void setBody(const std::string& body)
     { _body.assign(body); }
     void fillResponse();
+    void clear();
 private:
     int _statusCode;
     std::string _statusMessage;

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 #include <fcntl.h>
 #include "HttpContext.h"
 
@@ -31,9 +32,6 @@ void HttpContext::parseReqLine(const char *p, const char *ep)
     next = std::find(p, ep, '\r');
     _request.setVersion(p, next);
     _state = PARSE_HEADER;
-    for (auto& it : _request.args())
-        std::cout << it << " ";
-    std::cout << "\n";
 }
 
 void HttpContext::parseReqHeader(const char *p, const char *ep)
@@ -72,6 +70,7 @@ void HttpContext::response(const Angel::TcpConnectionPtr& conn)
     }
     _response.fillResponse();
     conn->send(_response.buffer());
+    _response.clear();
     if (!_keepAlive)
         conn->close();
 }

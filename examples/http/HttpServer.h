@@ -26,6 +26,7 @@ public:
     void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
         auto& context = std::any_cast<HttpContext&>(conn->getContext());
+        std::cout << buf.c_str();
         while (buf.readable() >= 2) {
             int crlf = buf.findCrlf();
             if (crlf >= 0) {
