@@ -20,8 +20,9 @@ public:
     ~TcpClient();
     void start();
     const char *name() { return _name.c_str(); }
-    void quitLoop(bool on);
     const TcpConnectionPtr& conn() const { return _conn; }
+    void notExitFromLoop();
+    void quit();
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
@@ -30,7 +31,7 @@ public:
     { _closeCb = std::move(_cb); }
 private:
     void newConnection(int fd);
-    void handleClose(const TcpConnectionPtr&);
+    void handleClose(const TcpConnectionPtr&) { quit(); }
 
     EventLoop *_loop;
     Connector _connector;

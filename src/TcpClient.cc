@@ -42,22 +42,20 @@ void TcpClient::newConnection(int fd)
                 [this]{ this->_connectionCb(this->_conn); });
 }
 
-void TcpClient::handleClose(const TcpConnectionPtr& conn)
-{
-    if (_closeCb) _closeCb(conn);
-    _loop->removeChannel(conn->getChannel());
-    _conn.reset();
-    logInfo("TcpClient[%s] break the connection", name());
-    if (_quitLoop) _loop->quit();
-}
-
 void TcpClient::start()
 {
     _connector.connect();
 }
 
-// 客户端断开连接时是否终止事件循环，默认终止
-void TcpClient::quitLoop(bool on)
+void TcpClient::quit()
 {
-    _quitLoop = on;
+    if (_closeCb) _closeCb(_conn);
+    _loop->removeChannel(_conn->getChannel());
+    _conn.reset();
+    if (_quitLoop) _loop->quit();
+}
+
+void TcpClient::notExitFromLoop()
+{
+    _quitLoop = false;
 }
