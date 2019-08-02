@@ -4,18 +4,6 @@
 
 using namespace Angel;
 
-Timer::Timer(EventLoop *loop)
-    : _loop(loop),
-    _timerId(1)
-{
-    logInfo("[Timer::ctor]");
-}
-
-Timer::~Timer()
-{
-    logInfo("[Timer::dtor]");
-}
-
 size_t Timer::addTimer(TimerTask *task)
 {
     size_t id = _timerId++;

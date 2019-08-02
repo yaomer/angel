@@ -37,12 +37,10 @@ Logger::Logger()
 {
     mkdir(".log", 0777);
     signal(SIGINT, flush_log_buf);
-    logInfo("[Logger::ctor]");
 }
 
 Logger::~Logger()
 {
-    logInfo("[Logger::dtor]");
     quit();
     _thread.join();
 }

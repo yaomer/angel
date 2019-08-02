@@ -16,13 +16,7 @@ Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
     _connected(false),
     _waitTime(2)
 {
-    logInfo("[Connector::ctor] -> [%s:%d]", _peerAddr.toIpAddr(),
-            _peerAddr.toIpPort());
-}
-
-Connector::~Connector()
-{
-    logInfo("[Connector::dtor] -> [%s:%d]", _peerAddr.toIpAddr(),
+    logInfo("[connect -> %s:%d]", _peerAddr.toIpAddr(),
             _peerAddr.toIpPort());
 }
 

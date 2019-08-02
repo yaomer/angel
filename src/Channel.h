@@ -28,8 +28,14 @@ public:
         ERROR    = 0x04,
     };
 
-    explicit Channel(EventLoop *loop);
-    ~Channel();
+    explicit Channel(EventLoop *loop)
+        : _loop(loop),
+        _fd(-1),
+        _events(0),
+        _revents(0)
+    {
+    }
+    ~Channel() {  };
     int fd() const { return _fd; }
     int events() const { return _events; }
     const char *evstr();

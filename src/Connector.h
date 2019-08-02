@@ -17,7 +17,7 @@ class EventLoop;
 class Connector : noncopyable {
 public:
     Connector(EventLoop *, InetAddr&);
-    ~Connector();
+    ~Connector() {  };
     void connect();
     void connecting(int fd);
     void connected(int fd);

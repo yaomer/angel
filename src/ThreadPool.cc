@@ -6,27 +6,6 @@
 
 using namespace Angel;
 
-ThreadPool::ThreadPool()
-    : _threadNums(0),
-    _quit(false)
-{
-    logInfo("[ThreadPool::ctor]");
-}
-
-ThreadPool::ThreadPool(size_t threadNums)
-    : _threadNums(threadNums),
-    _quit(false)
-{
-    logInfo("[ThreadPool::ctor]");
-    setThreadNums(_threadNums);
-}
-
-ThreadPool::~ThreadPool()
-{
-    logInfo("[ThreadPool::dtor]");
-    quit();
-}
-
 void ThreadPool::setThreadNums(size_t threadNums)
 {
     if (_threadNums >= _MAX_THREADS) {

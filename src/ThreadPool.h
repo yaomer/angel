@@ -13,9 +13,18 @@ namespace Angel {
 
 class ThreadPool : noncopyable {
 public:
-    ThreadPool();
-    explicit ThreadPool(size_t threadNums);
-    ~ThreadPool();
+    ThreadPool()
+        : _threadNums(0),
+        _quit(false)
+    {
+    }
+    explicit ThreadPool(size_t threadNums)
+        : _threadNums(threadNums),
+        _quit(false)
+    {
+        setThreadNums(_threadNums);
+    }
+    ~ThreadPool() { quit(); };
     void setThreadNums(size_t threadNums);
     void addTask(const TaskCallback _cb);
     void quit();

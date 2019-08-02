@@ -58,8 +58,12 @@ class EventLoop;
 // 其实在linux下，还用第三种方法，即timerfd
 class Timer : noncopyable {
 public:
-    explicit Timer(EventLoop *loop);
-    ~Timer();
+    explicit Timer(EventLoop *loop)
+        : _loop(loop),
+        _timerId(1)
+    {
+    }
+    ~Timer() {  };
     size_t addTimer(TimerTask *_task);
     // 返回最小超时值
     // set是可以在O(1)时间获取最小节点的，这只需要维护一个指向最小

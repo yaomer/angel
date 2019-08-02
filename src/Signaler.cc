@@ -35,12 +35,6 @@ Signaler::Signaler(EventLoop *loop)
     _sigChannel->setFd(_pairFd[0]);
     _signalFd = _pairFd[1];
     _sigChannel->setEventReadCb([this]{ this->sigCatch(); });
-    logInfo("[Signaler::ctor]");
-}
-
-Signaler::~Signaler()
-{
-    logInfo("[Signaler::dtor]");
 }
 
 void Signaler::start()

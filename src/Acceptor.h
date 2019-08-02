@@ -17,7 +17,7 @@ class EventLoop;
 class Acceptor : noncopyable {
 public:
     Acceptor(EventLoop *, InetAddr&);
-    ~Acceptor();
+    ~Acceptor() {  };
     void listen();
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }

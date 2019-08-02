@@ -20,12 +20,7 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     SockOps::setnonblock(_socket.fd());
     SockOps::bind(_socket.fd(), &_inetAddr.inetAddr());
     _acceptChannel->setFd(_socket.fd());
-    logInfo("[Acceptor::ctor, listenfd = %d]", _socket.fd());
-}
-
-Acceptor::~Acceptor()
-{
-    logInfo("[Acceptor::dtor]");
+    logInfo("listenfd = %d", _socket.fd());
 }
 
 void Acceptor::listen()

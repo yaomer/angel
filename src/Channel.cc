@@ -18,20 +18,6 @@ const char *eventStr[] = {
 };
 }
 
-Channel::Channel(EventLoop *loop)
-    : _loop(loop),
-    _fd(-1),
-    _events(0),
-    _revents(0)
-{
-    logInfo("[Channel::ctor]");
-}
-
-Channel::~Channel()
-{
-    logInfo("[Channel::dtor]");
-}
-
 const char *Channel::evstr()
 {
     return eventStr[_events];

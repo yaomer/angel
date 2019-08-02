@@ -23,7 +23,7 @@ class EventLoop;
 class Signaler : noncopyable {
 public:
     explicit Signaler(EventLoop *);
-    ~Signaler();
+    ~Signaler() {  };
     void add(int signo, const SignalerCallback _cb);
     void cancel(int signo);
     void sigCatch();
