@@ -42,6 +42,14 @@ void TcpClient::newConnection(int fd)
                 [this]{ this->_connectionCb(this->_conn); });
 }
 
+// connect()之后连接不会马上建立，如果此时立刻需要使用client.conn()，
+// 则必须保证它为真，exp:
+// ...
+// client.start();
+// client.conn()->send("hello\n");
+// 上面代码中client.conn()很可能为假，所以可以
+// while (!client.conn()) ;
+// 稍微等待一会
 void TcpClient::start()
 {
     _connector.connect();
