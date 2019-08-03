@@ -114,11 +114,13 @@ void EventLoop::run()
 void EventLoop::doFunctors()
 {
     std::vector<Functor> tfuncs;
+    {
+    std::lock_guard<std::mutex> mlock(_mutex);
     if (!_functors.empty()) {
         logDebug("executed %zu functors", _functors.size());
-        std::lock_guard<std::mutex> mlock(_mutex);
         tfuncs.swap(_functors);
         _functors.clear();
+    }
     }
     for (auto& func : tfuncs)
         func();
