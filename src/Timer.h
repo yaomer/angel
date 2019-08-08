@@ -17,7 +17,10 @@ public:
         : _id(0),
         _expire(expire),
         _interval(interval),
-        _timerCb(_cb) {  }
+        _timerCb(_cb),
+        _isCancel(false)
+    {  
+    }
     ~TimerTask() {  };
     size_t id() const { return _id; }
     int64_t expire() const { return _expire; }
@@ -28,6 +31,8 @@ public:
     void setInterval(int64_t interval) { _interval = interval; }
     void setTimerCb(const TimerCallback _cb) 
     { _timerCb = std::move(_cb); }
+    bool isCancel() const { return _isCancel; }
+    void canceled() { _isCancel = true; }
 private:
     size_t _id;
     // 定时器的到期时间
@@ -35,6 +40,7 @@ private:
     // 间隔定时器的间隔时间
     int64_t _interval;
     TimerCallback _timerCb;
+    bool _isCancel;
 };
 
 class TimerTaskCmp {

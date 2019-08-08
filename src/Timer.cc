@@ -44,8 +44,7 @@ void Timer::cancelTimerInLoop(size_t id)
         auto range = _timer.equal_range(it->second);
         for (auto it = range.first; it != range.second; it++) {
             if ((*it)->id() == id) {
-                if ((*it)->interval() > 0)
-                    (*it)->setInterval(0);
+                (*it)->canceled();
                 delTimer(it, id);
                 logInfo("Cancel a timer, id = %zu", id);
                 break;
@@ -67,6 +66,10 @@ void Timer::tick()
     while (!_timer.empty()) {
         auto task = *_timer.begin();
         if (task->expire() <= now) {
+            if (task->isCancel()) {
+                delTimer(_timer.begin(), task->id());
+                continue;
+            }
             task->timerCb()();
             if (task->interval() > 0) {
                 TimerTask *newTask = new TimerTask(now + task->interval(),
