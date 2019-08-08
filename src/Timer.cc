@@ -44,6 +44,8 @@ void Timer::cancelTimerInLoop(size_t id)
         auto range = _timer.equal_range(it->second);
         for (auto it = range.first; it != range.second; it++) {
             if ((*it)->id() == id) {
+                if ((*it)->interval() > 0)
+                    (*it)->setInterval(0);
                 delTimer(it, id);
                 logInfo("Cancel a timer, id = %zu", id);
                 break;

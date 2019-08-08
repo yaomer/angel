@@ -23,12 +23,12 @@ public:
     void connected(int fd);
     void timeout();
     void check(int fd);
+    int connectWaitTime() const { return _waitTime; }
+    void setConnectWaitTime(int time) { _waitTime = time;  }
+    bool isConnected() { return _connected; }
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }
 private:
-    //  wait [2, 4, 8, 16]s = [30]s
-    static const int _waitMaxTime = 16;
-    static const int _waitAllTime = 30;
 
     EventLoop *_loop;
     std::shared_ptr<Channel> _connectChannel;

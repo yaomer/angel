@@ -53,6 +53,8 @@ void TcpClient::newConnection(int fd)
 void TcpClient::start()
 {
     _connector.connect();
+    if (_connectTimeoutCb)
+        _loop->runAfter(_connector.connectWaitTime(), _connectTimeoutCb);
 }
 
 void TcpClient::quit()
@@ -66,4 +68,14 @@ void TcpClient::quit()
 void TcpClient::notExitFromLoop()
 {
     _quitLoop = false;
+}
+
+void TcpClient::retryWithPerSec()
+{
+    // TODO: connect超时后，每隔1秒尝试一次重连
+}
+
+void TcpClient::retryWithExpBackoff()
+{
+    // TODO: connect超时后，以指数退避方式进行重连
 }

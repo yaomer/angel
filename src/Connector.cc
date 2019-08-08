@@ -14,7 +14,7 @@ Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
     _connectChannel(new Channel(loop)),
     _peerAddr(inetAddr),
     _connected(false),
-    _waitTime(2)
+    _waitTime(30 * 1000)
 {
     logInfo("[connect -> %s:%d]", _peerAddr.toIpAddr(),
             _peerAddr.toIpPort());
@@ -41,7 +41,8 @@ void Connector::connect()
 void Connector::connecting(int sockfd)
 {
     logInfo("[connfd = %d] is connecting", sockfd);
-    _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
+    _loop->runAfter(1000, [this]{ this->timeout(); });
+    _waitTime -= 1000;
     _connectChannel->setEventReadCb(
             [this, sockfd]{ this->check(sockfd); });
     _connectChannel->setEventWriteCb(
@@ -58,18 +59,18 @@ void Connector::connected(int sockfd)
     if (_newConnectionCb) {
         _newConnectionCb(sockfd);
         _connected = true;
-    } else
-        _loop->quit();
+    }
 }
 
 void Connector::timeout()
 {
     if (!_connected) {
-        if (_waitTime == _waitMaxTime)
-            logFatal("connect timeout: %d s", _waitAllTime);
-        logInfo("connect: waited %d s", _waitTime);
-        _waitTime *= 2;
-        _loop->runAfter(1000 * _waitTime, [this]{ this->timeout(); });
+        if (_waitTime == 0) {
+            logError("connect timeout");
+            return;
+        }
+        _loop->runAfter(1000, [this]{ this->timeout(); });
+        _waitTime -= 1000;
     }
 }
 

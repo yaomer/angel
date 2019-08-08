@@ -22,9 +22,13 @@ public:
     const char *name() { return _name.c_str(); }
     const TcpConnectionPtr& conn() const { return _conn; }
     void notExitFromLoop();
+    void retryWithPerSec();
+    void retryWithExpBackoff();
     void quit();
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
+    void setConnectTimeoutCb(const ConnectTimeoutCallback _cb)
+    { _connectTimeoutCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
     { _messageCb = std::move(_cb); }
     void setCloseCb(const CloseCallback _cb)
@@ -39,6 +43,7 @@ private:
     std::atomic_bool _quitLoop;
     std::string _name;
     ConnectionCallback _connectionCb;
+    ConnectTimeoutCallback _connectTimeoutCb;
     MessageCallback _messageCb;
     CloseCallback _closeCb;
 };
