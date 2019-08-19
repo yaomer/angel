@@ -52,7 +52,7 @@ EventLoop::EventLoop()
         _thisThreadLoop = this;
     _tid = std::this_thread::get_id();
     SockOps::socketpair(_wakeFd);
-    std::lock_guard<std::mutex> mlock(_SYNC_INIT_LOCK);
+    std::lock_guard<std::mutex> mlock(_SYNC_SIG_INIT_LOCK);
     if (!__signalerPtr) {
         _signaler.reset(new Signaler(this));
         __signalerPtr = _signaler.get();
@@ -71,6 +71,7 @@ void EventLoop::removeChannel(const ChannelPtr& chl)
 
 void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 {
+    logInfo("channel(fd = %d) is added to loop", chl->fd());
     chl->enableRead();
     _poller->add(chl->fd(), chl->events());
     auto it = std::pair<int, ChannelPtr>(chl->fd(), chl);
@@ -79,6 +80,7 @@ void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 
 void EventLoop::removeChannelInLoop(const ChannelPtr& chl)
 {
+    logInfo("channel(fd = %d) is removed from loop", chl->fd());
     _poller->remove(chl->fd(), chl->events());
     _channelMaps.erase(chl->fd());
 }
@@ -88,9 +90,11 @@ void EventLoop::run()
     wakeupInit();
     if (_signaler) _signaler->start();
     while (!_quit) {
-        int nevents = _poller->wait(this, _timer->timeout());
+        int64_t timeout = _timer->timeout();
+        int nevents = _poller->wait(this, timeout);
+        logDebug("nloops = %zu, timeout = %lld, nevents = %d",
+                _nloops++, timeout, nevents);
         if (nevents > 0) {
-            logDebug("nevents = %d", nevents);
             for (auto& it : _activeChannels) {
                 it->handleEvent();
             }
@@ -99,7 +103,6 @@ void EventLoop::run()
             _timer->tick();
         }
         doFunctors();
-        _nloops++;
     }
 }
 
@@ -133,6 +136,7 @@ void EventLoop::wakeup()
     ssize_t n = write(_wakeFd[1], &one, sizeof(one));
     if (n != sizeof(one))
         logError("write %zd bytes instead of 8");
+    logDebug("waked up the ioLoop");
 }
 
 void EventLoop::handleRead()
@@ -190,5 +194,6 @@ size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 
 void EventLoop::cancelTimer(size_t id)
 {
+    logInfo("cancel a timer, id = %zu", id);
     _timer->cancelTimer(id);
 }

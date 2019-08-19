@@ -9,21 +9,22 @@ EventLoopThread::EventLoopThread()
     _thread([this]{ this->threadFunc(); })
 {
     _thread.detach();
-    logInfo("[EventLoopThread::ctor]");
+    logInfo("[EventLoopThread::ctor], thread id = %s", getThreadIdStr());
 }
 
 EventLoopThread::~EventLoopThread()
 {
     if (_loop) _loop->quit();
-    logInfo("[EventLoopThread::dtor]");
+    logInfo("[EventLoopThread::dtor], thread id = %s", getThreadIdStr());
 }
 
 EventLoop *EventLoopThread::getLoop()
 {
     std::unique_lock<std::mutex> mlock(_mutex);
-    // wait for _loop to be constructed
+    logDebug("wait for [loop] is be constructed");
     while (_loop == nullptr)
         _condVar.wait(mlock);
+    logDebug("the loop has been constructed, returning ...");
     return _loop;
 }
 
@@ -34,12 +35,13 @@ void EventLoopThread::quit()
 
 void EventLoopThread::threadFunc()
 {
+    logDebug("loop is constructing ...");
     EventLoop loop;
     {
     std::lock_guard<std::mutex> mlock(_mutex);
     _loop = &loop;
-    // let getLoop() to return
     _condVar.notify_one();
     }
+    logInfo("loop is running ...");
     loop.run();
 }

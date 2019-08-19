@@ -19,7 +19,7 @@ namespace Angel{
     // 保护__signalerPtr，使之正确初始化
     // 由于信号的特殊性，所以每个进程只能存在一个Signaler实例，
     // 即它只能绑定在一个eventloop上
-    std::mutex _SYNC_INIT_LOCK;
+    std::mutex _SYNC_SIG_INIT_LOCK;
     Angel::Signaler *__signalerPtr = nullptr;
 
     static int _signalFd = -1;
@@ -39,6 +39,7 @@ Signaler::Signaler(EventLoop *loop)
 
 void Signaler::start()
 {
+    logInfo("Signaler is started");
     _loop->addChannel(_sigChannel);
 }
 
@@ -74,8 +75,10 @@ void Signaler::addInLoop(int signo, const SignalerCallback _cb)
         sa.sa_handler = &sigHandler;
         auto it = std::pair<int, SignalerCallback>(signo, std::move(_cb));
         _sigCallbackMaps.insert(it);
+        logInfo("set sigHandler for Sig[%d]", signo);
     } else {
         sa.sa_handler = SIG_IGN;
+        logInfo("ignore the Sig[%d]", signo);
     }
     // 重启被信号中断的Syscall
     sa.sa_flags |= SA_RESTART;
@@ -96,6 +99,7 @@ void Signaler::cancelInLoop(int signo)
     sigfillset(&sa.sa_mask);
     if (sigaction(signo, &sa, nullptr) < 0)
         logError("sigaction: %s", strerrno());
+    logInfo("restores the default semantics of the Sig[%d]", signo);
 }
 
 // 信号捕获函数，根据读到的信号值调用对应的信号处理函数

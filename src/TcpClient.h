@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <string>
+
 #include "Connector.h"
 #include "TcpConnection.h"
 #include "InetAddr.h"
@@ -17,6 +18,7 @@ class EventLoop;
 class TcpClient {
 public:
     TcpClient(EventLoop *, InetAddr&, const char *);
+    ~TcpClient();
     void start();
     const char *name() { return _name.c_str(); }
     const TcpConnectionPtr& conn() const { return _conn; }

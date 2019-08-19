@@ -2,6 +2,7 @@
 #define _ANGEL_LOGSTREAM_H
 
 #include <string>
+
 #include "Buffer.h"
 #include "Logger.h"
 #include "util.h"

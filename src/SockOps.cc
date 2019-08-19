@@ -50,6 +50,7 @@ void SockOps::setnonblock(int sockfd)
 {
     int oflag = ::fcntl(sockfd, F_GETFL, 0);
     ::fcntl(sockfd, F_SETFL, oflag | O_NONBLOCK);
+    logDebug("fd = %d is set to nonblock", sockfd);
 }
 
 void SockOps::socketpair(int sockfd[])

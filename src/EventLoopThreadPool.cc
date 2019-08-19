@@ -6,21 +6,9 @@
 
 using namespace Angel;
 
-EventLoopThreadPool::EventLoopThreadPool()
-    : _threadNums(0),
-    _nextIndex(0)
-{
-    logInfo("[EventLoopThreadPool::ctor]");
-}
-
-EventLoopThreadPool::~EventLoopThreadPool()
-{
-    logInfo("[EventLoopThreadPool::dtor]");
-}
-
 void EventLoopThreadPool::setThreadNums(size_t threadNums)
 {
-    logInfo("[EventLoopThreadPool::started %zu threads]", threadNums);
+    logInfo("started %zu io threads", threadNums);
     _threadNums = threadNums;
     start();
 }
@@ -32,10 +20,12 @@ void EventLoopThreadPool::start()
         _threadPool.push_back(std::move(it));
     }
     // 等待所有线程初始化完成
+    logInfo("wait for all threads to complete-init");
     for (size_t i = 0; i < _threadNums; i++) {
         while (!_threadPool[i]->getLoop())
             ;
     }
+    logInfo("EventLoopThreadPool is started");
 }
 
 // 使用[round-robin]挑选出下一个[io thread]

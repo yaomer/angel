@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+
 #include "Channel.h"
 #include "noncopyable.h"
 #include "decls.h"
@@ -39,7 +40,7 @@ private:
     int _pairFd[2];
 };
 
-extern std::mutex _SYNC_INIT_LOCK;
+extern std::mutex _SYNC_SIG_INIT_LOCK;
 
 extern Angel::Signaler *__signalerPtr;
 

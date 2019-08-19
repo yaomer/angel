@@ -48,7 +48,7 @@ void Acceptor::handleAccept()
         return;
     }
     SockOps::setnonblock(connfd);
-    logInfo("[fd = %d is connected]", connfd);
+    logInfo("fd = %d is connected", connfd);
     if (_newConnectionCb)
         _newConnectionCb(connfd);
     else

@@ -82,7 +82,6 @@ int Kqueue::wait(EventLoop *loop, int64_t timeout)
 
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
-            printf("fd = %d\n", _evlist[i].ident);
             auto chl = loop->searchChannel(_evlist[i].ident);
             chl->setRevents(evret(_evlist[i]));
             loop->fillActiveChannel(chl);

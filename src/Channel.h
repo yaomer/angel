@@ -4,9 +4,11 @@
 #include <functional>
 #include <string>
 #include <atomic>
+
 #include "Buffer.h"
 #include "noncopyable.h"
 #include "decls.h"
+#include "LogStream.h"
 
 namespace Angel {
 
@@ -38,16 +40,16 @@ public:
     ~Channel() {  };
     int fd() const { return _fd; }
     int events() const { return _events; }
-    const char *evstr();
     int revents() const { return _revents; }
-    const char *revstr();
+    const char *evstr() { return ev2str(_events); };
+    const char *revstr() { return ev2str(_revents); };
     void setFd(int fd) { _fd = fd; }
     void setRevents(int revents) { _revents = revents; }
     bool isReading() { return _events & READ; }
     bool isWriting() { return _events & WRITE; }
-    void enableRead();
-    void enableWrite();
-    void disableWrite();
+    void enableRead() { _events |= READ; };
+    void enableWrite() { _events |= WRITE; changeEvents(); };
+    void disableWrite() { _events &= ~WRITE; changeEvents(); };
     void changeEvents();
     void handleEvent();
     void setEventReadCb(const EventReadCallback _cb)
@@ -57,6 +59,8 @@ public:
     void setEventErrorCb(const EventErrorCallback _cb)
     { _errorCb = std::move(_cb); }
 private:
+    const char *ev2str(int events);
+
     EventLoop *_loop;
     int _fd;
     int _events;
@@ -65,8 +69,6 @@ private:
     EventWriteCallback _writeCb;
     EventErrorCallback _errorCb;
 };
-
-extern const char *eventStr[];
 
 }
 

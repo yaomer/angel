@@ -9,15 +9,16 @@
 
 using namespace Angel;
 
+size_t Connector::_defaultWaitTime = 30 * 1000;
+
 Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
     : _loop(loop),
     _connectChannel(new Channel(loop)),
     _peerAddr(inetAddr),
     _connected(false),
-    _waitTime(30 * 1000)
+    _waitTime(_defaultWaitTime)
 {
-    logInfo("[connect -> %s:%d]", _peerAddr.toIpAddr(),
-            _peerAddr.toIpPort());
+    logInfo("connect -> [%s:%d]", _peerAddr.toIpAddr(), _peerAddr.toIpPort());
 }
 
 void Connector::connect()
@@ -40,7 +41,7 @@ void Connector::connect()
 
 void Connector::connecting(int sockfd)
 {
-    logInfo("[connfd = %d] is connecting", sockfd);
+    logInfo("connfd = %d is connecting ...", sockfd);
     _loop->runAfter(1000, [this]{ this->timeout(); });
     _waitTime -= 1000;
     _connectChannel->setEventReadCb(
@@ -53,7 +54,7 @@ void Connector::connecting(int sockfd)
 void Connector::connected(int sockfd)
 {
     if (_connected) return;
-    logInfo("[connfd = %d] is connected", sockfd);
+    logInfo("connfd = %d is connected", sockfd);
     _loop->removeChannel(_connectChannel);
     _connectChannel.reset();
     if (_newConnectionCb) {
@@ -81,7 +82,8 @@ void Connector::check(int sockfd)
 {
     int err = SockOps::getSocketError(sockfd);
     if (err) {
-        logFatal("connect: %s", strerr(err));
+        logError("connect: %s", strerr(err));
+        return;
     }
     connected(sockfd);
 }

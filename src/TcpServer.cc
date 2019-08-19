@@ -55,8 +55,8 @@ void TcpServer::newConnection(int fd)
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 {
+    logInfo("TcpConnection[id = %d] is removed from TcpServer", conn->id());
     if (_closeCb) _closeCb(conn);
-    logInfo("[fd = %d] is closed", conn->getChannel()->fd());
     conn->setState(TcpConnection::CLOSED);
     conn->getLoop()->removeChannel(conn->getChannel());
     _connectionMaps.erase(conn->id());
@@ -68,6 +68,7 @@ void TcpServer::start()
     // 会导致服务端意外退出
     addSignal(SIGPIPE, nullptr);
     _acceptor->listen();
+    logInfo("server is started");
 }
 
 void TcpServer::quit()

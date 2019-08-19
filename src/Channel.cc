@@ -7,49 +7,20 @@
 
 using namespace Angel;
 
-namespace Angel {
-
-const char *eventStr[] = {
-    "None",
-    "READ",
-    "WRITE",
-    "READ|WRITE",
-    "ERROR",
-};
-}
-
-const char *Channel::evstr()
+const char *Channel::ev2str(int events)
 {
-    return eventStr[_events];
-}
-
-const char *Channel::revstr()
-{
-    return eventStr[_revents];
-}
-
-void Channel::enableRead()
-{
-    _events |= READ;
-    logInfo("[fd = %d] enable READ", fd());
-}
-
-void Channel::enableWrite()
-{
-    _events |= WRITE;
-    changeEvents();
-    logInfo("[fd = %d] enable WRITE", fd());
-}
-
-void Channel::disableWrite()
-{
-    _events &= ~WRITE;
-    changeEvents();
-    logInfo("[fd = %d] disable WRITE", fd());
+    switch (events) {
+    case READ: return "READ"; break;
+    case WRITE: return "WRITE"; break;
+    case READ | WRITE: return "READ|WRITE"; break;
+    case ERROR: return "ERROR"; break;
+    default: return "NONE"; break;
+    }
 }
 
 void Channel::changeEvents()
 {
+    logDebug("fd = %d events is [%s]", fd(), evstr());
     _loop->changeEvent(fd(), events());
 }
 
@@ -57,7 +28,7 @@ void Channel::changeEvents()
 // 不同的事件触发不同的回调
 void Channel::handleEvent()
 {
-    logInfo("[fd = %d] revents is [%s]", fd(), revstr());
+    logDebug("fd = %d revents is [%s]", fd(), revstr());
     if (revents() & ERROR)
         if (_errorCb) _errorCb();
     if (revents() & READ)

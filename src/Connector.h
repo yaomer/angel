@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <functional>
+
 #include "Socket.h"
 #include "InetAddr.h"
 #include "Channel.h"
@@ -28,8 +29,9 @@ public:
     bool isConnected() { return _connected; }
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }
-private:
 
+    static size_t _defaultWaitTime;
+private:
     EventLoop *_loop;
     std::shared_ptr<Channel> _connectChannel;
     InetAddr _peerAddr;

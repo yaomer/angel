@@ -6,6 +6,7 @@
 #include <vector>
 #include <queue>
 #include <atomic>
+
 #include "noncopyable.h"
 #include "decls.h"
 

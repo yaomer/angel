@@ -42,6 +42,7 @@ void TcpConnection::connectEstablish()
 {
     _loop->addChannel(_channel);
     if (_connectionCb) _connectionCb(shared_from_this());
+    logInfo("TcpConnection[id = %d] is ESTABLISH", id());
 }
 
 void TcpConnection::handleRead()
@@ -84,7 +85,7 @@ void TcpConnection::handleWrite()
                     handleClose();
             }
         } else {
-            logError("write: %s", strerrno());
+            logWarn("write: %s", strerrno());
             // 对端尚未与我们建立连接或者对端已关闭连接
             if (errno == ECONNRESET || errno == EPIPE) {
                 handleClose();
@@ -98,7 +99,7 @@ void TcpConnection::handleWrite()
 // 未发送完的数据将会被丢弃
 void TcpConnection::handleClose()
 {
-    logInfo("[fd = %d] is closed", _channel->fd());
+    logInfo("fd = %d is closed", _channel->fd());
     if (_state == CLOSED) return;
     setState(CLOSED);
     if (_closeCb)
@@ -118,7 +119,7 @@ void TcpConnection::handleError()
 // 发送完后才真正断开连接
 void TcpConnection::close()
 {
-    logInfo("[fd = %d] is closing", _channel->fd());
+    logInfo("fd = %d is closing", _channel->fd());
     if (_state == CLOSED) return;
     setState(CLOSING);
     if (_closeCb)
@@ -131,8 +132,10 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
     ssize_t n = 0;
     size_t remainBytes = len;
 
-    if (_state == CLOSED)
+    if (_state == CLOSED) {
+        logWarn("TcpConnection[id = %d] is closed, give up sending", id());
         return;
+    }
     if (!_channel->isWriting() && _output.readable() == 0) {
         n = write(_channel->fd(), data, len);
         logInfo("write %zd bytes to [fd = %d]", n, _channel->fd());
@@ -143,10 +146,10 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
                     _loop->queueInLoop(
                             std::bind(_writeCompleteCb, shared_from_this()));
                 if (_state == CLOSING)
-                    handleClose();
+                    close();
             }
         } else {
-            logError("write: %s", strerrno());
+            logWarn("write: %s", strerrno());
             if (errno == ECONNRESET || errno == EPIPE) {
                 handleClose();
                 return;

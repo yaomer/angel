@@ -8,8 +8,11 @@ namespace Angel {
 
 class EventLoopThreadPool {
 public:
-    EventLoopThreadPool();
-    ~EventLoopThreadPool();
+    EventLoopThreadPool()
+        : _threadNums(0),
+        _nextIndex(0)
+    {
+    }
     size_t threadNums() const { return _threadNums; }
     void setThreadNums(size_t threadNums);
     EventLoopThread *getNextThread();

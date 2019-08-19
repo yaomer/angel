@@ -20,6 +20,12 @@ TcpClient::TcpClient(EventLoop *loop,
 {
     _connector.setNewConnectionCb(
             std::bind(&TcpClient::newConnection, this, _1));
+    logInfo("TcpClient[%s]::ctor", name);
+}
+
+TcpClient::~TcpClient()
+{
+    logInfo("TcpClient[%s]::dtor", name());
 }
 
 void TcpClient::newConnection(int fd)
@@ -49,6 +55,7 @@ void TcpClient::start()
     _connector.connect();
     if (_connectTimeoutCb)
         _loop->runAfter(_connector.connectWaitTime(), _connectTimeoutCb);
+    logInfo("TcpClient[%s] is started", name());
 }
 
 void TcpClient::quit()
