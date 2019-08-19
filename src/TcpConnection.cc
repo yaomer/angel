@@ -30,13 +30,18 @@ TcpConnection::TcpConnection(size_t id,
     _channel->setEventReadCb([this]{ this->handleRead(); });
     _channel->setEventWriteCb([this]{ this->handleWrite(); });
     _channel->setEventErrorCb([this]{ this->handleError(); });
-    _loop->addChannel(_channel);
     logInfo("[TcpConnection::ctor, id:%d]", _id);
 }
 
 TcpConnection::~TcpConnection()
 {
     logInfo("[TcpConnection::dtor, id:%d]", _id);
+}
+
+void TcpConnection::connectEstablish()
+{
+    _loop->addChannel(_channel);
+    if (_connectionCb) _connectionCb(shared_from_this());
 }
 
 void TcpConnection::handleRead()

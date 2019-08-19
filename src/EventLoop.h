@@ -22,7 +22,6 @@ namespace Angel {
 class EventLoop : noncopyable {
 public:
     EventLoop();
-    ~EventLoop();
     // 向loop中注册一个事件
     void addChannel(const ChannelPtr& chl);
     // 从loop中删除一个事件

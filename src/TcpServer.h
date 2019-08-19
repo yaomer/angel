@@ -26,9 +26,9 @@ public:
     typedef std::map<size_t, TcpConnectionPtr> ConnectionMaps;
 
     explicit TcpServer(EventLoop *, InetAddr&);
-    ~TcpServer();
     void newConnection(int fd);
     void removeConnection(const TcpConnectionPtr& conn);
+    InetAddr *inetAddr() { return _inetAddr.get(); }
 
     ConnectionMaps& connectionMaps() { return _connectionMaps; }
     size_t clients() const { return _connectionMaps.size(); };
@@ -68,6 +68,7 @@ private:
 
     EventLoop *_loop;
     std::unique_ptr<Acceptor> _acceptor;
+    std::unique_ptr<InetAddr> _inetAddr;
     std::unique_ptr<EventLoopThreadPool> _ioThreadPool;
     ConnectionMaps _connectionMaps;
     std::unique_ptr<ThreadPool> _threadPool;

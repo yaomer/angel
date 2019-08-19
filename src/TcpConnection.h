@@ -48,6 +48,7 @@ public:
     void setContext(std::any context) { _context = std::move(context); }
     void setTimeoutTimerId(size_t id) { _timeoutTimerId = id; }
     void setConnTimeout(int64_t timeout) { _connTimeout = timeout; }
+    void connectEstablish();
     void close();
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }

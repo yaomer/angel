@@ -57,12 +57,6 @@ EventLoop::EventLoop()
         _signaler.reset(new Signaler(this));
         __signalerPtr = _signaler.get();
     }
-    logInfo("[EventLoop::ctor]");
-}
-
-EventLoop::~EventLoop()
-{
-    logInfo("[EventLoop::dtor]");
 }
 
 void EventLoop::addChannel(const ChannelPtr& chl)
@@ -94,9 +88,7 @@ void EventLoop::run()
     wakeupInit();
     if (_signaler) _signaler->start();
     while (!_quit) {
-        int64_t timeout = _timer->timeout();
-        logDebug("timeout = %zd ms", timeout);
-        int nevents = _poller->wait(this, timeout);
+        int nevents = _poller->wait(this, _timer->timeout());
         if (nevents > 0) {
             logDebug("nevents = %d", nevents);
             for (auto& it : _activeChannels) {
@@ -182,6 +174,7 @@ size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
     int64_t expire = TimeStamp::now() + timeout;
     TimerTask *task = new TimerTask(expire, 0, std::move(_cb));
     size_t id = _timer->addTimer(task);
+    logInfo("add a timer after %lld ms, timer id = %zu", timeout, id);
     return id;
 }
 
@@ -191,6 +184,7 @@ size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
     int64_t expire = TimeStamp::now() + interval;
     TimerTask *task = new TimerTask(expire, interval, std::move(_cb));
     size_t id = _timer->addTimer(task);
+    logInfo("add a timer every %lld ms, timer id = %zu", interval, id);
     return id;
 }
 

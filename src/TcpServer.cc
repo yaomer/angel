@@ -12,6 +12,7 @@ using std::placeholders::_1;
 TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
     : _loop(loop),
     _acceptor(new Acceptor(loop, listenAddr)),
+    _inetAddr(new InetAddr(listenAddr)),
     _ioThreadPool(new EventLoopThreadPool),
     _threadPool(new ThreadPool),
     _connId(1),
@@ -19,12 +20,6 @@ TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
 {
     _acceptor->setNewConnectionCb(
             std::bind(&TcpServer::newConnection, this, _1));
-    logInfo("[TcpServer::ctor]");
-}
-
-TcpServer::~TcpServer()
-{
-    logInfo("[TcpServer::dtor]");
 }
 
 EventLoop *TcpServer::getNextLoop()
@@ -43,19 +38,19 @@ void TcpServer::newConnection(int fd)
     InetAddr peerAddr = SockOps::getPeerAddr(fd);
     TcpConnectionPtr conn(new TcpConnection(id, ioLoop, fd, localAddr, peerAddr));
     conn->setState(TcpConnection::CONNECTED);
+    conn->setConnectionCb(_connectionCb);
     conn->setMessageCb(_messageCb);
     conn->setWriteCompleteCb(_writeCompleteCb);
     conn->setCloseCb(
             std::bind(&TcpServer::removeConnection, this, _1));
     _connectionMaps[id] = conn;
-    if (_connectionCb)
-        ioLoop->runInLoop(
-                [this, conn]{ this->_connectionCb(conn); });
     if (_connTimeout > 0) {
         size_t id = ioLoop->runAfter(_connTimeout, [conn]{ conn->close(); });
         conn->setTimeoutTimerId(id);
         conn->setConnTimeout(_connTimeout);
     }
+    ioLoop->runInLoop(
+            std::bind(&TcpConnection::connectEstablish, conn.get()));
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)

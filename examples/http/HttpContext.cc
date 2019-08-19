@@ -36,17 +36,15 @@ void HttpContext::parseReqLine(const char *p, const char *ep)
 
 void HttpContext::parseReqHeader(const char *p, const char *ep)
 {
-    const char *next = nullptr;
-    if (strncmp(p, "Host: ", 6) == 0) {
-        p += 6;
-        next = std::find(p, ep, '\r');
-        _request.setHost(p, next);
-    } else if (strncmp(p, "Connection: ", 12) == 0) {
-        p += 12;
-        next = std::find(p, ep, '\r');
-        _request.setConnection(p, next);
-    } else if (strncmp(p, "\r\n", 2) == 0) {
+    if (strncmp(p, "\r\n", 2) == 0) {
         _state = PARSE_LINE;
+        return;
+    }
+    const char *next = std::find(p, ep, '\r');
+    if (strncmp(p, "Host: ", 6) == 0) {
+        _request.setHost(p + 6, next);
+    } else if (strncmp(p, "Connection: ", 12) == 0) {
+        _request.setConnection(p + 12, next);
     } else
         ;
 }
@@ -71,8 +69,9 @@ void HttpContext::response(const Angel::TcpConnectionPtr& conn)
     _response.fillResponse();
     conn->send(_response.buffer());
     _response.clear();
-    if (!_keepAlive)
+    if (!_keepAlive) {
         conn->close();
+    }
 }
 
 void HttpContext::fcat(std::string& buffer)

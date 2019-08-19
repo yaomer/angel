@@ -13,8 +13,9 @@ public:
         PARSE_HEADER,
     };
     HttpContext() 
-        : _state(PARSE_LINE), _keepAlive(true) {  }
+        : _state(PARSE_LINE), _keepAlive(false) {  }
     int state() const { return _state; }
+    void setState(int state) { _state = state; }
     void parseReqLine(const char *p, const char *ep);
     void parseReqHeader(const char *p, const char *ep);
     void response(const Angel::TcpConnectionPtr& conn);

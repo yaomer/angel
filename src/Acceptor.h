@@ -19,6 +19,7 @@ public:
     Acceptor(EventLoop *, InetAddr&);
     ~Acceptor() {  };
     void listen();
+    int listenFd() const { return _socket.fd(); }
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }
 private:

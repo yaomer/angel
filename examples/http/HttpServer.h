@@ -18,6 +18,7 @@ public:
                 std::bind(&HttpServer::onConnection, this, _1));
         _server.setMessageCb(
                 std::bind(&HttpServer::onMessage, this, _1, _2));
+        // _server.setIoThreadNums(4);
     }
     void onConnection(const Angel::TcpConnectionPtr& conn)
     {
@@ -25,8 +26,10 @@ public:
     }
     void onMessage(const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf)
     {
+        if (!conn->getContext().has_value())
+            return;
         auto& context = std::any_cast<HttpContext&>(conn->getContext());
-        std::cout << buf.c_str();
+        // std::cout << buf.c_str();
         while (buf.readable() >= 2) {
             int crlf = buf.findCrlf();
             if (crlf >= 0) {
@@ -36,7 +39,8 @@ public:
                     break;
                 case HttpContext::PARSE_HEADER:
                     context.parseReqHeader(buf.peek(), buf.peek() + crlf + 2);
-                    context.response(conn);
+                    if (context.state() == HttpContext::PARSE_LINE)
+                        context.response(conn);
                     break;
                 }
                 buf.retrieve(crlf + 2);

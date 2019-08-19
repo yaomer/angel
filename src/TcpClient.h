@@ -17,14 +17,14 @@ class EventLoop;
 class TcpClient {
 public:
     TcpClient(EventLoop *, InetAddr&, const char *);
-    ~TcpClient();
     void start();
     const char *name() { return _name.c_str(); }
     const TcpConnectionPtr& conn() const { return _conn; }
-    void notExitFromLoop();
-    void retryWithPerSec();
-    void retryWithExpBackoff();
+    void notExitLoop();
     void quit();
+    bool isConnected() { return _connector.isConnected(); }
+    void setConnectWaitTime(int milliseconds)
+    { _connector.setConnectWaitTime(milliseconds); }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
     void setConnectTimeoutCb(const ConnectTimeoutCallback _cb)

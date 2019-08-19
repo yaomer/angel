@@ -6,13 +6,15 @@ void HttpResponse::fillResponse()
 {
     char buf[64];
 
-    snprintf(buf, sizeof(buf), "HTTP/1.1 %d ", _statusCode);
+    snprintf(buf, sizeof(buf), "HTTP/1.0 %d ", _statusCode);
     _buffer.append(buf);
     _buffer.append(_statusMessage);
     _buffer.append("\r\n");
 
-    snprintf(buf, sizeof(buf), "%zu", _body.size());
-    setContentLength(buf);
+    if (!_body.empty()) {
+        snprintf(buf, sizeof(buf), "%zu", _body.size());
+        setContentLength(buf);
+    }
 
     struct tm tm;
     time_t now = time(nullptr);
@@ -27,7 +29,8 @@ void HttpResponse::fillResponse()
         _buffer.append("\r\n");
     }
     _buffer.append("\r\n");
-    _buffer.append(_body);
+    if (!_body.empty())
+        _buffer.append(_body);
 }
 
 void HttpResponse::clear()

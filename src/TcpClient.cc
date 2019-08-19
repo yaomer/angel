@@ -20,12 +20,6 @@ TcpClient::TcpClient(EventLoop *loop,
 {
     _connector.setNewConnectionCb(
             std::bind(&TcpClient::newConnection, this, _1));
-    logInfo("TcpClient[%s]::ctor", name);
-}
-
-TcpClient::~TcpClient()
-{
-    logInfo("TcpClient[%s]::dtor", name());
 }
 
 void TcpClient::newConnection(int fd)
@@ -34,12 +28,12 @@ void TcpClient::newConnection(int fd)
     InetAddr peerAddr = InetAddr(SockOps::getPeerAddr(fd));
     _conn = TcpConnectionPtr(new TcpConnection(1, _loop, fd, localAddr, peerAddr));
     _conn->setState(TcpConnection::CONNECTED);
+    _conn->setConnectionCb(_connectionCb);
     _conn->setMessageCb(_messageCb);
     _conn->setCloseCb(
             std::bind(&TcpClient::handleClose, this, _1));
-    if (_connectionCb)
-        _loop->runInLoop(
-                [this]{ this->_connectionCb(this->_conn); });
+    _loop->runInLoop(
+            std::bind(&TcpConnection::connectEstablish, _conn.get()));
 }
 
 // connect()之后连接不会马上建立，如果此时立刻需要使用client.conn()，
@@ -65,17 +59,7 @@ void TcpClient::quit()
     if (_quitLoop) _loop->quit();
 }
 
-void TcpClient::notExitFromLoop()
+void TcpClient::notExitLoop()
 {
     _quitLoop = false;
-}
-
-void TcpClient::retryWithPerSec()
-{
-    // TODO: connect超时后，每隔1秒尝试一次重连
-}
-
-void TcpClient::retryWithExpBackoff()
-{
-    // TODO: connect超时后，以指数退避方式进行重连
 }
