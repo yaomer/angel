@@ -42,18 +42,19 @@ public:
         _buf[_writeindex] = '\0';
         return peek();
     }
-    int findStr(char *s, const char *p, size_t plen)
+    int findStr(char *s, const char *pattern)
     {
-        const char *pattern = std::search(s, begin() + _writeindex, p, p + plen);
-        return pattern == begin() + _writeindex ? -1 : pattern - s;
+        const char *p = std::search(s, begin() + _writeindex, 
+                pattern, pattern + strlen(pattern));
+        return p == begin() + _writeindex ? -1 : p - s;
     }
-    int findStr(const char *s, size_t len)
+    int findStr(const char *pattern)
     {
-        return findStr(peek(), s, len);
+        return findStr(peek(), pattern);
     }
     // 返回\r\n在Buffer中第一次出现的位置，没出现返回-1
-    int findCrlf() { return findStr("\r\n", 2); }
-    int findLf() { return findStr("\n", 1); }
+    int findCrlf() { return findStr("\r\n"); }
+    int findLf() { return findStr("\n"); }
     // 跳过已读的数据
     void retrieve(size_t len)
     {
