@@ -6,20 +6,14 @@
 
 using namespace Angel;
 
-void EventLoopThreadPool::setThreadNums(size_t threadNums)
+void EventLoopThreadPool::start(size_t threadNums)
 {
-    logInfo("started %zu io threads", threadNums);
     _threadNums = threadNums;
-    start();
-}
-
-void EventLoopThreadPool::start()
-{
+    logInfo("started %zu io threads", threadNums);
     for (size_t i = 0; i < _threadNums; i++) {
         auto it = std::unique_ptr<EventLoopThread>(new EventLoopThread);
         _threadPool.push_back(std::move(it));
     }
-    // 等待所有线程初始化完成
     logInfo("wait for all threads to complete-init");
     for (size_t i = 0; i < _threadNums; i++) {
         while (!_threadPool[i]->getLoop())

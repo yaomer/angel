@@ -43,10 +43,10 @@ public:
     }
 
     void setIoThreadNums(size_t threadNums)
-    { _ioThreadPool->setThreadNums(threadNums); }
+    { _ioThreadPool->start(threadNums); }
 
     void setTaskThreadNums(size_t threadNums)
-    { _threadPool->setThreadNums(threadNums); }
+    { _threadPool->start(threadNums); }
 
     void executor(const TaskCallback _cb)
     { _threadPool->addTask(std::move(_cb)); }

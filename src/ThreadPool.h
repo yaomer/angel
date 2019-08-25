@@ -23,17 +23,14 @@ public:
         : _threadNums(threadNums),
         _quit(false)
     {
-        setThreadNums(_threadNums);
+        start(threadNums);
     }
     ~ThreadPool() { quit(); };
-    void setThreadNums(size_t threadNums);
+    void start(size_t threadNums);
     void addTask(const TaskCallback _cb);
     void quit();
 private:
-    void start();
     void threadFunc();
-
-    static const size_t _MAX_THREADS = 256;
 
     size_t _threadNums;
     std::vector<std::thread> _workers;

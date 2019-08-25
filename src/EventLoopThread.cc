@@ -21,7 +21,7 @@ EventLoopThread::~EventLoopThread()
 EventLoop *EventLoopThread::getLoop()
 {
     std::unique_lock<std::mutex> mlock(_mutex);
-    logDebug("wait for [loop] is be constructed");
+    logDebug("wait for [loop] to be constructed");
     while (_loop == nullptr)
         _condVar.wait(mlock);
     logDebug("the loop has been constructed, returning ...");

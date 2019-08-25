@@ -6,24 +6,15 @@
 
 using namespace Angel;
 
-void ThreadPool::setThreadNums(size_t threadNums)
+void ThreadPool::start(size_t threadNums)
 {
-    if (_threadNums >= _MAX_THREADS) {
-        logWarn("A maximum of %d threads can be created", _MAX_THREADS);
-        _threadNums = 0;
-    } else if (_threadNums == 0)
-        _threadNums = threadNums;
-    start();
-}
-
-void ThreadPool::start()
-{
+    _threadNums = threadNums;
     for (size_t i = 0; i < _threadNums; i++) {
         std::thread thread([this]{ this->threadFunc(); });
         thread.detach();
         _workers.push_back(std::move(thread));
     }
-    logInfo("[ThreadPool::started %zu threads]", _threadNums);
+    logInfo("started %zu task threads", _threadNums);
 }
 
 void ThreadPool::addTask(const TaskCallback _cb)
