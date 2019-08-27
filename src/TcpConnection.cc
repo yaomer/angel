@@ -177,7 +177,7 @@ void TcpConnection::send(const char *s, size_t len)
         // 跨线程必须将数据拷贝一份，防止数据失效
         std::string message(s, len);
         _loop->runInLoop(
-                std::bind(&TcpConnection::sendInNotIoThread, this, message));
+                std::bind(&TcpConnection::sendInNotIoThread, this, std::move(message)));
     }
     updateTimeoutTimer();
 }

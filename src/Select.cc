@@ -28,8 +28,7 @@ Select::~Select()
 void Select::add(int fd, int events)
 {
     _fds.push_back(fd);
-    auto it = std::pair<int, int>(fd, _fds.size() - 1);
-    _indexs.insert(it);
+    _indexs.emplace(fd, _fds.size() - 1);
     change(fd, events);
     _maxFd = MAX(_maxFd, fd);
 }

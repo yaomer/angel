@@ -11,8 +11,8 @@ void EventLoopThreadPool::start(size_t threadNums)
     _threadNums = threadNums;
     logInfo("started %zu io threads", threadNums);
     for (size_t i = 0; i < _threadNums; i++) {
-        auto it = std::unique_ptr<EventLoopThread>(new EventLoopThread);
-        _threadPool.push_back(std::move(it));
+        // auto it = std::unique_ptr<EventLoopThread>(new EventLoopThread);
+        _threadPool.emplace_back(new EventLoopThread);
     }
     logInfo("wait for all threads to complete-init");
     for (size_t i = 0; i < _threadNums; i++) {

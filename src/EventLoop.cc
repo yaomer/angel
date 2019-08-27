@@ -74,8 +74,7 @@ void EventLoop::addChannelInLoop(const ChannelPtr& chl)
     logInfo("channel(fd = %d) is added to loop", chl->fd());
     chl->enableRead();
     _poller->add(chl->fd(), chl->events());
-    auto it = std::pair<int, ChannelPtr>(chl->fd(), chl);
-    _channelMaps.insert(it);
+    _channelMaps.emplace(chl->fd(), chl);
 }
 
 void EventLoop::removeChannelInLoop(const ChannelPtr& chl)

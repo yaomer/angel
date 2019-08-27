@@ -17,8 +17,7 @@ void Poll::add(int fd, int events)
     struct pollfd ev;
     evset(ev, fd, events);
     _pollfds.emplace_back(ev);
-    auto it = std::pair<int, int>(ev.fd, _pollfds.size() - 1);
-    _indexs.insert(it);
+    _indexs.emplace(ev.fd, _pollfds.size() - 1);
 }
 
 void Poll::change(int fd, int events)

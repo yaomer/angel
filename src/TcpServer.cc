@@ -43,7 +43,7 @@ void TcpServer::newConnection(int fd)
     conn->setWriteCompleteCb(_writeCompleteCb);
     conn->setCloseCb(
             std::bind(&TcpServer::removeConnection, this, _1));
-    _connectionMaps[id] = conn;
+    _connectionMaps.emplace(id, conn);
     if (_connTimeout > 0) {
         size_t id = ioLoop->runAfter(_connTimeout, [conn]{ conn->close(); });
         conn->setTimeoutTimerId(id);

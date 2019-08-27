@@ -22,9 +22,8 @@ void Timer::cancelTimer(size_t id)
 void Timer::addTimerInLoop(TimerTask *task, size_t id)
 {
     task->setId(id);
-    auto it = std::shared_ptr<TimerTask>(task);
-    _timer.insert(it);
-    _idMaps.insert(std::make_pair(id, it));
+    _timer.emplace(task);
+    _idMaps.emplace(id, task);
 }
 
 // Cancel a TimerTask is O(logn)

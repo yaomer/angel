@@ -73,8 +73,7 @@ void Signaler::addInLoop(int signo, const SignalerCallback _cb)
     bzero(&sa, sizeof(sa));
     if (_cb) {
         sa.sa_handler = &sigHandler;
-        auto it = std::pair<int, SignalerCallback>(signo, std::move(_cb));
-        _sigCallbackMaps.insert(it);
+        _sigCallbackMaps.emplace(signo, std::move(_cb));
         logInfo("set sigHandler for Sig[%d]", signo);
     } else {
         sa.sa_handler = SIG_IGN;
