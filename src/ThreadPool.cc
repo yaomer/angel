@@ -12,7 +12,7 @@ void ThreadPool::start(size_t threadNums)
     for (size_t i = 0; i < _threadNums; i++) {
         std::thread thread([this]{ this->threadFunc(); });
         thread.detach();
-        _workers.push_back(std::move(thread));
+        _workers.emplace_back(std::move(thread));
     }
     logInfo("started %zu task threads", _threadNums);
 }
@@ -24,7 +24,7 @@ void ThreadPool::addTask(const TaskCallback _cb)
         return;
     }
     std::lock_guard<std::mutex> mlock(_mutex);
-    _qtask.push(_cb);
+    _qtask.emplace(_cb);
     _condVar.notify_one();
 }
 

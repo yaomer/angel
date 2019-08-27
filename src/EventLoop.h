@@ -36,7 +36,7 @@ public:
     { return _channelMaps.find(fd)->second; }
 
     void fillActiveChannel(ChannelPtr& chl)
-    { _activeChannels.push_back(chl); }
+    { _activeChannels.emplace_back(chl); }
 
     void run();
     void wakeup();

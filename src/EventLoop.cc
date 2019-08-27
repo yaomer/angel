@@ -158,7 +158,7 @@ void EventLoop::runInLoop(const Functor _cb)
 {
     if (!isInLoopThread()) {
         std::lock_guard<std::mutex> mlock(_mutex);
-        _functors.push_back(std::move(_cb));
+        _functors.emplace_back(_cb);
         wakeup();
     } else
         _cb();
@@ -168,7 +168,7 @@ void EventLoop::runInLoop(const Functor _cb)
 void EventLoop::queueInLoop(const Functor _cb)
 {
     std::lock_guard<std::mutex> mlock(_mutex);
-    _functors.push_back(std::move(_cb));
+    _functors.emplace_back(_cb);
     wakeup();
 }
 
