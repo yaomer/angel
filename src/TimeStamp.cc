@@ -12,6 +12,13 @@ int64_t TimeStamp::now()
     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
+int64_t TimeStamp::nowUs()
+{
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
 namespace Angel {
 
     thread_local char tsp_timestr_buf[32];

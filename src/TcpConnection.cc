@@ -27,6 +27,7 @@ TcpConnection::TcpConnection(size_t id,
     _connTimeout(0)
 {
     _channel->setFd(sockfd);
+    _socket->setReuseAddr(true);
     _channel->setEventReadCb([this]{ this->handleRead(); });
     _channel->setEventWriteCb([this]{ this->handleWrite(); });
     _channel->setEventErrorCb([this]{ this->handleError(); });
