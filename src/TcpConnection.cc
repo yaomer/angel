@@ -49,7 +49,7 @@ void TcpConnection::connectEstablish()
 void TcpConnection::handleRead()
 {
     ssize_t n = _input.readFd(_channel->fd());
-    logInfo("read %zd bytes from [fd = %d]", n, _channel->fd());
+    logDebug("read %zd bytes from [fd = %d]", n, _channel->fd());
     if (n > 0) {
         if (_messageCb)
             _messageCb(shared_from_this(), _input);
@@ -139,7 +139,7 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
     }
     if (!_channel->isWriting() && _output.readable() == 0) {
         n = write(_channel->fd(), data, len);
-        logInfo("write %zd bytes to [fd = %d]", n, _channel->fd());
+        logDebug("write %zd bytes to [fd = %d]", n, _channel->fd());
         if (n >= 0) {
             remainBytes = len - n;
             if (remainBytes == 0) {

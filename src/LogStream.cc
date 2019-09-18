@@ -41,7 +41,7 @@ namespace Angel {
             log_last_second = seconds;
         } else {
             // 在1s内只需要格式化ms部分
-            snprintf(log_time_buf + 21, sizeof(log_time_buf) - 21,
+            snprintf(log_time_buf + 20, sizeof(log_time_buf) - 20,
                     "%03lld", ms % 1000);
         }
         return log_time_buf;
