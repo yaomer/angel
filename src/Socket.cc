@@ -8,15 +8,8 @@
 
 using namespace Angel;
 
-Socket::Socket(int fd)
-    : _sockfd(fd)
-{
-    logInfo("[Socket::ctor, fd = %d]", fd);
-}
-
 Socket::~Socket()
 {
-    logInfo("[Socket::dtor, close(%d)]", _sockfd);
     ::close(_sockfd);
 }
 

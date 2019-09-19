@@ -50,12 +50,11 @@ void TcpServer::newConnection(int fd)
         conn->setConnTimeout(_connTimeout);
     }
     ioLoop->runInLoop(
-            std::bind(&TcpConnection::connectEstablish, conn.get()));
+            std::bind(&TcpConnection::connectEstablish, conn));
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 {
-    logInfo("TcpConnection[id = %d] is removed from TcpServer", conn->id());
     if (_closeCb) _closeCb(conn);
     conn->setState(TcpConnection::CLOSED);
     conn->getLoop()->removeChannel(conn->getChannel());

@@ -9,13 +9,13 @@ EventLoopThread::EventLoopThread()
     _thread([this]{ this->threadFunc(); })
 {
     _thread.detach();
-    logInfo("[EventLoopThread::ctor], thread id = %s", getThreadIdStr());
+    logInfo("ctor, thread id = %s", getThreadIdStr());
 }
 
 EventLoopThread::~EventLoopThread()
 {
     if (_loop) _loop->quit();
-    logInfo("[EventLoopThread::dtor], thread id = %s", getThreadIdStr());
+    logInfo("dtor, thread id = %s", getThreadIdStr());
 }
 
 EventLoop *EventLoopThread::getLoop()

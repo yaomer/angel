@@ -10,11 +10,11 @@ using namespace Angel;
 const char *Channel::ev2str(int events)
 {
     switch (events) {
-    case READ: return "READ"; break;
-    case WRITE: return "WRITE"; break;
-    case READ | WRITE: return "READ|WRITE"; break;
-    case ERROR: return "ERROR"; break;
-    default: return "NONE"; break;
+    case READ: return "READ";
+    case WRITE: return "WRITE";
+    case READ | WRITE: return "READ|WRITE";
+    case ERROR: return "ERROR";
+    default: return "NONE";
     }
 }
 

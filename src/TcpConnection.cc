@@ -27,29 +27,30 @@ TcpConnection::TcpConnection(size_t id,
     _connTimeout(0)
 {
     _channel->setFd(sockfd);
-    _socket->setReuseAddr(true);
     _channel->setEventReadCb([this]{ this->handleRead(); });
     _channel->setEventWriteCb([this]{ this->handleWrite(); });
     _channel->setEventErrorCb([this]{ this->handleError(); });
-    logInfo("[TcpConnection::ctor, id:%d]", _id);
+    logInfo("ctor, id = %d, fd = %d", _id, sockfd);
 }
 
 TcpConnection::~TcpConnection()
 {
-    logInfo("[TcpConnection::dtor, id:%d]", _id);
+    if (_timeoutTimerId > 0)
+        _loop->cancelTimer(_timeoutTimerId);
+    logInfo("dtor, id = %d, close(%d)", id(), _socket->fd());
 }
 
 void TcpConnection::connectEstablish()
 {
     _loop->addChannel(_channel);
     if (_connectionCb) _connectionCb(shared_from_this());
-    logInfo("TcpConnection[id = %d] is ESTABLISH", id());
+    logInfo("TcpConnection id = %d is ESTABLISHED", id());
 }
 
 void TcpConnection::handleRead()
 {
     ssize_t n = _input.readFd(_channel->fd());
-    logDebug("read %zd bytes from [fd = %d]", n, _channel->fd());
+    logDebug("read %zd bytes from fd = %d", n, _channel->fd());
     if (n > 0) {
         if (_messageCb)
             _messageCb(shared_from_this(), _input);
@@ -110,7 +111,7 @@ void TcpConnection::handleClose()
 
 void TcpConnection::handleError()
 {
-    logError("[fd = %d]: %s", _channel->fd(), strerrno());
+    logError("fd = %d: %s", _channel->fd(), strerrno());
     // 对端已关闭连接
     if (errno == ECONNRESET)
         handleClose();
@@ -134,12 +135,12 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
     size_t remainBytes = len;
 
     if (_state == CLOSED) {
-        logWarn("TcpConnection[id = %d] is closed, give up sending", id());
+        logWarn("TcpConnection id = %d is closed, give up sending", id());
         return;
     }
     if (!_channel->isWriting() && _output.readable() == 0) {
         n = write(_channel->fd(), data, len);
-        logDebug("write %zd bytes to [fd = %d]", n, _channel->fd());
+        logDebug("write %zd bytes to fd = %d", n, _channel->fd());
         if (n >= 0) {
             remainBytes = len - n;
             if (remainBytes == 0) {

@@ -8,7 +8,9 @@ namespace Angel {
 
 class Socket : noncopyable {
 public:
-    explicit Socket(int fd);
+    explicit Socket(int fd) : _sockfd(fd)
+    {
+    }
     ~Socket();
     int fd() const { return _sockfd; }
     void setKeepAlive(bool on);

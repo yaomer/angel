@@ -20,12 +20,12 @@ TcpClient::TcpClient(EventLoop *loop,
 {
     _connector.setNewConnectionCb(
             std::bind(&TcpClient::newConnection, this, _1));
-    logInfo("TcpClient[%s]::ctor", name);
+    logInfo("ctor, name = %s", name);
 }
 
 TcpClient::~TcpClient()
 {
-    logInfo("TcpClient[%s]::dtor", name());
+    logInfo("dtor, name = %s", name());
 }
 
 void TcpClient::newConnection(int fd)

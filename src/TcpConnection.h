@@ -23,8 +23,8 @@ class TcpConnection : noncopyable,
     public std::enable_shared_from_this<TcpConnection> {
 public:
     TcpConnection(size_t id,
-                  EventLoop *loop, 
-                  int sockfd, 
+                  EventLoop *loop,
+                  int sockfd,
                   InetAddr localAddr,
                   InetAddr peerAddr);
     ~TcpConnection();
@@ -77,6 +77,7 @@ private:
     InetAddr _localAddr;
     InetAddr _peerAddr;
     // 保存连接所需的上下文
+    // context不应包含一个TcpConnectionPtr，否则将会造成循环引用
     std::any _context;
     // 标识一个连接所处的状态
     std::atomic_int _state;

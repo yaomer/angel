@@ -133,9 +133,10 @@ void EventLoop::wakeup()
 {
     uint64_t one = 1;
     ssize_t n = write(_wakeFd[1], &one, sizeof(one));
-    if (n != sizeof(one))
+    if (n != sizeof(one)) {
         logError("write %zd bytes instead of 8");
-    logDebug("waked up the ioLoop");
+    } else
+        logDebug("waked up the ioLoop");
 }
 
 void EventLoop::handleRead()
