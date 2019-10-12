@@ -17,14 +17,17 @@ class EventLoop;
 
 class TcpClient {
 public:
+    enum Flag { NOTEXITLOOP = 01, DISCONNECT = 02 };
+    TcpClient(EventLoop *, InetAddr&);
     TcpClient(EventLoop *, InetAddr&, const char *);
     ~TcpClient();
     void start();
     const char *name() { return _name.c_str(); }
+    void setName(const std::string& name) { _name = name; }
     const TcpConnectionPtr& conn() const { return _conn; }
     void notExitLoop();
     void quit();
-    bool isConnected() { return _connector.isConnected(); }
+    bool isConnected() { return _connector.isConnected() && _conn; }
     void setConnectWaitTime(int milliseconds)
     { _connector.setConnectWaitTime(milliseconds); }
     void setConnectionCb(const ConnectionCallback _cb)
@@ -37,17 +40,20 @@ public:
     { _closeCb = std::move(_cb); }
 private:
     void newConnection(int fd);
-    void handleClose(const TcpConnectionPtr&) { quit(); }
+    void handleClose(const TcpConnectionPtr&);
 
     EventLoop *_loop;
     Connector _connector;
     std::shared_ptr<TcpConnection> _conn;
-    std::atomic_bool _quitLoop;
     std::string _name;
+    int _flag;
+    // 连接刚建立后被调用
     ConnectionCallback _connectionCb;
     ConnectTimeoutCallback _connectTimeoutCb;
     MessageCallback _messageCb;
+    // 对端关闭连接时被调用
     CloseCallback _closeCb;
+    size_t _connectTimeoutTimerId;
 };
 
 }

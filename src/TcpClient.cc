@@ -10,13 +10,24 @@
 using namespace Angel;
 using std::placeholders::_1;
 
+TcpClient::TcpClient(EventLoop *loop, InetAddr& inetAddr)
+    : _loop(loop),
+    _connector(loop, inetAddr),
+    _flag(0),
+    _connectTimeoutTimerId(0)
+{
+    _connector.setNewConnectionCb(
+            std::bind(&TcpClient::newConnection, this, _1));
+}
+
 TcpClient::TcpClient(EventLoop *loop,
                      InetAddr& inetAddr,
                      const char *name)
     : _loop(loop),
     _connector(loop, inetAddr),
-    _quitLoop(true),
-    _name(name)
+    _name(name),
+    _flag(0),
+    _connectTimeoutTimerId(0)
 {
     _connector.setNewConnectionCb(
             std::bind(&TcpClient::newConnection, this, _1));
@@ -25,6 +36,7 @@ TcpClient::TcpClient(EventLoop *loop,
 
 TcpClient::~TcpClient()
 {
+    handleClose(_conn);
     logInfo("dtor, name = %s", name());
 }
 
@@ -42,31 +54,28 @@ void TcpClient::newConnection(int fd)
             std::bind(&TcpConnection::connectEstablish, _conn.get()));
 }
 
-// connect()之后连接不会马上建立，如果此时立刻需要使用client.conn()，
-// 则必须保证它为真，exp:
-// ...
-// client.start();
-// client.conn()->send("hello\n");
-// 上面代码中client.conn()很可能为假，所以可以
-// while (!client.conn()) ;
-// 稍微等待一会
 void TcpClient::start()
 {
     _connector.connect();
     if (_connectTimeoutCb)
-        _loop->runAfter(_connector.connectWaitTime(), _connectTimeoutCb);
+        _connectTimeoutTimerId = _loop->runAfter(
+                _connector.connectWaitTime(), _connectTimeoutCb);
     logInfo("TcpClient[%s] is started", name());
 }
 
-void TcpClient::quit()
+void TcpClient::handleClose(const TcpConnectionPtr& conn)
 {
+    if (_flag & DISCONNECT) return;
+    if (_connectTimeoutTimerId > 0)
+        _loop->cancelTimer(_connectTimeoutTimerId);
     if (_closeCb) _closeCb(_conn);
     _loop->removeChannel(_conn->getChannel());
     _conn.reset();
-    if (_quitLoop) _loop->quit();
+    if (!(_flag & NOTEXITLOOP)) _loop->quit();
+    _flag |= DISCONNECT;
 }
 
 void TcpClient::notExitLoop()
 {
-    _quitLoop = false;
+    _flag |= NOTEXITLOOP;
 }

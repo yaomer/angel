@@ -44,7 +44,7 @@ void TcpConnection::connectEstablish()
 {
     _loop->addChannel(_channel);
     if (_connectionCb) _connectionCb(shared_from_this());
-    logInfo("TcpConnection id = %d is ESTABLISHED", id());
+    logInfo("conn id = %d is ESTABLISHED", id());
 }
 
 void TcpConnection::handleRead()
