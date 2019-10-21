@@ -1,7 +1,6 @@
 #ifndef _ANGEL_EVENTLOOP_H
 #define _ANGEL_EVENTLOOP_H
 
-#include <iostream>
 #include <atomic>
 #include <memory>
 #include <functional>

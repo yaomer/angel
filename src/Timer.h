@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <set>
 #include <unordered_map>
+
 #include "TimeStamp.h"
 #include "noncopyable.h"
 #include "decls.h"
@@ -19,17 +20,17 @@ public:
         _interval(interval),
         _timerCb(_cb),
         _isCancel(false)
-    {  
+    {
     }
     ~TimerTask() {  };
     size_t id() const { return _id; }
     int64_t expire() const { return _expire; }
     int64_t interval() const { return _interval; }
     const TimerCallback timerCb() const { return _timerCb; }
-    void setId(size_t id) { _id = id; } 
+    void setId(size_t id) { _id = id; }
     void setExpire(int64_t expire) { _expire = expire; }
     void setInterval(int64_t interval) { _interval = interval; }
-    void setTimerCb(const TimerCallback _cb) 
+    void setTimerCb(const TimerCallback _cb)
     { _timerCb = std::move(_cb); }
     bool isCancel() const { return _isCancel; }
     void canceled() { _isCancel = true; }
@@ -90,7 +91,7 @@ public:
 private:
     void addTimerInLoop(TimerTask *_task, size_t id);
     void cancelTimerInLoop(size_t id);
-    
+
     // 这里之所以要用到TimerIterator，是因为multiset提供两个erase()，
     // 一个以值为参数，一个以迭代器为参数，如果存有重复的元素，则前者
     // 会删掉所有值相同的元素，而后者只会删掉迭代器指向的那个元素，

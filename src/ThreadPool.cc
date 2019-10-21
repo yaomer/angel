@@ -1,6 +1,3 @@
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include "ThreadPool.h"
 #include "LogStream.h"
 

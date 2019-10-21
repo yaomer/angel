@@ -1,7 +1,6 @@
 #ifndef _ANGEL_TCPCLIENT_H
 #define _ANGEL_TCPCLIENT_H
 
-#include <atomic>
 #include <string>
 
 #include "Connector.h"
@@ -19,14 +18,12 @@ class TcpClient {
 public:
     enum Flag { NOTEXITLOOP = 01, DISCONNECT = 02 };
     TcpClient(EventLoop *, InetAddr&);
-    TcpClient(EventLoop *, InetAddr&, const char *);
     ~TcpClient();
     void start();
     const char *name() { return _name.c_str(); }
     void setName(const std::string& name) { _name = name; }
     const TcpConnectionPtr& conn() const { return _conn; }
     void notExitLoop();
-    void quit();
     bool isConnected() { return _connector.isConnected() && _conn; }
     void setConnectWaitTime(int milliseconds)
     { _connector.setConnectWaitTime(milliseconds); }

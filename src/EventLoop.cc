@@ -1,13 +1,7 @@
 #include <unistd.h>
-#include <csignal>
-#include <thread>
-#include <mutex>
-#include <memory>
-#include <map>
-#include <vector>
+#include <signal.h>
+
 #include "EventLoop.h"
-#include "Timer.h"
-#include "Signaler.h"
 #include "LogStream.h"
 #include "Socket.h"
 #include "SockOps.h"

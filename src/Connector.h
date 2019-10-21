@@ -4,10 +4,8 @@
 #include <memory>
 #include <functional>
 
-#include "Socket.h"
 #include "InetAddr.h"
 #include "Channel.h"
-#include "Buffer.h"
 #include "noncopyable.h"
 #include "decls.h"
 
@@ -20,18 +18,19 @@ public:
     Connector(EventLoop *, InetAddr&);
     ~Connector() {  };
     void connect();
-    void connecting(int fd);
-    void connected(int fd);
-    void timeout();
-    void check(int fd);
     int connectWaitTime() const { return _waitTime; }
     void setConnectWaitTime(int time) { _waitTime = time;  }
     bool isConnected() { return _connected; }
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }
 
-    static size_t _defaultWaitTime;
+    static size_t default_wait_time;
 private:
+    void connecting(int fd);
+    void connected(int fd);
+    void timeout();
+    void check(int fd);
+
     EventLoop *_loop;
     std::shared_ptr<Channel> _connectChannel;
     InetAddr _peerAddr;

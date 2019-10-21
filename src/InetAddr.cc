@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <string.h>
+
 #include "InetAddr.h"
 #include "SockOps.h"
 #include "LogStream.h"
@@ -27,11 +28,6 @@ InetAddr::InetAddr(int port, const char *addr)
     _sockaddr.sin_port = htons(port);
     if (inet_pton(AF_INET, addr, &_sockaddr.sin_addr) <= 0)
         logFatal("inet_pton: %s", strerrno());
-}
-
-InetAddr::InetAddr(struct sockaddr_in addr)
-{
-    _sockaddr = std::move(addr);
 }
 
 int InetAddr::toIpPort()

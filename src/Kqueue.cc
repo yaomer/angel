@@ -2,10 +2,9 @@
 
 #ifdef _ANGEL_HAVE_KQUEUE
 
-#include <sys/event.h>
 #include <unistd.h>
 #include <string.h>
-#include <vector>
+
 #include "Kqueue.h"
 #include "EventLoop.h"
 #include "Channel.h"

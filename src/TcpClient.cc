@@ -1,10 +1,6 @@
 #include "TcpClient.h"
 #include "EventLoop.h"
-#include "InetAddr.h"
 #include "SockOps.h"
-#include "Connector.h"
-#include "TcpConnection.h"
-#include "Channel.h"
 #include "LogStream.h"
 
 using namespace Angel;
@@ -20,24 +16,9 @@ TcpClient::TcpClient(EventLoop *loop, InetAddr& inetAddr)
             std::bind(&TcpClient::newConnection, this, _1));
 }
 
-TcpClient::TcpClient(EventLoop *loop,
-                     InetAddr& inetAddr,
-                     const char *name)
-    : _loop(loop),
-    _connector(loop, inetAddr),
-    _name(name),
-    _flag(0),
-    _connectTimeoutTimerId(0)
-{
-    _connector.setNewConnectionCb(
-            std::bind(&TcpClient::newConnection, this, _1));
-    logInfo("ctor, name = %s", name);
-}
-
 TcpClient::~TcpClient()
 {
     handleClose(_conn);
-    logInfo("dtor, name = %s", name());
 }
 
 void TcpClient::newConnection(int fd)
@@ -60,7 +41,7 @@ void TcpClient::start()
     if (_connectTimeoutCb)
         _connectTimeoutTimerId = _loop->runAfter(
                 _connector.connectWaitTime(), _connectTimeoutCb);
-    logInfo("TcpClient[%s] is started", name());
+    logInfo("client is starting");
 }
 
 void TcpClient::handleClose(const TcpConnectionPtr& conn)

@@ -3,15 +3,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <signal.h>
 #include <iostream>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <chrono>
-#include <csignal>
+
 #include "TimeStamp.h"
 #include "Logger.h"
-#include "LogStream.h"
 
 using namespace Angel;
 

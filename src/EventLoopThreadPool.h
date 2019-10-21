@@ -1,7 +1,8 @@
-#ifndef _ANGEL_EVENTLOOPTHREADPOOL_H
-#define _ANGEL_EVENTLOOPTHREADPOOL_H
+#ifndef _ANGEL_EVENTLOOP_THREAD_POOL_H
+#define _ANGEL_EVENTLOOP_THREAD_POOL_H
 
 #include <memory>
+
 #include "EventLoopThread.h"
 
 namespace Angel {
@@ -24,4 +25,4 @@ private:
 
 }
 
-#endif // _ANGEL_EVENTLOOPTHREADPOOL_H
+#endif // _ANGEL_EVENTLOOP_THREAD_POOL_H

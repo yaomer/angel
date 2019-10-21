@@ -1,5 +1,5 @@
-#ifndef _ANGEL_EVENTLOOPTHREAD_H
-#define _ANGEL_EVENTLOOPTHREAD_H
+#ifndef _ANGEL_EVENTLOOP_THREAD_H
+#define _ANGEL_EVENTLOOP_THREAD_H
 
 #include <functional>
 #include <thread>
@@ -28,4 +28,4 @@ private:
 };
 }
 
-#endif // _ANGEL_EVENTLOOPTHREAD_H
+#endif // _ANGEL_EVENTLOOP_THREAD_H

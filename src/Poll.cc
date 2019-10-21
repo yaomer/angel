@@ -2,9 +2,8 @@
 
 #ifdef _ANGEL_HAVE_POLL
 
-#include <sys/poll.h>
 #include <unistd.h>
-#include <vector>
+
 #include "Poll.h"
 #include "EventLoop.h"
 #include "Channel.h"

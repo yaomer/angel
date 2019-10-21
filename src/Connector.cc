@@ -1,22 +1,21 @@
 #include <errno.h>
+
 #include "EventLoop.h"
-#include "Channel.h"
 #include "Socket.h"
 #include "SockOps.h"
-#include "InetAddr.h"
 #include "Connector.h"
 #include "LogStream.h"
 
 using namespace Angel;
 
-size_t Connector::_defaultWaitTime = 30 * 1000;
+size_t Connector::default_wait_time = 30 * 1000;
 
 Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
     : _loop(loop),
     _connectChannel(new Channel(loop)),
     _peerAddr(inetAddr),
     _connected(false),
-    _waitTime(_defaultWaitTime)
+    _waitTime(default_wait_time)
 {
     logInfo("connect -> [%s:%d]", _peerAddr.toIpAddr(), _peerAddr.toIpPort());
 }
@@ -82,7 +81,7 @@ void Connector::check(int sockfd)
 {
     int err = SockOps::getSocketError(sockfd);
     if (err) {
-        logError("connect: %s", strerr(err));
+        logWarn("connect: %s", strerr(err));
         return;
     }
     connected(sockfd);

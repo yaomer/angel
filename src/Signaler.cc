@@ -1,11 +1,8 @@
 #include <signal.h>
 #include <unistd.h>
 #include <string.h>
-#include <functional>
-#include <mutex>
-#include <memory>
+
 #include "EventLoop.h"
-#include "Channel.h"
 #include "Signaler.h"
 #include "Socket.h"
 #include "SockOps.h"

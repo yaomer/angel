@@ -2,13 +2,9 @@
 #define _ANGEL_CHANNEL_H
 
 #include <functional>
-#include <string>
-#include <atomic>
 
-#include "Buffer.h"
 #include "noncopyable.h"
 #include "decls.h"
-#include "LogStream.h"
 
 namespace Angel {
 
@@ -63,8 +59,8 @@ private:
 
     EventLoop *_loop;
     int _fd;
-    int _events;
-    int _revents;
+    int _events; // 用户关注的事件
+    int _revents; // 由内核返回的已经发生的事件
     EventReadCallback _readCb;
     EventWriteCallback _writeCb;
     EventErrorCallback _errorCb;

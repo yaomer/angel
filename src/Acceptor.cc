@@ -1,8 +1,7 @@
 #include <unistd.h>
+
 #include "Acceptor.h"
 #include "EventLoop.h"
-#include "InetAddr.h"
-#include "Channel.h"
 #include "SockOps.h"
 #include "LogStream.h"
 

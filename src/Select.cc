@@ -2,7 +2,6 @@
 
 #ifdef _ANGEL_HAVE_SELECT
 
-#include <sys/select.h>
 #include "EventLoop.h"
 #include "Select.h"
 #include "LogStream.h"

@@ -1,11 +1,13 @@
-#ifndef _ANGEL_THREADPOOL_H
-#define _ANGEL_THREADPOOL_H
+#ifndef _ANGEL_THREAD_POOL_H
+#define _ANGEL_THREAD_POOL_H
 
 #include <functional>
 #include <thread>
 #include <vector>
 #include <queue>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 #include "noncopyable.h"
 #include "decls.h"
@@ -41,4 +43,4 @@ private:
 };
 }
 
-#endif // _ANGEL_THREADPOOL_H
+#endif // _ANGEL_THREAD_POOL_H

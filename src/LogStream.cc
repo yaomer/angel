@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <iostream>
+
 #include "TimeStamp.h"
 #include "LogStream.h"
 

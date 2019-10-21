@@ -1,5 +1,6 @@
 #include <vector>
 #include <memory>
+
 #include "EventLoopThread.h"
 #include "EventLoopThreadPool.h"
 #include "LogStream.h"
@@ -19,7 +20,7 @@ void EventLoopThreadPool::start(size_t threadNums)
         while (!_threadPool[i]->getLoop())
             ;
     }
-    logInfo("EventLoopThreadPool is started");
+    logInfo("EventLoopThreadPool is starting");
 }
 
 // 使用[round-robin]挑选出下一个[io thread]

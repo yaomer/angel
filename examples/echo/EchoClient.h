@@ -4,6 +4,8 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpClient.h>
 
+#include <iostream>
+
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -11,7 +13,7 @@ class EchoClient {
 public:
     EchoClient(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
-        _client(loop, inetAddr, "EchoClient")
+        _client(loop, inetAddr)
     {
         _client.setMessageCb(
                 std::bind(&EchoClient::onMessage, this, _1, _2));

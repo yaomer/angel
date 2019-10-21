@@ -8,9 +8,9 @@ namespace Angel {
 
 class Buffer {
 public:
-    Buffer() : _buf(INIT_SIZE) {  }
+    Buffer() : _buf(init_size) {  }
+    explicit Buffer(size_t size) : _buf(size) {  }
     ~Buffer() {  }
-    static const size_t INIT_SIZE = 1024;
     char *begin() { return &*_buf.begin(); }
     char *peek() { return begin() + _readindex; }
     size_t prependable() const { return _readindex; }
@@ -36,15 +36,15 @@ public:
         }
     }
     // 返回C风格字符串
-    const char *c_str() 
-    { 
+    const char *c_str()
+    {
         makeSpace(1);
         _buf[_writeindex] = '\0';
         return peek();
     }
     int findStr(char *s, const char *pattern)
     {
-        const char *p = std::search(s, begin() + _writeindex, 
+        const char *p = std::search(s, begin() + _writeindex,
                 pattern, pattern + strlen(pattern));
         return p == begin() + _writeindex ? -1 : p - s;
     }
@@ -72,6 +72,17 @@ public:
         std::swap(_writeindex, _buffer._writeindex);
     }
     char& operator[](size_t idx) { return _buf[idx]; }
+    bool strcmp(const char *s)
+    {
+        size_t len = strlen(s);
+        return readable() >= len && strncmp(peek(), s, len) == 0;
+    }
+    bool strcasecmp(const char *s)
+    {
+        size_t len = strlen(s);
+        return readable() >= len && strncasecmp(peek(), s, len) == 0;
+    }
+    static const size_t init_size = 1024;
 private:
     std::vector<char> _buf;
     size_t _readindex = 0;

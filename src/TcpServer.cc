@@ -1,8 +1,7 @@
 #include <signal.h>
+
 #include "TcpServer.h"
-#include "Acceptor.h"
 #include "EventLoop.h"
-#include "TcpConnection.h"
 #include "SockOps.h"
 #include "LogStream.h"
 
@@ -67,7 +66,7 @@ void TcpServer::start()
     // 会导致服务端意外退出
     addSignal(SIGPIPE, nullptr);
     _acceptor->listen();
-    logInfo("server is started");
+    logInfo("server is starting");
 }
 
 void TcpServer::quit()

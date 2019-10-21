@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <string.h>
+
 #include "Socket.h"
 #include "LogStream.h"
 #include "config.h"

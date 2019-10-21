@@ -10,7 +10,19 @@ public:
     InetAddr();
     explicit InetAddr(int);
     InetAddr(int, const char *);
-    InetAddr(struct sockaddr_in);
+    InetAddr(struct sockaddr_in addr)
+    {
+        _sockaddr = addr;
+    }
+    InetAddr(const InetAddr& inetAddr)
+    {
+        _sockaddr = inetAddr._sockaddr;
+    }
+    InetAddr& operator=(const InetAddr& inetAddr)
+    {
+        _sockaddr = inetAddr._sockaddr;
+        return *this;
+    }
     struct sockaddr_in& inetAddr() { return _sockaddr; }
     int toIpPort();
     const char *toIpAddr();

@@ -4,6 +4,8 @@
 #include <Angel/EventLoop.h>
 #include <Angel/TcpClient.h>
 
+#include <iostream>
+
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -11,7 +13,7 @@ class ChargenClient {
 public:
     ChargenClient(Angel::EventLoop *loop, Angel::InetAddr& inetAddr)
         : _loop(loop),
-        _client(loop, inetAddr, "ChargenClient")
+        _client(loop, inetAddr)
     {
         _client.setMessageCb(
                 std::bind(&ChargenClient::onMessage, this, _1, _2));
