@@ -25,12 +25,8 @@ public:
     const TcpConnectionPtr& conn() const { return _conn; }
     void notExitLoop();
     bool isConnected() { return _connector.isConnected() && _conn; }
-    void setConnectWaitTime(int milliseconds)
-    { _connector.setConnectWaitTime(milliseconds); }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
-    void setConnectTimeoutCb(const ConnectTimeoutCallback _cb)
-    { _connectTimeoutCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
     { _messageCb = std::move(_cb); }
     void setCloseCb(const CloseCallback _cb)
@@ -46,11 +42,9 @@ private:
     int _flag;
     // 连接刚建立后被调用
     ConnectionCallback _connectionCb;
-    ConnectTimeoutCallback _connectTimeoutCb;
     MessageCallback _messageCb;
     // 对端关闭连接时被调用
     CloseCallback _closeCb;
-    size_t _connectTimeoutTimerId;
 };
 
 }

@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <unistd.h>
 
 #include "EventLoop.h"
 #include "Socket.h"
@@ -8,20 +9,10 @@
 
 using namespace Angel;
 
-size_t Connector::default_wait_time = 30 * 1000;
-
-Connector::Connector(EventLoop *loop, InetAddr& inetAddr)
-    : _loop(loop),
-    _connectChannel(new Channel(loop)),
-    _peerAddr(inetAddr),
-    _connected(false),
-    _waitTime(default_wait_time)
-{
-    logInfo("connect -> [%s:%d]", _peerAddr.toIpAddr(), _peerAddr.toIpPort());
-}
-
 void Connector::connect()
 {
+    _waitRetry = false;
+    logInfo("connect -> [%s:%d]", _peerAddr.toIpAddr(), _peerAddr.toIpPort());
     int sockfd = SockOps::socket();
     SockOps::setnonblock(sockfd);
     int ret = SockOps::connect(sockfd, &_peerAddr.inetAddr());
@@ -41,8 +32,6 @@ void Connector::connect()
 void Connector::connecting(int sockfd)
 {
     logInfo("connfd = %d is connecting ...", sockfd);
-    _loop->runAfter(1000, [this]{ this->timeout(); });
-    _waitTime -= 1000;
     _connectChannel->setEventReadCb(
             [this, sockfd]{ this->check(sockfd); });
     _connectChannel->setEventWriteCb(
@@ -62,27 +51,29 @@ void Connector::connected(int sockfd)
     }
 }
 
-void Connector::timeout()
-{
-    if (!_connected) {
-        if (_waitTime == 0) {
-            logError("connect timeout");
-            return;
-        }
-        _loop->runAfter(1000, [this]{ this->timeout(); });
-        _waitTime -= 1000;
-    }
-}
-
 // 在Mac OS上使用poll判断sockfd的状态，好像有时会可读，有时会可写
 // 所以我们在可读可写情况下都使用getsockopt来获取sockfd的状态
 
+// 如果一个socket fd上出现了错误，那么在close(fd)之前，只能通过
+// getsockopt()获取一次错误，之后便不会再触发
+
 void Connector::check(int sockfd)
 {
+    if (_waitRetry) return;
     int err = SockOps::getSocketError(sockfd);
     if (err) {
-        logWarn("connect: %s", strerr(err));
+        logError("connect: %s, try to reconnect after %d seconds",
+                strerr(err), retry_interval);
+        retry(sockfd);
         return;
     }
     connected(sockfd);
+}
+
+void Connector::retry(int sockfd)
+{
+    _loop->removeChannel(_connectChannel);
+    _loop->runAfter(1000 * retry_interval, [this]{ this->connect(); });
+    _waitRetry = true;
+    ::close(sockfd);
 }

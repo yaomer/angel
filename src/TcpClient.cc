@@ -9,8 +9,7 @@ using std::placeholders::_1;
 TcpClient::TcpClient(EventLoop *loop, InetAddr& inetAddr)
     : _loop(loop),
     _connector(loop, inetAddr),
-    _flag(0),
-    _connectTimeoutTimerId(0)
+    _flag(0)
 {
     _connector.setNewConnectionCb(
             std::bind(&TcpClient::newConnection, this, _1));
@@ -38,17 +37,12 @@ void TcpClient::newConnection(int fd)
 void TcpClient::start()
 {
     _connector.connect();
-    if (_connectTimeoutCb)
-        _connectTimeoutTimerId = _loop->runAfter(
-                _connector.connectWaitTime(), _connectTimeoutCb);
     logInfo("client is starting");
 }
 
 void TcpClient::handleClose(const TcpConnectionPtr& conn)
 {
     if (_flag & DISCONNECT) return;
-    if (_connectTimeoutTimerId > 0)
-        _loop->cancelTimer(_connectTimeoutTimerId);
     if (_closeCb) _closeCb(_conn);
     _loop->removeChannel(_conn->getChannel());
     _conn.reset();

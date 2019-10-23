@@ -18,6 +18,8 @@ class EventLoop;
 // 几乎所有类型的事件都需要的，无论是I/O、Timer或Signal，
 // 而对于写事件来说，则必须在需要的时候注册，否则会造成
 // busy loop，导致CPU空转
+//
+// Channel并不持有fd，也就是说析构时不会去close(fd)
 class Channel : noncopyable {
 public:
     enum EventType {

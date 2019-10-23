@@ -15,28 +15,34 @@ class EventLoop;
 
 class Connector : noncopyable {
 public:
-    Connector(EventLoop *, InetAddr&);
+    Connector(EventLoop *loop, InetAddr& inetAddr)
+        : _loop(loop),
+        _connectChannel(new Channel(loop)),
+        _peerAddr(inetAddr),
+        _connected(false),
+        _waitRetry(false)
+    {
+    }
     ~Connector() {  };
     void connect();
-    int connectWaitTime() const { return _waitTime; }
-    void setConnectWaitTime(int time) { _waitTime = time;  }
     bool isConnected() { return _connected; }
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }
 
-    static size_t default_wait_time;
 private:
+    static const int retry_interval = 3;
+
     void connecting(int fd);
     void connected(int fd);
-    void timeout();
     void check(int fd);
+    void retry(int fd);
 
     EventLoop *_loop;
     std::shared_ptr<Channel> _connectChannel;
     InetAddr _peerAddr;
     NewConnectionCallback _newConnectionCb;
-    int _connected;
-    int _waitTime;
+    bool _connected;
+    bool _waitRetry;
 };
 }
 
