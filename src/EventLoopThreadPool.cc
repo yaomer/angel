@@ -15,7 +15,7 @@ void EventLoopThreadPool::start(size_t threadNums)
         // auto it = std::unique_ptr<EventLoopThread>(new EventLoopThread);
         _threadPool.emplace_back(new EventLoopThread);
     }
-    logInfo("wait for all threads to complete-init");
+    // 等待所有IO线程完成初始化
     for (size_t i = 0; i < _threadNums; i++) {
         while (!_threadPool[i]->getLoop())
             ;

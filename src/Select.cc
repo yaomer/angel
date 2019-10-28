@@ -12,7 +12,7 @@ Select::Select()
 {
     FD_ZERO(&_rdset);
     FD_ZERO(&_wrset);
-    _fds.reserve(_INIT_FDS_SIZE);
+    _fds.reserve(fds_init_size);
     _maxFd = -1;
     setName("select");
 }

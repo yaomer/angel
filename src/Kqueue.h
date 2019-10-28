@@ -20,7 +20,7 @@ public:
     void add(int fd, int events);
     void change(int fd, int events);
     void remove(int fd, int events);
-    const int _INIT_EVLIST_SIZE = 64;
+    static const size_t evlist_init_size = 64;
 private:
     int evret(struct kevent&);
 

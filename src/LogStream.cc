@@ -95,3 +95,8 @@ void Angel::setLoggerLevel(int level)
 {
     __loggerLevel = level;
 }
+
+void Angel::setLoggerFlush(int flush)
+{
+    __logger.setFlush(flush);
+}

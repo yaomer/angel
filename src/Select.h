@@ -18,9 +18,8 @@ public:
     void add(int fd, int events);
     void change(int fd, int events);
     void remove(int fd, int events);
+    static const size_t fds_init_size = 64;
 private:
-    static const int _INIT_FDS_SIZE = 64;
-
     fd_set _rdset;
     fd_set _wrset;
     std::vector<int> _fds;

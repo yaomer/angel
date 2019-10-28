@@ -14,7 +14,7 @@ using namespace Angel;
 
 Kqueue::Kqueue()
     : _addFds(0),
-    _evlistSize(_INIT_EVLIST_SIZE)
+    _evlistSize(evlist_init_size)
 {
     _kqfd = kqueue();
     _evlist.resize(_evlistSize);

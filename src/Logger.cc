@@ -15,8 +15,6 @@ using namespace Angel;
 namespace Angel {
 
     Angel::Logger __logger;
-
-    int Logger::log_flush = Logger::FLUSH_TO_FILE;
 }
 
 // 用户键入Ctr+C后，flush logger
@@ -30,7 +28,8 @@ Logger::Logger()
     : _thread(std::thread([this]{ this->threadFunc(); })),
     _quit(false),
     _fd(-1),
-    _filesize(0)
+    _filesize(0),
+    _logFlush(FLUSH_TO_FILE)
 {
     mkdir(".log", 0777);
     signal(SIGINT, flush_log_buf);
@@ -42,7 +41,7 @@ Logger::~Logger()
     _thread.join();
 }
 
-void Logger::setFilename()
+void Logger::getFilename()
 {
     _filename.clear();
     _filename += "./.log/";
@@ -55,14 +54,14 @@ void Logger::setFilename()
 
 void Logger::creatFile()
 {
-    setFilename();
+    getFilename();
     _fd = open(_filename.c_str(),
             O_WRONLY | O_APPEND | O_CREAT, 0664);
     if (_fd < 0) {
         logWarn("can't open %s: %s, now write to stdout",
                 _filename.c_str(), strerrno());
-        log_flush = FLUSH_TO_STDOUT;
-        _fd = log_flush;
+        _logFlush = FLUSH_TO_STDOUT;
+        _fd = _logFlush;
         return;
     }
     _filesize = 0;
@@ -78,7 +77,7 @@ void Logger::rollFile()
 
 void Logger::setFlush()
 {
-    switch (log_flush) {
+    switch (_logFlush) {
     case FLUSH_TO_FILE:
         creatFile();
         logInfo("write logger to file");
@@ -114,10 +113,16 @@ void Logger::threadFunc()
 
 void Logger::flush()
 {
-    write(_fd, _flushBuf.peek(), _flushBuf.readable());
-    _filesize += _flushBuf.readable();
-    _flushBuf.retrieveAll();
-    if (log_flush == FLUSH_TO_FILE)
+    while (_flushBuf.readable() > 0) {
+        ssize_t n = ::write(_fd, _flushBuf.peek(), _flushBuf.readable());
+        if (n < 0) {
+            fprintf(stderr, "write: %s", strerrno());
+            break;
+        }
+        _filesize += n;
+        _flushBuf.retrieve(n);
+    }
+    if (_logFlush == FLUSH_TO_FILE)
         rollFile();
 }
 

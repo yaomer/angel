@@ -18,6 +18,8 @@ extern int __loggerLevel;
 // 如果设置为WARN，则只打印>=WARN级别的日志
 void setLoggerLevel(int level);
 
+void setLoggerFlush(int flush);
+
 }
 
 #define logDebug(...) \

@@ -33,11 +33,10 @@ public:
     };
     void writeToBuffer(const char *s, size_t len);
     void wakeup();
-    std::mutex& getMutex() { return _mutex; }
+    void setFlush(int flush) { _logFlush = flush; }
 
     static void quit();
 
-    static int log_flush;
     static const size_t log_buffer_max_size = 512 * 1024;
     static const size_t log_roll_filesize = 1024 * 1024 * 1024;
     static const int log_flush_interval = 1;
@@ -45,7 +44,7 @@ private:
     void flush();
     void setFlush();
     void threadFunc();
-    void setFilename();
+    void getFilename();
     void creatFile();
     void rollFile();
 
@@ -58,6 +57,7 @@ private:
     int _fd;
     std::string _filename;
     size_t _filesize;
+    int _logFlush;
 };
 
 extern Angel::Logger __logger;

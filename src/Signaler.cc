@@ -36,7 +36,7 @@ Signaler::Signaler(EventLoop *loop)
 
 void Signaler::start()
 {
-    logInfo("Signaler is started");
+    logInfo("Signaler is starting");
     _loop->addChannel(_sigChannel);
 }
 
@@ -93,15 +93,17 @@ void Signaler::cancelInLoop(int signo)
     _sigCallbackMaps.erase(signo);
     sa.sa_flags |= SA_RESTART;
     sigfillset(&sa.sa_mask);
-    if (sigaction(signo, &sa, nullptr) < 0)
+    if (sigaction(signo, &sa, nullptr) < 0) {
         logError("sigaction: %s", strerrno());
-    logInfo("restores the default semantics of the Sig[%d]", signo);
+    } else {
+        logInfo("restores the default semantics of the Sig[%d]", signo);
+    }
 }
 
 // 信号捕获函数，根据读到的信号值调用对应的信号处理函数
 void Signaler::sigCatch()
 {
-    static char buf[1024];
+    static unsigned char buf[1024];
     bzero(buf, sizeof(buf));
     ssize_t n = read(_sigChannel->fd(), buf, sizeof(buf));
     if (n < 0)

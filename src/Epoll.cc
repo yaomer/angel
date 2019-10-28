@@ -14,7 +14,7 @@ using namespace Angel;
 
 Epoll::Epoll()
     : _addFds(0),
-    _evListSize(_INIT_EVLIST_SIZE)
+    _evListSize(evlist_init_size)
 {
     _epfd = epoll_create(1);
     _evList.resize(_evListSize);
