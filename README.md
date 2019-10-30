@@ -12,8 +12,8 @@ CMake >= 3.1
 gcc >= 7.0 / clang >= 4.0
 ```
 
-### How to build
+### Build
 ```
-$ cd $Angel.dir/
+$ cd Angel.dir/
 $ ./build.sh
 ```
