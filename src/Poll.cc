@@ -11,6 +11,17 @@
 
 using namespace Angel;
 
+static inline void evset(struct pollfd& ev, int fd, int events)
+{
+    ev.fd = fd;
+    ev.events = 0;
+    ev.revents = 0;
+    if (events & Channel::READ)
+        ev.events |= POLLIN;
+    if (events & Channel::WRITE)
+        ev.events |= POLLOUT;
+}
+
 void Poll::add(int fd, int events)
 {
     struct pollfd ev;
@@ -35,6 +46,18 @@ void Poll::remove(int fd, int events)
     _indexs.erase(fd);
 }
 
+static inline int evret(int events)
+{
+    int rets = 0;
+    if (events & POLLIN)
+        rets |= Channel::READ;
+    if (events & POLLOUT)
+        rets |= Channel::WRITE;
+    if (events & POLLERR)
+        rets |= Channel::ERROR;
+    return rets;
+}
+
 int Poll::wait(EventLoop *loop, int64_t timeout)
 {
     int nevents = poll(&_pollfds[0], _pollfds.size(), timeout);
@@ -54,29 +77,6 @@ int Poll::wait(EventLoop *loop, int64_t timeout)
             logError("poll: %s", strerrno());
     }
     return ret;
-}
-
-void Poll::evset(struct pollfd& ev, int fd, int events)
-{
-    ev.fd = fd;
-    ev.events = 0;
-    ev.revents = 0;
-    if (events & Channel::READ)
-        ev.events |= POLLIN;
-    if (events & Channel::WRITE)
-        ev.events |= POLLOUT;
-}
-
-int Poll::evret(int events)
-{
-    int rets = 0;
-    if (events & POLLIN)
-        rets |= Channel::READ;
-    if (events & POLLOUT)
-        rets |= Channel::WRITE;
-    if (events & POLLERR)
-        rets |= Channel::ERROR;
-    return rets;
 }
 
 #endif // _ANGEL_HAVE_POLL

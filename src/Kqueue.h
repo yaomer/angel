@@ -22,8 +22,6 @@ public:
     void remove(int fd, int events);
     static const size_t evlist_init_size = 64;
 private:
-    int evret(struct kevent&);
-
     int _kqfd;
     int _addFds = 0;
     std::vector<struct kevent> _evlist;

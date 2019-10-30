@@ -17,11 +17,6 @@ Select::Select()
     setName("select");
 }
 
-Select::~Select()
-{
-
-}
-
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void Select::add(int fd, int events)

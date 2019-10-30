@@ -67,29 +67,7 @@ void Kqueue::remove(int fd, int events)
     _addFds--;
 }
 
-int Kqueue::wait(EventLoop *loop, int64_t timeout)
-{
-    struct timespec tsp;
-    memset(&tsp, 0, sizeof(tsp));
-
-    if (timeout > 0) {
-        tsp.tv_sec = timeout / 1000;
-        tsp.tv_nsec = (timeout % 1000) * 1000 * 1000;
-    }
-    int nevents = kevent(_kqfd, nullptr, 0, &_evlist[0], _evlist.size(),
-            timeout >= 0 ? &tsp : nullptr);
-
-    if (nevents > 0) {
-        for (int i = 0; i < nevents; i++) {
-            auto chl = loop->searchChannel(_evlist[i].ident);
-            chl->setRevents(evret(_evlist[i]));
-            loop->fillActiveChannel(chl);
-        }
-    }
-    return nevents;
-}
-
-int Kqueue::evret(struct kevent& ev)
+static inline int evret(struct kevent& ev)
 {
     int rets = 0;
     if (ev.filter == EVFILT_READ)
@@ -111,6 +89,28 @@ int Kqueue::evret(struct kevent& ev)
         }
     }
     return rets;
+}
+
+int Kqueue::wait(EventLoop *loop, int64_t timeout)
+{
+    struct timespec tsp;
+    memset(&tsp, 0, sizeof(tsp));
+
+    if (timeout > 0) {
+        tsp.tv_sec = timeout / 1000;
+        tsp.tv_nsec = (timeout % 1000) * 1000 * 1000;
+    }
+    int nevents = kevent(_kqfd, nullptr, 0, &_evlist[0], _evlist.size(),
+            timeout >= 0 ? &tsp : nullptr);
+
+    if (nevents > 0) {
+        for (int i = 0; i < nevents; i++) {
+            auto chl = loop->searchChannel(_evlist[i].ident);
+            chl->setRevents(evret(_evlist[i]));
+            loop->fillActiveChannel(chl);
+        }
+    }
+    return nevents;
 }
 
 #endif // _ANGEL_HAVE_KQUEUE

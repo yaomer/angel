@@ -7,8 +7,6 @@ namespace Angel {
 
 namespace SockOps {
 
-struct sockaddr *sockaddr_cast(struct sockaddr_in *addr);
-
 int socket();
 void bind(int sockfd, struct sockaddr_in *addr);
 void listen(int sockfd);

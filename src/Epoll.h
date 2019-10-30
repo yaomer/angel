@@ -21,9 +21,6 @@ public:
     void remove(int fd, int events);
     static const size_t evlist_init_size = 64;
 private:
-    void evset(struct epoll_event& ev, int fd, int events);
-    int evret(int events);
-
     int _epfd;
     size_t _addFds;
     std::vector<struct epoll_event> _evList;

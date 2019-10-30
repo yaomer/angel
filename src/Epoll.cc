@@ -26,6 +26,16 @@ Epoll::~Epoll()
     close(_epfd);
 }
 
+static inline void evset(struct epoll_event& ev, int fd, int events)
+{
+    ev.data.fd = fd;
+    ev.events = 0;
+    if (events & Channel::READ)
+        ev.events |= EPOLLIN;
+    if (events & Channel::WRITE)
+        ev.events |= EPOLLOUT;
+}
+
 void Epoll::add(int fd, int events)
 {
     struct epoll_event ev;
@@ -53,6 +63,18 @@ void Epoll::remove(int fd, int events)
     _addFds--;
 }
 
+static inline int evret(int events)
+{
+    int rets = 0;
+    if (events & EPOLLIN)
+        rets |= Channel::READ;
+    if (events & EPOLLOUT)
+        rets |= Channel::WRITE;
+    if (events & EPOLLERR)
+        rets |= Channel::ERROR;
+    return rets;
+}
+
 int Epoll::wait(EventLoop *loop, int64_t timeout)
 {
     int nevents = epoll_wait(_epfd, &_evList[0], _evList.size(), timeout);
@@ -67,28 +89,6 @@ int Epoll::wait(EventLoop *loop, int64_t timeout)
             logError("epoll_wait: %s", strerrno());
     }
     return nevents;
-}
-
-void Epoll::evset(struct epoll_event& ev, int fd, int events)
-{
-    ev.data.fd = fd;
-    ev.events = 0;
-    if (events & Channel::READ)
-        ev.events |= EPOLLIN;
-    if (events & Channel::WRITE)
-        ev.events |= EPOLLOUT;
-}
-
-int Epoll::evret(int events)
-{
-    int rets = 0;
-    if (events & EPOLLIN)
-        rets |= Channel::READ;
-    if (events & EPOLLOUT)
-        rets |= Channel::WRITE;
-    if (events & EPOLLERR)
-        rets |= Channel::ERROR;
-    return rets;
 }
 
 #endif

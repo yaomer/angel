@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "Acceptor.h"
 #include "EventLoop.h"
@@ -11,7 +12,8 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     : _loop(loop),
     _acceptChannel(new Channel(loop)),
     _socket(SockOps::socket()),
-    _inetAddr(listenAddr)
+    _inetAddr(listenAddr),
+    _idleFd(::open("/dev/null", O_RDONLY | O_CLOEXEC))
 {
     _socket.setKeepAlive(true);
     _socket.setReuseAddr(true);
@@ -39,6 +41,12 @@ void Acceptor::handleAccept()
         case EWOULDBLOCK: // BSD
         case EPROTO: // SVR4
         case ECONNABORTED: // POSIX
+            break;
+        case EMFILE:
+            ::close(_idleFd);
+            connfd = SockOps::accept(_socket.fd());
+            ::close(connfd);
+            _idleFd = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
             break;
         default:
             logError("accept: %s", strerrno());

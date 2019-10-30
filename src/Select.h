@@ -13,7 +13,7 @@ namespace Angel {
 class Select : public Poller, noncopyable {
 public:
     Select();
-    ~Select();
+    ~Select() {  };
     int wait(EventLoop *loop, int64_t timeout);
     void add(int fd, int events);
     void change(int fd, int events);

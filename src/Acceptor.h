@@ -31,6 +31,7 @@ private:
     Socket _socket;
     InetAddr _inetAddr;
     NewConnectionCallback _newConnectionCb;
+    int _idleFd;
 };
 }
 

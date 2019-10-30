@@ -21,9 +21,6 @@ public:
     void change(int fd, int events);
     void remove(int fd, int events);
 private:
-    void evset(struct pollfd& ev, int fd, int events);
-    int evret(int events);
-
     std::vector<struct pollfd> _pollfds;
     // <fd, index>, index for _pollfds
     std::map<int, int> _indexs;

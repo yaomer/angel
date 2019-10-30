@@ -7,7 +7,7 @@
 
 using namespace Angel;
 
-struct sockaddr *SockOps::sockaddr_cast(struct sockaddr_in *addr)
+static inline struct sockaddr *sockaddr_cast(struct sockaddr_in *addr)
 {
     return reinterpret_cast<struct sockaddr *>(addr);
 }
@@ -26,9 +26,11 @@ void SockOps::bind(int sockfd, struct sockaddr_in *addr)
         logFatal("bind: %s", strerrno());
 }
 
+#define LISTENQ 1024
+
 void SockOps::listen(int sockfd)
 {
-    if (::listen(sockfd, 1024) < 0)
+    if (::listen(sockfd, LISTENQ) < 0)
         logFatal("listen: %s", strerrno());
 }
 
@@ -50,7 +52,6 @@ void SockOps::setnonblock(int sockfd)
 {
     int oflag = ::fcntl(sockfd, F_GETFL, 0);
     ::fcntl(sockfd, F_SETFL, oflag | O_NONBLOCK);
-    logDebug("fd = %d is set to nonblock", sockfd);
 }
 
 void SockOps::socketpair(int sockfd[])
