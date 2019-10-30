@@ -17,7 +17,7 @@ class EventLoop;
 class TcpClient {
 public:
     enum Flag { NOTEXITLOOP = 01, DISCONNECT = 02 };
-    TcpClient(EventLoop *, InetAddr&);
+    TcpClient(EventLoop *, InetAddr);
     ~TcpClient();
     void start();
     const char *name() { return _name.c_str(); }

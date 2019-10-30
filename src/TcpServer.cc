@@ -8,7 +8,7 @@
 using namespace Angel;
 using std::placeholders::_1;
 
-TcpServer::TcpServer(EventLoop *loop, InetAddr& listenAddr)
+TcpServer::TcpServer(EventLoop *loop, InetAddr listenAddr)
     : _loop(loop),
     _acceptor(new Acceptor(loop, listenAddr)),
     _inetAddr(new InetAddr(listenAddr)),

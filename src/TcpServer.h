@@ -26,7 +26,7 @@ class TcpServer {
 public:
     typedef std::map<size_t, TcpConnectionPtr> ConnectionMaps;
 
-    explicit TcpServer(EventLoop *, InetAddr&);
+    explicit TcpServer(EventLoop *, InetAddr);
     void newConnection(int fd);
     void removeConnection(const TcpConnectionPtr& conn);
     InetAddr *inetAddr() { return _inetAddr.get(); }

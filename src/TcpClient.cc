@@ -6,7 +6,7 @@
 using namespace Angel;
 using std::placeholders::_1;
 
-TcpClient::TcpClient(EventLoop *loop, InetAddr& inetAddr)
+TcpClient::TcpClient(EventLoop *loop, InetAddr inetAddr)
     : _loop(loop),
     _connector(loop, inetAddr),
     _flag(0)

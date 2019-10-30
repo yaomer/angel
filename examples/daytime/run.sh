@@ -12,4 +12,3 @@ elif [ "$PLATFORM" == "Linux" ]; then
 fi
 
 $CXX $CXXFLAGS DaytimeServer.cc -langel -o server
-$CXX $CXXFLAGS DaytimeClient.cc -langel -o client
