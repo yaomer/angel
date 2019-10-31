@@ -201,9 +201,9 @@ void TcpConnection::send(const void *v, size_t len)
 
 void TcpConnection::updateTimeoutTimer()
 {
-    if (_timeoutTimerId == 0)
-        return;
+    if (_timeoutTimerId == 0) return;
     _loop->cancelTimer(_timeoutTimerId);
-    _timeoutTimerId = _loop->runAfter(
-            _connTimeout, [this]{ shared_from_this()->close(); });
+    _timeoutTimerId = _loop->runAfter(_connTimeout, [this]{
+            shared_from_this()->close();
+            });
 }

@@ -6,12 +6,14 @@
 #include <mutex>
 #include <condition_variable>
 
+#include "noncopyable.h"
+
 namespace Angel {
 
 class EventLoop;
 
 // One-loop-per-thread
-class EventLoopThread {
+class EventLoopThread : noncopyable {
 public:
     EventLoopThread();
     ~EventLoopThread();

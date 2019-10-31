@@ -5,8 +5,10 @@
 #include <string>
 
 namespace Angel {
+
 class EventLoop;
 
+// 封装底层的I/O multiplexing，为上层提供一个统一的接口
 class Poller {
 public:
     virtual ~Poller() {  };

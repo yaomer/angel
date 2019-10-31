@@ -67,7 +67,7 @@ void Kqueue::remove(int fd, int events)
     _addFds--;
 }
 
-static inline int evret(struct kevent& ev)
+static int evret(struct kevent& ev)
 {
     int rets = 0;
     if (ev.filter == EVFILT_READ)

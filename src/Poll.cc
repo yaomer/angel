@@ -46,7 +46,7 @@ void Poll::remove(int fd, int events)
     _indexs.erase(fd);
 }
 
-static inline int evret(int events)
+static int evret(int events)
 {
     int rets = 0;
     if (events & POLLIN)

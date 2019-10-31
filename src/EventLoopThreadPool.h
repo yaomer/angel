@@ -4,10 +4,11 @@
 #include <memory>
 
 #include "EventLoopThread.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
-class EventLoopThreadPool {
+class EventLoopThreadPool : noncopyable {
 public:
     EventLoopThreadPool()
         : _threadNums(0),

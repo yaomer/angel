@@ -9,12 +9,13 @@
 #include "Channel.h"
 #include "Buffer.h"
 #include "decls.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
 class EventLoop;
 
-class TcpClient {
+class TcpClient : noncopyable {
 public:
     enum Flag { NOTEXITLOOP = 01, DISCONNECT = 02 };
     TcpClient(EventLoop *, InetAddr);

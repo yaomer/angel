@@ -12,6 +12,7 @@
 #include "EventLoopThreadPool.h"
 #include "ThreadPool.h"
 #include "decls.h"
+#include "noncopyable.h"
 
 namespace Angel {
 
@@ -22,7 +23,7 @@ class EventLoop;
 // 2. [单线程reactor + thread pool](setTaskThreadNums(N > 0))
 // 3. [多线程reactor](setIoThreadNums(N > 0))
 // 4. [多线程reactor + thread pool](setIoThreadNums(N > 0), setTaskThreadNums(N > 0))
-class TcpServer {
+class TcpServer : noncopyable {
 public:
     typedef std::map<size_t, TcpConnectionPtr> ConnectionMaps;
 
@@ -71,6 +72,13 @@ private:
     std::unique_ptr<Acceptor> _acceptor;
     std::unique_ptr<InetAddr> _inetAddr;
     std::unique_ptr<EventLoopThreadPool> _ioThreadPool;
+    // 只有主线程在接收到一个新连接时会将其添加到ConnectionMaps中，
+    // 而在除此之外的其他地方则不会修改ConnectionMaps
+    //
+    // 当服务器以多线程方式运行时，就有可能会出现并发访问ConnectionMaps的问题
+    // 解决方法通常有两种：
+    // 1）由TcpServer提供一把锁，在访问ConnectionMaps时必须先加锁
+    // 2）业务逻辑将涉及到ConnectionMaps的操作放入主线程中执行(通过queueInLoop())
     ConnectionMaps _connectionMaps;
     std::unique_ptr<ThreadPool> _threadPool;
     size_t _connId;

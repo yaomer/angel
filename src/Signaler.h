@@ -27,12 +27,12 @@ public:
     ~Signaler() {  };
     void add(int signo, const SignalerCallback _cb);
     void cancel(int signo);
-    void sigCatch();
     void start();
-    static void sigHandler(int signo);
 private:
     void addInLoop(int signo, const SignalerCallback _cb);
     void cancelInLoop(int signo);
+    void sigCatch();
+    static void sigHandler(int signo);
 
     EventLoop *_loop;
     std::shared_ptr<Channel> _sigChannel;

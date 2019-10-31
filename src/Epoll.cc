@@ -63,7 +63,7 @@ void Epoll::remove(int fd, int events)
     _addFds--;
 }
 
-static inline int evret(int events)
+static int evret(int events)
 {
     int rets = 0;
     if (events & EPOLLIN)
