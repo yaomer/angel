@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <string.h>
+#include <stdarg.h>
+
 #include "EventLoop.h"
 #include "InetAddr.h"
 #include "Socket.h"
@@ -197,6 +199,19 @@ void TcpConnection::send(const std::string& s)
 void TcpConnection::send(const void *v, size_t len)
 {
     send(reinterpret_cast<const char*>(v), len);
+}
+
+void TcpConnection::formatSend(const char *fmt, ...)
+{
+    va_list ap, ap1;
+    va_start(ap, fmt);
+    va_copy(ap1, ap);
+    int len = vsnprintf(nullptr, 0, fmt, ap1);
+    va_end(ap1);
+    char buf[len + 1];
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    send(buf, len);
 }
 
 void TcpConnection::updateTimeoutTimer()
