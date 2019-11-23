@@ -21,7 +21,7 @@ struct sockaddr_in getPeerAddr(int sockfd);
 int getSocketError(int sockfd);
 
 int toHostIpPort(in_port_t port);
-const char *toHostIpAddr(struct in_addr *addr);
+const char *toHostIpAddr(const struct in_addr *addr);
 
 }
 }

@@ -30,12 +30,12 @@ InetAddr::InetAddr(int port, const char *addr)
         logFatal("inet_pton: %s", strerrno());
 }
 
-int InetAddr::toIpPort()
+int InetAddr::toIpPort() const
 {
     return SockOps::toHostIpPort(_sockaddr.sin_port);
 }
 
-const char *InetAddr::toIpAddr()
+const char *InetAddr::toIpAddr() const
 {
     return SockOps::toHostIpAddr(&_sockaddr.sin_addr);
 }

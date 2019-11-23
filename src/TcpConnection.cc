@@ -83,8 +83,9 @@ void TcpConnection::handleWrite()
             if (_output.readable() == 0) {
                 _channel->disableWrite();
                 if (_writeCompleteCb)
-                    _loop->queueInLoop(
-                            std::bind(_writeCompleteCb, shared_from_this()));
+                    _loop->queueInLoop([conn = shared_from_this()]{
+                            conn->_writeCompleteCb(conn);
+                            });
                 if (_state == CLOSING)
                     handleClose();
             }
@@ -107,8 +108,9 @@ void TcpConnection::handleClose()
     if (_state == CLOSED) return;
     setState(CLOSED);
     if (_closeCb)
-        _loop->runInLoop(
-                std::bind(_closeCb, shared_from_this()));
+        _loop->runInLoop([conn = shared_from_this()]{
+                conn->_closeCb(conn);
+                });
 }
 
 void TcpConnection::handleError()
@@ -127,8 +129,9 @@ void TcpConnection::close()
     if (_state == CLOSED) return;
     setState(CLOSING);
     if (_closeCb)
-        _loop->runInLoop(
-                std::bind(_closeCb, shared_from_this()));
+        _loop->runInLoop([conn = shared_from_this()]{
+                conn->_closeCb(conn);
+                });
 }
 
 void TcpConnection::sendInLoop(const char *data, size_t len)
@@ -147,8 +150,9 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
             remainBytes = len - n;
             if (remainBytes == 0) {
                 if (_writeCompleteCb)
-                    _loop->queueInLoop(
-                            std::bind(_writeCompleteCb, shared_from_this()));
+                    _loop->queueInLoop([conn = shared_from_this()]{
+                            conn->_writeCompleteCb(conn);
+                            });
                 if (_state == CLOSING)
                     close();
             }
@@ -180,8 +184,9 @@ void TcpConnection::send(const char *s, size_t len)
     } else {
         // 跨线程必须将数据拷贝一份，防止数据失效
         std::string message(s, len);
-        _loop->runInLoop(
-                std::bind(&TcpConnection::sendInNotIoThread, this, std::move(message)));
+        _loop->runInLoop([this, message = std::move(message)]{
+                this->sendInNotIoThread(message);
+                });
     }
     updateTimeoutTimer();
 }

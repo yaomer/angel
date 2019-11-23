@@ -11,8 +11,9 @@ TcpClient::TcpClient(EventLoop *loop, InetAddr inetAddr)
     _connector(loop, inetAddr),
     _flag(0)
 {
-    _connector.setNewConnectionCb(
-            std::bind(&TcpClient::newConnection, this, _1));
+    _connector.setNewConnectionCb([this](int fd){
+            this->newConnection(fd);
+            });
 }
 
 TcpClient::~TcpClient()
@@ -28,10 +29,10 @@ void TcpClient::newConnection(int fd)
     _conn->setState(TcpConnection::CONNECTED);
     _conn->setConnectionCb(_connectionCb);
     _conn->setMessageCb(_messageCb);
-    _conn->setCloseCb(
-            std::bind(&TcpClient::handleClose, this, _1));
-    _loop->runInLoop(
-            std::bind(&TcpConnection::connectEstablish, _conn.get()));
+    _conn->setCloseCb([this](const TcpConnectionPtr& conn){
+            this->handleClose(conn);
+            });
+    _loop->runInLoop([conn = this->_conn]{ conn->connectEstablish(); });
 }
 
 void TcpClient::start()

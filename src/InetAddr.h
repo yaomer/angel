@@ -24,8 +24,8 @@ public:
         return *this;
     }
     struct sockaddr_in& inetAddr() { return _sockaddr; }
-    int toIpPort();
-    const char *toIpAddr();
+    int toIpPort() const;
+    const char *toIpAddr() const;
 private:
     struct sockaddr_in _sockaddr;
 };
