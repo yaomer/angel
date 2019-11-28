@@ -1,6 +1,7 @@
 #include <time.h>
 #include <sys/time.h>
-#include <iostream>
+#include <stdio.h>
+
 #include "TimeStamp.h"
 
 using namespace Angel;

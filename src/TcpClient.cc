@@ -4,7 +4,6 @@
 #include "LogStream.h"
 
 using namespace Angel;
-using std::placeholders::_1;
 
 TcpClient::TcpClient(EventLoop *loop, InetAddr inetAddr)
     : _loop(loop),

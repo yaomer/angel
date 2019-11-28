@@ -6,7 +6,6 @@
 #include "LogStream.h"
 
 using namespace Angel;
-using std::placeholders::_1;
 
 TcpServer::TcpServer(EventLoop *loop, InetAddr listenAddr)
     : _loop(loop),

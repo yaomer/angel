@@ -11,7 +11,6 @@
 #include "LogStream.h"
 
 using namespace Angel;
-using std::placeholders::_1;
 
 TcpConnection::TcpConnection(size_t id,
                              EventLoop *loop,
