@@ -33,7 +33,6 @@ set (SRC_HEADERS
     ${PROJECT_SRC_DIR}/TcpConnection.h
     ${PROJECT_SRC_DIR}/InetAddr.h
     ${PROJECT_SRC_DIR}/Socket.h
-    ${PROJECT_SRC_DIR}/SockOps.h
     ${PROJECT_SRC_DIR}/TcpServer.h
     ${PROJECT_SRC_DIR}/TcpClient.h
     ${PROJECT_SRC_DIR}/Timer.h
@@ -71,22 +70,18 @@ set (SRC_FILES
 
 if (_ANGEL_HAVE_POLL)
     list(APPEND SRC_FILES ${PROJECT_SRC_DIR}/Poll.cc)
-    list(APPEND SRC_HEADERS ${PROJECT_SRC_DIR}/Poll.h)
 endif()
 
 if (_ANGEL_HAVE_EPOLL)
     list(APPEND SRC_FILES ${PROJECT_SRC_DIR}/Epoll.cc)
-    list(APPEND SRC_HEADERS ${PROJECT_SRC_DIR}/Epoll.h)
 endif()
 
 if (_ANGEL_HAVE_KQUEUE)
     list(APPEND SRC_FILES ${PROJECT_SRC_DIR}/Kqueue.cc)
-    list(APPEND SRC_HEADERS ${PROJECT_SRC_DIR}/Kqueue.h)
 endif()
 
 if (_ANGEL_HAVE_SELECT)
     list(APPEND SRC_FILES ${PROJECT_SRC_DIR}/Select.cc)
-    list(APPEND SRC_HEADERS ${PROJECT_SRC_DIR}/Select.h)
 endif()
 
 add_library (angel STATIC ${SRC_FILES})
