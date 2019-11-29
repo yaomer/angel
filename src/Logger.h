@@ -48,6 +48,8 @@ private:
     void creatFile();
     void rollFile();
 
+    const char *timeStr();
+
     Buffer _writeBuf;
     Buffer _flushBuf;
     std::thread _thread;

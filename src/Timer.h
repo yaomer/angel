@@ -5,9 +5,9 @@
 #include <set>
 #include <unordered_map>
 
-#include "TimeStamp.h"
 #include "noncopyable.h"
 #include "decls.h"
+#include "util.h"
 
 namespace Angel {
 
@@ -79,7 +79,7 @@ public:
     {
         int64_t timeval;
         if (!_timer.empty()) {
-            timeval = _timer.begin()->get()->expire() - TimeStamp::now();
+            timeval = _timer.begin()->get()->expire() - nowMs();
             timeval = timeval > 0 ? timeval : 0;
         } else
             timeval = -1;
@@ -98,6 +98,9 @@ private:
     // 很显然我们想要的是后者
     typedef std::multiset<std::shared_ptr<TimerTask>, TimerTaskCmp>::iterator TimerIterator;
     void delTimer(const TimerIterator it, size_t id);
+
+    // 将task重新添加到timer中
+    void reAddTimer(const std::shared_ptr<TimerTask>& task, int64_t now);
 
     EventLoop *_loop;
     // TimerTask中的expire可能会有重复

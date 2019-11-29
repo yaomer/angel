@@ -57,27 +57,29 @@ void Timer::delTimer(const TimerIterator it, size_t id)
     _idMaps.erase(id);
 }
 
+void Timer::reAddTimer(const std::shared_ptr<TimerTask>& task, int64_t now)
+{
+    TimerTask *newTask = new TimerTask(now + task->interval(),
+            task->interval(), task->timerCb());
+    newTask->setId(task->id());
+    delTimer(_timer.begin(), newTask->id());
+    addTimerInLoop(newTask, newTask->id());
+}
+
 void Timer::tick()
 {
-    int64_t now = TimeStamp::now();
+    int64_t now = nowMs();
     while (!_timer.empty()) {
         auto task = *_timer.begin();
-        if (task->expire() <= now) {
-            if (task->isCancel()) {
-                delTimer(_timer.begin(), task->id());
-                continue;
-            }
-            task->timerCb()();
-            if (task->interval() > 0) {
-                TimerTask *newTask = new TimerTask(now + task->interval(),
-                        task->interval(), task->timerCb());
-                newTask->setId(task->id());
-                delTimer(_timer.begin(), newTask->id());
-                addTimerInLoop(newTask, newTask->id());
-            } else {
-                delTimer(_timer.begin(), task->id());
-            }
-        } else
-            break;
+        if (task->expire() > now) break;
+        if (task->isCancel()) {
+            delTimer(_timer.begin(), task->id());
+            continue;
+        }
+        task->timerCb()();
+        if (task->interval() > 0)
+            reAddTimer(task, now);
+        else
+            delTimer(_timer.begin(), task->id());
     }
 }

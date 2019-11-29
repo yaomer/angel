@@ -7,8 +7,8 @@
 #include <iostream>
 #include <chrono>
 
-#include "TimeStamp.h"
 #include "Logger.h"
+#include "util.h"
 
 using namespace Angel;
 
@@ -45,8 +45,7 @@ void Logger::getFilename()
 {
     _filename.clear();
     _filename += "./.log/";
-    char *p = const_cast<char*>
-        (TimeStamp::timeStr(TimeStamp::LOCAL_TIME));
+    char *p = const_cast<char*>(timeStr());
     p[19] = '\0';
     _filename += p;
     _filename += ".log";
@@ -143,4 +142,25 @@ void Logger::quit()
 {
     __logger._quit = true;
     __logger.wakeup();
+}
+
+namespace Angel {
+
+    thread_local char tsp_timestr_buf[32];
+}
+
+// len >= 25
+const char *Logger::timeStr()
+{
+    struct tm tm;
+    long long ms = nowMs();
+    time_t seconds = ms / 1000;
+
+    gmtime_r(&seconds, &tm);
+    tm.tm_hour += 8;
+    snprintf(tsp_timestr_buf, sizeof(tsp_timestr_buf),
+            "%4d-%02d-%02d %02d:%02d:%02d.%03lld",
+            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+            tm.tm_hour, tm.tm_min, tm.tm_sec, ms % 1000);
+    return tsp_timestr_buf;
 }

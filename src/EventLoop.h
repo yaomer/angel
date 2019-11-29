@@ -42,8 +42,8 @@ public:
     bool isInLoopThread();
     void runInLoop(const Functor _cb);
     void queueInLoop(const Functor _cb);
-    size_t runAfter(int64_t timeout, const TimerCallback _cb);
-    size_t runEvery(int64_t interval, const TimerCallback _cb);
+    size_t runAfter(int64_t timeout_ms, const TimerCallback _cb);
+    size_t runEvery(int64_t interval_ms, const TimerCallback _cb);
     void cancelTimer(size_t id);
     void quit() { _quit = true; wakeup(); }
 private:

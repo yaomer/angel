@@ -36,7 +36,6 @@ set (SRC_HEADERS
     ${PROJECT_SRC_DIR}/SockOps.h
     ${PROJECT_SRC_DIR}/TcpServer.h
     ${PROJECT_SRC_DIR}/TcpClient.h
-    ${PROJECT_SRC_DIR}/TimeStamp.h
     ${PROJECT_SRC_DIR}/Timer.h
     ${PROJECT_SRC_DIR}/Signaler.h
     ${PROJECT_SRC_DIR}/ThreadPool.h
@@ -62,7 +61,6 @@ set (SRC_FILES
     ${PROJECT_SRC_DIR}/Connector.cc
     ${PROJECT_SRC_DIR}/TcpServer.cc
     ${PROJECT_SRC_DIR}/TcpClient.cc
-    ${PROJECT_SRC_DIR}/TimeStamp.cc
     ${PROJECT_SRC_DIR}/Timer.cc
     ${PROJECT_SRC_DIR}/Signaler.cc
     ${PROJECT_SRC_DIR}/ThreadPool.cc

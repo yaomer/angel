@@ -2,7 +2,6 @@
 #include <stdarg.h>
 #include <iostream>
 
-#include "TimeStamp.h"
 #include "LogStream.h"
 
 using namespace Angel;
@@ -29,7 +28,7 @@ namespace Angel {
     const char *formatTime()
     {
         struct tm tm;
-        long long ms = TimeStamp::now();
+        long long ms = nowMs();
         time_t seconds = ms / 1000;
 
         if (seconds != log_last_second) {

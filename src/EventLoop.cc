@@ -169,7 +169,7 @@ void EventLoop::queueInLoop(const Functor _cb)
 // [timeout ms]后执行一次_cb
 size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 {
-    int64_t expire = TimeStamp::now() + timeout;
+    int64_t expire = nowMs() + timeout;
     TimerTask *task = new TimerTask(expire, 0, std::move(_cb));
     size_t id = _timer->addTimer(task);
     logInfo("add a timer after %lld ms, timer id = %zu", timeout, id);
@@ -179,7 +179,7 @@ size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
 // 每隔[interval ms]执行一次_cb
 size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
 {
-    int64_t expire = TimeStamp::now() + interval;
+    int64_t expire = nowMs() + interval;
     TimerTask *task = new TimerTask(expire, interval, std::move(_cb));
     size_t id = _timer->addTimer(task);
     logInfo("add a timer every %lld ms, timer id = %zu", interval, id);
