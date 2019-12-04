@@ -33,6 +33,7 @@ set (SRC_HEADERS
     ${PROJECT_SRC_DIR}/TcpConnection.h
     ${PROJECT_SRC_DIR}/InetAddr.h
     ${PROJECT_SRC_DIR}/Socket.h
+    ${PROJECT_SRC_DIR}/SockOps.h
     ${PROJECT_SRC_DIR}/TcpServer.h
     ${PROJECT_SRC_DIR}/TcpClient.h
     ${PROJECT_SRC_DIR}/Timer.h

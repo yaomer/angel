@@ -31,7 +31,9 @@ void TcpClient::newConnection(int fd)
     _conn->setCloseCb([this](const TcpConnectionPtr& conn){
             this->handleClose(conn);
             });
-    _loop->runInLoop([conn = this->_conn]{ conn->connectEstablish(); });
+    _loop->runInLoop([conn = this->_conn]{
+            conn->connectEstablish();
+            });
 }
 
 void TcpClient::start()
