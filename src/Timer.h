@@ -102,7 +102,7 @@ private:
     // 删除最小定时器
     void delTimer() { delTimer(_timer.begin()); }
 
-    void updateTimerTask(const std::shared_ptr<TimerTask>& task, int64_t now);
+    void updateTimer(int64_t now);
 
     EventLoop *_loop;
     // TimerTask中的expire可能会有重复

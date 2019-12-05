@@ -51,8 +51,9 @@ void Timer::cancelTimerInLoop(size_t id)
     }
 }
 
-void Timer::updateTimerTask(const std::shared_ptr<TimerTask>& task, int64_t now)
+void Timer::updateTimer(int64_t now)
 {
+    auto& task = *_timer.begin();
     if (task->interval() > 0) {
         TimerTask *newTask = new TimerTask(now + task->interval(),
                 task->interval(), task->timerCb());
@@ -71,11 +72,10 @@ void Timer::tick()
     while (!_timer.empty()) {
         auto task = *_timer.begin();
         if (task->expire() > now) break;
+        task->timerCb()();
+        // task can be canceled in timerCb()
         if (!task->isCancel()) {
-            task->timerCb()();
-            updateTimerTask(task, now);
-        } else {
-            delTimer();
+            updateTimer(now);
         }
     }
 }
