@@ -44,26 +44,25 @@ void Timer::cancelTimerInLoop(size_t id)
         for (auto it = range.first; it != range.second; it++) {
             if ((*it)->id() == id) {
                 (*it)->canceled();
-                delTimer(it, id);
+                delTimer(it);
                 break;
             }
         }
     }
 }
 
-void Timer::delTimer(const TimerIterator it, size_t id)
+void Timer::updateTimerTask(const std::shared_ptr<TimerTask>& task, int64_t now)
 {
-    _timer.erase(it);
-    _idMaps.erase(id);
-}
-
-void Timer::reAddTimer(const std::shared_ptr<TimerTask>& task, int64_t now)
-{
-    TimerTask *newTask = new TimerTask(now + task->interval(),
-            task->interval(), task->timerCb());
-    newTask->setId(task->id());
-    delTimer(_timer.begin(), newTask->id());
-    addTimerInLoop(newTask, newTask->id());
+    if (task->interval() > 0) {
+        TimerTask *newTask = new TimerTask(now + task->interval(),
+                task->interval(), task->timerCb());
+        newTask->setId(task->id());
+        // 必须先删除旧的task，再添加更新后的task，以保证正确的执行顺序
+        delTimer();
+        addTimerInLoop(newTask, newTask->id());
+    } else {
+        delTimer();
+    }
 }
 
 void Timer::tick()
@@ -72,14 +71,11 @@ void Timer::tick()
     while (!_timer.empty()) {
         auto task = *_timer.begin();
         if (task->expire() > now) break;
-        if (task->isCancel()) {
-            delTimer(_timer.begin(), task->id());
-            continue;
+        if (!task->isCancel()) {
+            task->timerCb()();
+            updateTimerTask(task, now);
+        } else {
+            delTimer();
         }
-        task->timerCb()();
-        if (task->interval() > 0)
-            reAddTimer(task, now);
-        else
-            delTimer(_timer.begin(), task->id());
     }
 }

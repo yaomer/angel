@@ -97,10 +97,12 @@ private:
     // 会删掉所有值相同的元素，而后者只会删掉迭代器指向的那个元素，
     // 很显然我们想要的是后者
     typedef std::multiset<std::shared_ptr<TimerTask>, TimerTaskCmp>::iterator TimerIterator;
-    void delTimer(const TimerIterator it, size_t id);
+    void delTimer(const TimerIterator it)
+    { _timer.erase(it); _idMaps.erase(it->get()->id()); }
+    // 删除最小定时器
+    void delTimer() { delTimer(_timer.begin()); }
 
-    // 将task重新添加到timer中
-    void reAddTimer(const std::shared_ptr<TimerTask>& task, int64_t now);
+    void updateTimerTask(const std::shared_ptr<TimerTask>& task, int64_t now);
 
     EventLoop *_loop;
     // TimerTask中的expire可能会有重复
