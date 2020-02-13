@@ -151,9 +151,7 @@ bool EventLoop::isInLoopThread()
 void EventLoop::runInLoop(const Functor _cb)
 {
     if (!isInLoopThread()) {
-        std::lock_guard<std::mutex> mlock(_mutex);
-        _functors.emplace_back(_cb);
-        wakeup();
+        queueInLoop(_cb);
     } else
         _cb();
 }
@@ -161,8 +159,10 @@ void EventLoop::runInLoop(const Functor _cb)
 // 向任务队列中添加一个任务
 void EventLoop::queueInLoop(const Functor _cb)
 {
+    {
     std::lock_guard<std::mutex> mlock(_mutex);
     _functors.emplace_back(_cb);
+    }
     wakeup();
 }
 

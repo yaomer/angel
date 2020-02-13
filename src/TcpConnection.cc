@@ -221,8 +221,9 @@ void TcpConnection::formatSend(const char *fmt, ...)
 void TcpConnection::updateTimeoutTimer()
 {
     if (_timeoutTimerId == 0) return;
-    _loop->cancelTimer(_timeoutTimerId);
-    _timeoutTimerId = _loop->runAfter(_connTimeout, [this]{
-            shared_from_this()->close();
+   _loop->cancelTimer(_timeoutTimerId);
+    _timeoutTimerId = _loop->runAfter(_connTimeout,
+            [conn = shared_from_this()]{
+            conn->close();
             });
 }

@@ -57,7 +57,15 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn)
     if (_closeCb) _closeCb(conn);
     conn->setState(TcpConnection::CLOSED);
     conn->getLoop()->removeChannel(conn->getChannel());
-    _connectionMaps.erase(conn->id());
+    // 必须在主线程的EventLoop中移除一个连接，否则多个线程就有可能并发
+    // 修改connectionMaps
+    // 例如，主线程接收到一个新连接，之后调用newConnection将它添加到
+    // connectionMaps中，如果此时恰好有某个io子线程要移除一个连接，并且
+    // 正在调用removeConnection，这时两个线程就会同时修改connectionMaps，
+    // 这会导致难以预料的后果
+    _loop->runInLoop([this, conn]{
+            this->connectionMaps().erase(conn->id());
+            });
 }
 
 void TcpServer::start()
