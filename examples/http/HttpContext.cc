@@ -1,10 +1,11 @@
 #include <iostream>
 #include <unistd.h>
 #include <fcntl.h>
+
 #include "HttpContext.h"
 
 // [method url version\r\n]
-void HttpContext::parseReqLine(const char *p, const char *ep)
+void HttpContext::parseLine(const char *p, const char *ep)
 {
     const char *next = std::find(p, ep, ' ');
     _request.setMethod(p, next);
@@ -34,7 +35,7 @@ void HttpContext::parseReqLine(const char *p, const char *ep)
     _state = PARSE_HEADER;
 }
 
-void HttpContext::parseReqHeader(const char *p, const char *ep)
+void HttpContext::parseHeader(const char *p, const char *ep)
 {
     if (strncmp(p, "\r\n", 2) == 0) {
         _state = PARSE_LINE;

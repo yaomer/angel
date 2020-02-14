@@ -1,10 +1,12 @@
 #ifndef _ANGEL_HTTP_CONTEXT_H
 #define _ANGEL_HTTP_CONTEXT_H
 
+#include <Angel/TcpConnection.h>
+
+#include <string>
+
 #include "HttpRequest.h"
 #include "HttpResponse.h"
-#include <Angel/TcpConnection.h>
-#include <string>
 
 class HttpContext {
 public:
@@ -12,12 +14,12 @@ public:
         PARSE_LINE,
         PARSE_HEADER,
     };
-    HttpContext() 
+    HttpContext()
         : _state(PARSE_LINE), _keepAlive(false) {  }
     int state() const { return _state; }
     void setState(int state) { _state = state; }
-    void parseReqLine(const char *p, const char *ep);
-    void parseReqHeader(const char *p, const char *ep);
+    void parseLine(const char *p, const char *ep);
+    void parseHeader(const char *p, const char *ep);
     void response(const Angel::TcpConnectionPtr& conn);
     void fcat(std::string& buffer);
 private:

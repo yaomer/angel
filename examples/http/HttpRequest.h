@@ -14,7 +14,7 @@ public:
     std::string& host() { return _host; }
     std::string& connection() { return _connection; }
     ArgList& args() { return _argList; }
-    void setMethod(const char *s, const char *es) 
+    void setMethod(const char *s, const char *es)
     { _method.assign(s, es - s); }
     void setUrl(const char *s, const char *es)
     { _url.assign(s, es - s); }
@@ -25,7 +25,7 @@ public:
     void setConnection(const char *s, const char *es)
     { _connection.assign(s, es - s); }
     void addArg(const char *s, const char *es)
-    { _argList.push_back(std::string(s, es - s));}
+    { _argList.emplace_back(s, es);}
 private:
     std::string _method;
     std::string _url;
