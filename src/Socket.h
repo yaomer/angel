@@ -1,7 +1,8 @@
 #ifndef _ANGEL_SOCKET_H
 #define _ANGEL_SOCKET_H
 
-#include "InetAddr.h"
+#include <unistd.h>
+
 #include "noncopyable.h"
 
 namespace Angel {
@@ -11,12 +12,8 @@ public:
     explicit Socket(int fd) : _sockfd(fd)
     {
     }
-    ~Socket();
+    ~Socket() { close(_sockfd); };
     int fd() const { return _sockfd; }
-    void setKeepAlive(bool on);
-    void setNoDelay(bool on);
-    void setReuseAddr(bool on);
-    void setReusePort(bool on);
 private:
     const int _sockfd;
 };

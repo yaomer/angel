@@ -55,7 +55,6 @@ set (SRC_FILES
     ${PROJECT_SRC_DIR}/Buffer.cc
     ${PROJECT_SRC_DIR}/TcpConnection.cc
     ${PROJECT_SRC_DIR}/InetAddr.cc
-    ${PROJECT_SRC_DIR}/Socket.cc
     ${PROJECT_SRC_DIR}/SockOps.cc
     ${PROJECT_SRC_DIR}/Acceptor.cc
     ${PROJECT_SRC_DIR}/Connector.cc

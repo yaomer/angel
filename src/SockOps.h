@@ -23,7 +23,12 @@ int getSocketError(int sockfd);
 int toHostIpPort(in_port_t port);
 const char *toHostIpAddr(const struct in_addr *addr);
 
+void setKeepAlive(int fd, bool on);
+void setNoDelay(int fd, bool on);
+void setReuseAddr(int fd, bool on);
+void setReusePort(int fd, bool on);
+
 }
 }
 
-#endif
+#endif // _ANGEL_SOCKOPS_H

@@ -15,9 +15,9 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     _inetAddr(listenAddr),
     _idleFd(::open("/dev/null", O_RDONLY | O_CLOEXEC))
 {
-    _socket.setKeepAlive(true);
-    _socket.setReuseAddr(true);
-    _socket.setNoDelay(true);
+    SockOps::setKeepAlive(_socket.fd(), true);
+    SockOps::setReuseAddr(_socket.fd(), true);
+    SockOps::setNoDelay(_socket.fd(), true);
     SockOps::setnonblock(_socket.fd());
     SockOps::bind(_socket.fd(), &_inetAddr.inetAddr());
     _acceptChannel->setFd(_socket.fd());
