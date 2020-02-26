@@ -16,16 +16,8 @@ namespace Angel {
 
 class ThreadPool : noncopyable {
 public:
-    ThreadPool()
-        : _threadNums(0),
-        _quit(false)
+    ThreadPool() : _threadNums(0), _quit(false)
     {
-    }
-    explicit ThreadPool(size_t threadNums)
-        : _threadNums(threadNums),
-        _quit(false)
-    {
-        start(threadNums);
     }
     ~ThreadPool() { quit(); };
     void start(size_t threadNums);
@@ -34,6 +26,7 @@ public:
 private:
     void threadFunc();
 
+    static const size_t maxthreads = 256;
     size_t _threadNums;
     std::vector<std::thread> _workers;
     std::queue<TaskCallback> _qtask;

@@ -9,6 +9,10 @@ using namespace Angel;
 
 void EventLoopThreadPool::start(size_t threadNums)
 {
+    if (threadNums > maxthreads) {
+        logWarn("A maximum of %zu io-threads can be started", maxthreads);
+        return;
+    }
     _threadNums = threadNums;
     logInfo("started %zu io threads", threadNums);
     for (size_t i = 0; i < _threadNums; i++) {
@@ -20,7 +24,7 @@ void EventLoopThreadPool::start(size_t threadNums)
         while (!_threadPool[i]->getLoop())
             ;
     }
-    logInfo("EventLoopThreadPool is starting");
+    logInfo("EventLoopThreadPool is running");
 }
 
 // 使用[round-robin]挑选出下一个[io thread]

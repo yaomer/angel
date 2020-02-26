@@ -9,13 +9,13 @@ EventLoopThread::EventLoopThread()
     _thread([this]{ this->threadFunc(); })
 {
     _thread.detach();
-    logInfo("ctor, thread id = %s", getThreadIdStr());
+    logInfo("thread %s is running", getThreadIdStr());
 }
 
 EventLoopThread::~EventLoopThread()
 {
     if (_loop) _loop->quit();
-    logInfo("dtor, thread id = %s", getThreadIdStr());
+    logInfo("thread %s is ready to exit", getThreadIdStr());
 }
 
 EventLoop *EventLoopThread::getLoop()
@@ -40,6 +40,6 @@ void EventLoopThread::threadFunc()
     _loop = &loop;
     _condVar.notify_one();
     }
-    logInfo("loop is running ...");
+    logInfo("ioLoop is running");
     loop.run();
 }

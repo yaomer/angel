@@ -98,6 +98,7 @@ void Logger::threadFunc()
     while (1) {
         {
         std::unique_lock<std::mutex> mlock(_mutex);
+        // 这里就算出现虚假唤醒也无关紧要，即睡眠时间小于log_flush_interval也是可以的
         _condVar.wait_for(mlock, std::chrono::seconds(log_flush_interval));
         if (_writeBuf.readable() > 0)
             _writeBuf.swap(_flushBuf);

@@ -19,8 +19,8 @@ public:
     void add(int fd, int events);
     void change(int fd, int events);
     void remove(int fd, int events);
-    static const size_t evlist_init_size = 64;
 private:
+    static const size_t evlist_init_size = 64;
     int _epfd;
     size_t _addFds;
     std::vector<struct epoll_event> _evList;

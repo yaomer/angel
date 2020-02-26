@@ -1,7 +1,7 @@
-#include <iostream>
 #include <sys/uio.h>
 
 #include "Buffer.h"
+#include "LogStream.h"
 
 // 将fd中的数据读到Buffer中
 int Angel::Buffer::readFd(int fd)
@@ -24,5 +24,7 @@ int Angel::Buffer::readFd(int fd)
             append(extrabuf, n - writen);
         }
     }
+    logDebug("buffer: readindex=%zu, writeindex=%zu, size=%zu",
+            _readindex, _writeindex, _buf.size());
     return n;
 }

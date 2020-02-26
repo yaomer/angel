@@ -1,6 +1,3 @@
-#include <unistd.h>
-#include <signal.h>
-
 #include "EventLoop.h"
 #include "LogStream.h"
 #include "Socket.h"
@@ -65,7 +62,7 @@ void EventLoop::removeChannel(const ChannelPtr& chl)
 
 void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 {
-    logInfo("channel(fd = %d) is added to loop", chl->fd());
+    logInfo("channel[fd=%d] has been added to the loop", chl->fd());
     chl->enableRead();
     _poller->add(chl->fd(), chl->events());
     _channelMaps.emplace(chl->fd(), chl);
@@ -73,7 +70,7 @@ void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 
 void EventLoop::removeChannelInLoop(const ChannelPtr& chl)
 {
-    logInfo("channel(fd = %d) is removed from loop", chl->fd());
+    logInfo("channel[fd=%d] has been removed from the loop", chl->fd());
     _poller->remove(chl->fd(), chl->events());
     _channelMaps.erase(chl->fd());
 }
@@ -85,11 +82,10 @@ void EventLoop::run()
     while (!_quit) {
         int64_t timeout = _timer->timeout();
         int nevents = _poller->wait(this, timeout);
-        logDebug("nloops = %zu, timeout = %lld, nevents = %d",
-                _nloops++, timeout, nevents);
+        logDebug("nloops=%zu, timeout=%lld, nevents=%d", _nloops++, timeout, nevents);
         if (nevents > 0) {
-            for (auto& it : _activeChannels) {
-                it->handleEvent();
+            for (auto& channel : _activeChannels) {
+                channel->handleEvent();
             }
             _activeChannels.clear();
         } else if (nevents == 0) {
@@ -128,9 +124,9 @@ void EventLoop::wakeup()
     uint64_t one = 1;
     ssize_t n = write(_wakeFd[1], &one, sizeof(one));
     if (n != sizeof(one)) {
-        logError("write %zd bytes instead of 8");
+        logError("write %zd bytes instead of %zu", n, sizeof(one));
     } else
-        logDebug("waked up the ioLoop");
+        logDebug("wake up the ioLoop");
 }
 
 void EventLoop::handleRead()
@@ -138,7 +134,7 @@ void EventLoop::handleRead()
     uint64_t one;
     ssize_t n = read(_wakeFd[0], &one, sizeof(one));
     if (n != sizeof(one))
-        logError("read %zd bytes instead of 8");
+        logError("read %zd bytes instead of %zu", n, sizeof(one));
 }
 
 // 判断当前线程是否是io线程
@@ -148,46 +144,46 @@ bool EventLoop::isInLoopThread()
 }
 
 // 在io线程执行用户回调
-void EventLoop::runInLoop(const Functor _cb)
+void EventLoop::runInLoop(const Functor cb)
 {
     if (!isInLoopThread()) {
-        queueInLoop(_cb);
+        queueInLoop(cb);
     } else
-        _cb();
+        cb();
 }
 
 // 向任务队列中添加一个任务
-void EventLoop::queueInLoop(const Functor _cb)
+void EventLoop::queueInLoop(const Functor cb)
 {
     {
     std::lock_guard<std::mutex> mlock(_mutex);
-    _functors.emplace_back(_cb);
+    _functors.emplace_back(cb);
     }
     wakeup();
 }
 
-// [timeout ms]后执行一次_cb
-size_t EventLoop::runAfter(int64_t timeout, const TimerCallback _cb)
+// [timeout ms]后执行一次cb
+size_t EventLoop::runAfter(int64_t timeout, const TimerCallback cb)
 {
     int64_t expire = nowMs() + timeout;
-    TimerTask *task = new TimerTask(expire, 0, std::move(_cb));
+    TimerTask *task = new TimerTask(expire, 0, std::move(cb));
     size_t id = _timer->addTimer(task);
-    logInfo("add a timer after %lld ms, timer id = %zu", timeout, id);
+    logInfo("add a timer[id=%zu] after %lld ms", id, timeout);
     return id;
 }
 
-// 每隔[interval ms]执行一次_cb
-size_t EventLoop::runEvery(int64_t interval, const TimerCallback _cb)
+// 每隔[interval ms]执行一次cb
+size_t EventLoop::runEvery(int64_t interval, const TimerCallback cb)
 {
     int64_t expire = nowMs() + interval;
-    TimerTask *task = new TimerTask(expire, interval, std::move(_cb));
+    TimerTask *task = new TimerTask(expire, interval, std::move(cb));
     size_t id = _timer->addTimer(task);
-    logInfo("add a timer every %lld ms, timer id = %zu", interval, id);
+    logInfo("add a timer[id=%zu] every %lld ms", id, interval);
     return id;
 }
 
 void EventLoop::cancelTimer(size_t id)
 {
-    logInfo("cancel a timer, id = %zu", id);
+    logInfo("cancel a timer[id=%zu]", id);
     _timer->cancelTimer(id);
 }

@@ -10,12 +10,13 @@ using namespace Angel;
 TcpServer::TcpServer(EventLoop *loop, InetAddr listenAddr)
     : _loop(loop),
     _acceptor(new Acceptor(loop, listenAddr)),
-    _inetAddr(new InetAddr(listenAddr)),
+    _listenAddr(new InetAddr(listenAddr)),
     _ioThreadPool(new EventLoopThreadPool),
     _threadPool(new ThreadPool),
-    _connId(1),
+    _connId(1), // 预留下0，可能会用到
     _connTimeout(-1)
 {
+    logInfo("started a server [%s:%d]", listenAddr.toIpAddr(), listenAddr.toIpPort());
     _acceptor->setNewConnectionCb([this](int fd){
             this->newConnection(fd);
             });
@@ -36,7 +37,6 @@ void TcpServer::newConnection(int fd)
     InetAddr localAddr = SockOps::getLocalAddr(fd);
     InetAddr peerAddr = SockOps::getPeerAddr(fd);
     TcpConnectionPtr conn(new TcpConnection(id, ioLoop, fd, localAddr, peerAddr));
-    conn->setState(TcpConnection::CONNECTED);
     conn->setConnectionCb(_connectionCb);
     conn->setMessageCb(_messageCb);
     conn->setWriteCompleteCb(_writeCompleteCb);
@@ -70,14 +70,14 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 
 void TcpServer::start()
 {
-    // 必须忽略SIGPIPE信号，不然当向一个已关闭的连接发送消息时，
-    // 会导致服务端意外退出
+    logInfo("server [%s:%d] is running", _listenAddr->toIpAddr(), _listenAddr->toIpPort());
+    // 必须忽略SIGPIPE信号，不然当向一个已关闭的连接发送消息时，会导致服务端意外退出
     addSignal(SIGPIPE, nullptr);
     _acceptor->listen();
-    logInfo("server is starting");
 }
 
 void TcpServer::quit()
 {
+    logInfo("server [%s:%d] is ready to exit", _listenAddr->toIpAddr(), _listenAddr->toIpPort());
     _loop->quit();
 }

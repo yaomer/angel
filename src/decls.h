@@ -12,7 +12,7 @@ class Buffer;
 class Entry;
 
 // for TcpClient
-typedef std::function<void()> ConnectTimeoutCallback;
+typedef std::function<void()> ConnectionTimeoutCallback;
 // for TcpConnection
 typedef std::shared_ptr<TcpConnection> TcpConnectionPtr;
 typedef std::weak_ptr<TcpConnection> WeakTcpConnectionPtr;

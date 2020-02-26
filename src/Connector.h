@@ -17,8 +17,8 @@ class Connector : noncopyable {
 public:
     Connector(EventLoop *loop, InetAddr& inetAddr)
         : _loop(loop),
-        _connectChannel(new Channel(loop)),
         _peerAddr(inetAddr),
+        _connectChannel(new Channel(loop)),
         _connected(false),
         _waitRetry(false)
     {
@@ -26,6 +26,7 @@ public:
     ~Connector() {  };
     void connect();
     bool isConnected() { return _connected; }
+    int connfd() const { return _connectChannel->fd(); }
     void setNewConnectionCb(const NewConnectionCallback _cb)
     { _newConnectionCb = std::move(_cb); }
 
@@ -38,8 +39,8 @@ private:
     void retry(int fd);
 
     EventLoop *_loop;
-    std::shared_ptr<Channel> _connectChannel;
     InetAddr _peerAddr;
+    std::shared_ptr<Channel> _connectChannel;
     NewConnectionCallback _newConnectionCb;
     bool _connected;
     bool _waitRetry;

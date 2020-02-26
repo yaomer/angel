@@ -17,8 +17,29 @@ namespace Angel {
 
 class EventLoop;
 
-// TcpConnection抽象一个Tcp连接，它是不可再生的，连接到来时
-// 被构造，连接断开时被析构
+// TcpConnection抽象一个Tcp连接，它是不可再生的，连接到来时被构造，
+// 连接断开时被析构。
+//
+// 下面是一个TcpConnection对象的生命期：
+// 通过Acceptor::handleAccept()接收到一个新连接，得到connfd
+//           |
+//           v
+// 通过TcpServer::newConnection()，构造一个TcpConnection对象，连接进入CONNECTING状态
+//           |
+//           v
+// 通过TcpConnection::connectEstablish()，将连接加入到事件循环中，连接进入CONNECTED状态
+//           |
+//           v
+// 此时连接已建立完成，可进行正常通信
+//           |
+//           v
+// 关闭连接有两种情况：
+// 1）服务端主动关闭，连接进入CLOSING状态，在将Buffer中剩余的数据发送完毕后，将连接关闭
+// 2）对端断开连接或连接出错，连接进入CLOSED状态，立刻关闭连接
+//           |
+//           v
+// 最后通过调用TcpServer::removeConnection()来移除一个连接
+//
 class TcpConnection : noncopyable,
     public std::enable_shared_from_this<TcpConnection> {
 public:
@@ -29,10 +50,10 @@ public:
                   InetAddr peerAddr);
     ~TcpConnection();
     enum State {
-        CONNECTING,
-        CONNECTED,
-        CLOSING,
-        CLOSED,
+        CONNECTING, // 连接正在建立
+        CONNECTED,  // 连接建立完成
+        CLOSING,    // 连接将要关闭
+        CLOSED,     // 连接立刻就要关闭
     };
     size_t id() const { return _id; }
     void send(const char *s);
@@ -66,8 +87,8 @@ private:
     void handleClose();
     void handleError();
     void sendInLoop(const char *data, size_t len);
-    void sendInNotIoThread(const std::string& data);
     void updateTimeoutTimer();
+    const char *getStateString();
 
     size_t _id;
     EventLoop *_loop;
@@ -80,21 +101,13 @@ private:
     // 保存连接所需的上下文
     // context不应包含一个TcpConnectionPtr，否则将会造成循环引用
     std::any _context;
-    // 标识一个连接所处的状态
-    std::atomic_int _state;
-    // 连接的超时定时器的id
-    size_t _timeoutTimerId;
-    // 连接的超时值
-    int64_t _connTimeout;
-    // 接受一个新连接后调用
+    std::atomic_int _state; // 标识一个连接的状态
+    int64_t _connTimeout; // 连接的最大空闲时间
+    size_t _timeoutTimerId; // 连接的超时定时器的id
     ConnectionCallback _connectionCb;
-    // 正常的消息通讯使用
     MessageCallback _messageCb;
-    // 数据发送完成后调用
     WriteCompleteCallback _writeCompleteCb;
-    // 关闭连接时调用
     CloseCallback _closeCb;
-    // 连接出错时调用
     ErrorCallback _errorCb;
 };
 

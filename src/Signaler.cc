@@ -36,7 +36,7 @@ Signaler::Signaler(EventLoop *loop)
 
 void Signaler::start()
 {
-    logInfo("Signaler is starting");
+    logInfo("Signaler is running");
     _loop->addChannel(_sigChannel);
 }
 

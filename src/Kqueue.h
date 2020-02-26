@@ -20,8 +20,8 @@ public:
     void add(int fd, int events);
     void change(int fd, int events);
     void remove(int fd, int events);
-    static const size_t evlist_init_size = 64;
 private:
+    static const size_t evlist_init_size = 64;
     int _kqfd;
     int _addFds = 0;
     std::vector<struct kevent> _evlist;

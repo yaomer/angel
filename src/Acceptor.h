@@ -29,7 +29,7 @@ private:
     EventLoop *_loop;
     std::shared_ptr<Channel> _acceptChannel;
     Socket _socket;
-    InetAddr _inetAddr;
+    InetAddr _listenAddr;
     NewConnectionCallback _newConnectionCb;
     int _idleFd;
 };

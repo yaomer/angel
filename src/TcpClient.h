@@ -17,14 +17,14 @@ class EventLoop;
 
 class TcpClient : noncopyable {
 public:
-    enum Flag { NOTEXITLOOP = 01, DISCONNECT = 02 };
+    enum Flag { EXITLOOP = 01, DISCONNECT = 02 };
     TcpClient(EventLoop *, InetAddr);
     ~TcpClient();
     void start();
     const char *name() { return _name.c_str(); }
     void setName(const std::string& name) { _name = name; }
     const TcpConnectionPtr& conn() const { return _conn; }
-    void notExitLoop();
+    void notExitLoop() { _flag &= ~EXITLOOP; };
     bool isConnected() { return _connector.isConnected() && _conn; }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }

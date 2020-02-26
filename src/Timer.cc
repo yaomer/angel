@@ -25,6 +25,7 @@ void Timer::addTimerInLoop(TimerTask *task, size_t id)
     auto it = std::shared_ptr<TimerTask>(task);
     _timer.emplace(it);
     _idMaps.emplace(id, it);
+    logDebug("timer[id=%zu] has been added to the Timer", id);
 }
 
 // Cancel a TimerTask is O(logn)
@@ -43,6 +44,7 @@ void Timer::cancelTimerInLoop(size_t id)
         auto range = _timer.equal_range(it->second);
         for (auto it = range.first; it != range.second; it++) {
             if ((*it)->id() == id) {
+                logDebug("timer[id=%d] has been canceled", id);
                 (*it)->canceled();
                 delTimer(it);
                 break;

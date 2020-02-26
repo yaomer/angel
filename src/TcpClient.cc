@@ -5,10 +5,10 @@
 
 using namespace Angel;
 
-TcpClient::TcpClient(EventLoop *loop, InetAddr inetAddr)
+TcpClient::TcpClient(EventLoop *loop, InetAddr peerAddr)
     : _loop(loop),
-    _connector(loop, inetAddr),
-    _flag(0)
+    _connector(loop, peerAddr),
+    _flag(EXITLOOP)
 {
     _connector.setNewConnectionCb([this](int fd){
             this->newConnection(fd);
@@ -39,7 +39,8 @@ void TcpClient::newConnection(int fd)
 void TcpClient::start()
 {
     _connector.connect();
-    logInfo("client is starting");
+    auto localAddr = InetAddr(SockOps::getLocalAddr(_connector.connfd()));
+    logInfo("client [%s:%d] is running", localAddr.toIpAddr(), localAddr.toIpPort());
 }
 
 void TcpClient::handleClose(const TcpConnectionPtr& conn)
@@ -48,11 +49,6 @@ void TcpClient::handleClose(const TcpConnectionPtr& conn)
     if (_closeCb) _closeCb(_conn);
     _loop->removeChannel(_conn->getChannel());
     _conn.reset();
-    if (!(_flag & NOTEXITLOOP)) _loop->quit();
+    if (_flag & EXITLOOP) _loop->quit();
     _flag |= DISCONNECT;
-}
-
-void TcpClient::notExitLoop()
-{
-    _flag |= NOTEXITLOOP;
 }

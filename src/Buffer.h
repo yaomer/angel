@@ -82,8 +82,8 @@ public:
         size_t len = strlen(s);
         return readable() >= len && strncasecmp(peek(), s, len) == 0;
     }
-    static const size_t init_size = 1024;
 private:
+    static const size_t init_size = 1024;
     std::vector<char> _buf;
     size_t _readindex = 0;
     size_t _writeindex = 0;

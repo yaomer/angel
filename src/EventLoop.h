@@ -40,10 +40,10 @@ public:
     void run();
     void wakeup();
     bool isInLoopThread();
-    void runInLoop(const Functor _cb);
-    void queueInLoop(const Functor _cb);
-    size_t runAfter(int64_t timeout_ms, const TimerCallback _cb);
-    size_t runEvery(int64_t interval_ms, const TimerCallback _cb);
+    void runInLoop(const Functor cb);
+    void queueInLoop(const Functor cb);
+    size_t runAfter(int64_t timeout_ms, const TimerCallback cb);
+    size_t runEvery(int64_t interval_ms, const TimerCallback cb);
     void cancelTimer(size_t id);
     void quit() { _quit = true; wakeup(); }
 private:

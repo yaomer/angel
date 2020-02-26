@@ -5,6 +5,10 @@ using namespace Angel;
 
 void ThreadPool::start(size_t threadNums)
 {
+    if (threadNums < maxthreads) {
+        logWarn("A maximum of %zu task-threads can be started", maxthreads);
+        return;
+    }
     _threadNums = threadNums;
     for (size_t i = 0; i < _threadNums; i++) {
         std::thread thread([this]{ this->threadFunc(); });
