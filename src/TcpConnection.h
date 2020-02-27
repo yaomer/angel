@@ -69,10 +69,10 @@ public:
     bool isConnected() { return _state == CONNECTED; }
     std::any& getContext() { return _context; }
     void setContext(std::any context) { _context = std::move(context); }
-    void setTimeoutTimerId(size_t id) { _timeoutTimerId = id; }
-    void setConnTimeout(int64_t timeout) { _connTimeout = timeout; }
+    void setTtl(size_t timerId, int64_t ttl)
+    { _ttlTimerId = timerId; _ttl = ttl; }
     void connectEstablish();
-    void close();
+    void close() { handleClose(false); }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
@@ -84,10 +84,11 @@ public:
 private:
     void handleRead();
     void handleWrite();
-    void handleClose();
+    void handleClose(bool isForced);
     void handleError();
+    void forceCloseConnection() { handleClose(true); }
     void sendInLoop(const char *data, size_t len);
-    void updateTimeoutTimer();
+    void updateTtlTimerIfNeeded();
     const char *getStateString();
 
     size_t _id;
@@ -102,8 +103,8 @@ private:
     // context不应包含一个TcpConnectionPtr，否则将会造成循环引用
     std::any _context;
     std::atomic_int _state; // 标识一个连接的状态
-    int64_t _connTimeout; // 连接的最大空闲时间
-    size_t _timeoutTimerId; // 连接的超时定时器的id
+    int64_t _ttl;
+    size_t _ttlTimerId;
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     WriteCompleteCallback _writeCompleteCb;

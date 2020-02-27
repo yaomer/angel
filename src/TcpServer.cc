@@ -14,7 +14,7 @@ TcpServer::TcpServer(EventLoop *loop, InetAddr listenAddr)
     _ioThreadPool(new EventLoopThreadPool),
     _threadPool(new ThreadPool),
     _connId(1), // 预留下0，可能会用到
-    _connTimeout(-1)
+    _ttl(0)    // 默认禁用TTL
 {
     logInfo("started a server [%s:%d]", listenAddr.toIpAddr(), listenAddr.toIpPort());
     _acceptor->setNewConnectionCb([this](int fd){
@@ -44,16 +44,16 @@ void TcpServer::newConnection(int fd)
             this->removeConnection(conn);
             });
     _connectionMaps.emplace(id, conn);
-    if (_connTimeout > 0) {
-        size_t id = ioLoop->runAfter(_connTimeout, [conn]{ conn->close(); });
-        conn->setTimeoutTimerId(id);
-        conn->setConnTimeout(_connTimeout);
-    }
+    setTtlTimerIfNeeded(ioLoop, conn);
     ioLoop->runInLoop([conn]{ conn->connectEstablish(); });
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 {
+    // 这里禁用conn的TTL，因为如果用户开启了TTL，并且在_closeCb()中发送了数据，
+    // 而conn->send()中会更新连接的ttl timer，从而会导致conn的生命期被延长，
+    // 即再经过ttl时间后才会被关闭
+    conn->setTtl(0, 0);
     if (_closeCb) _closeCb(conn);
     conn->setState(TcpConnection::CLOSED);
     conn->getLoop()->removeChannel(conn->getChannel());
@@ -63,9 +63,16 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn)
     // connectionMaps中，如果此时恰好有某个io子线程要移除一个连接，并且
     // 正在调用removeConnection，这时两个线程就会同时修改connectionMaps，
     // 这会导致难以预料的后果
-    _loop->runInLoop([this, conn]{
-            this->connectionMaps().erase(conn->id());
+    _loop->runInLoop([this, id = conn->id()]{
+            this->connectionMaps().erase(id);
             });
+}
+
+void TcpServer::setTtlTimerIfNeeded(EventLoop *loop, const TcpConnectionPtr& conn)
+{
+    if (_ttl <= 0) return;
+    size_t id = loop->runAfter(_ttl, [conn]{ conn->close(); });
+    conn->setTtl(id, _ttl);
 }
 
 void TcpServer::start()

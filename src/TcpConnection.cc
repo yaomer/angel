@@ -24,8 +24,8 @@ TcpConnection::TcpConnection(size_t id,
     _localAddr(localAddr),
     _peerAddr(peerAddr),
     _state(CONNECTING),
-    _connTimeout(0),
-    _timeoutTimerId(0)
+    _ttl(0),
+    _ttlTimerId(0)
 {
     _channel->setFd(sockfd);
     _channel->setEventReadCb([this]{ this->handleRead(); });
@@ -36,8 +36,8 @@ TcpConnection::TcpConnection(size_t id,
 
 TcpConnection::~TcpConnection()
 {
-    if (_timeoutTimerId > 0)
-        _loop->cancelTimer(_timeoutTimerId);
+    if (_ttlTimerId > 0)
+        _loop->cancelTimer(_ttlTimerId);
     logInfo("conn: id=%d, fd=%d, state=%s [dtor]", _id, _socket->fd(), getStateString());
 }
 
@@ -61,12 +61,11 @@ void TcpConnection::handleRead()
             _input.retrieveAll();
         }
     } else if (n == 0) {
-        handleClose();
+        forceCloseConnection();
     } else {
         handleError();
     }
-    // 有事件发生后，更新相应的超时定时器
-    updateTimeoutTimer();
+    updateTtlTimerIfNeeded();
 }
 
 // 每当关注的sockfd可写时，由handleWrite()负责将未发送完的数据发送过去
@@ -86,25 +85,27 @@ void TcpConnection::handleWrite()
                             conn->_writeCompleteCb(conn);
                             });
                 if (_state == CLOSING)
-                    handleClose();
+                    forceCloseConnection();
             }
         } else {
             logWarn("write to [conn: id=%d, fd=%d]: %s", _id, _channel->fd(), strerrno());
             // 对端尚未与我们建立连接或者对端已关闭连接
             if (errno == ECONNRESET || errno == EPIPE) {
-                handleClose();
+                forceCloseConnection();
                 return;
             }
         }
     }
 }
 
-// 对端关闭连接或连接出错时调用，强制关闭一个连接，未发送完的数据将会被丢弃
-void TcpConnection::handleClose()
+void TcpConnection::handleClose(bool isForced)
 {
-    logInfo("[conn: id=%d, fd=%d] is closed", _id, _channel->fd());
+    logInfo("[conn: id=%d, fd=%d] will close", _id, _channel->fd());
     if (_state == CLOSED) return;
-    setState(CLOSED);
+    if (!isForced && _output.readable() > 0) {
+        setState(CLOSING);
+        return;
+    }
     if (_closeCb)
         _loop->runInLoop([conn = shared_from_this()]{
                 conn->_closeCb(conn);
@@ -116,19 +117,7 @@ void TcpConnection::handleError()
     logError("[conn: id=%d, fd=%d]: %s", _id, _channel->fd(), strerrno());
     // 对端已关闭连接
     if (errno == ECONNRESET)
-        handleClose();
-}
-
-// 服务端主动关闭一个连接时调用，保证停留在缓冲区中的数据发送完后才真正断开连接
-void TcpConnection::close()
-{
-    logInfo("[conn: id=%d, fd=%d] is closing", _id, _channel->fd());
-    if (_state == CLOSED) return;
-    setState(CLOSING);
-    if (_closeCb)
-        _loop->runInLoop([conn = shared_from_this()]{
-                conn->_closeCb(conn);
-                });
+        forceCloseConnection();
 }
 
 void TcpConnection::sendInLoop(const char *data, size_t len)
@@ -151,12 +140,12 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
                             conn->_writeCompleteCb(conn);
                             });
                 if (_state == CLOSING)
-                    close();
+                    forceCloseConnection();
             }
         } else {
             logWarn("write to [conn: id=%d, fd=%d]: %s", _id, _channel->fd(), strerrno());
             if (errno == ECONNRESET || errno == EPIPE) {
-                handleClose();
+                forceCloseConnection();
                 return;
             }
         }
@@ -180,7 +169,7 @@ void TcpConnection::send(const char *s, size_t len)
                 this->sendInLoop(message.data(), message.size());
                 });
     }
-    updateTimeoutTimer();
+    updateTtlTimerIfNeeded();
 }
 
 void TcpConnection::send(const char *s)
@@ -211,12 +200,11 @@ void TcpConnection::formatSend(const char *fmt, ...)
     send(buf, len);
 }
 
-void TcpConnection::updateTimeoutTimer()
+void TcpConnection::updateTtlTimerIfNeeded()
 {
-    if (_timeoutTimerId == 0) return;
-    _loop->cancelTimer(_timeoutTimerId);
-    _timeoutTimerId = _loop->runAfter(_connTimeout,
-            [conn = shared_from_this()]{
+    if (_ttl <= 0) return;
+    _loop->cancelTimer(_ttlTimerId);
+    _ttlTimerId = _loop->runAfter(_ttl, [conn = shared_from_this()]{
             conn->close();
             });
 }

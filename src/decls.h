@@ -9,13 +9,9 @@ namespace Angel {
 class Channel;
 class TcpConnection;
 class Buffer;
-class Entry;
 
-// for TcpClient
-typedef std::function<void()> ConnectionTimeoutCallback;
 // for TcpConnection
 typedef std::shared_ptr<TcpConnection> TcpConnectionPtr;
-typedef std::weak_ptr<TcpConnection> WeakTcpConnectionPtr;
 typedef std::function<void(const TcpConnectionPtr&)> ConnectionCallback;
 typedef std::function<void(const TcpConnectionPtr&, Buffer&)> MessageCallback;
 typedef std::function<void(const TcpConnectionPtr&)> CloseCallback;

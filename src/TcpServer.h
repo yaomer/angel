@@ -55,13 +55,9 @@ public:
     // 启动或退出服务器
     void start();
     void quit();
+    // 设置空闲连接的最大存活时间
+    void setConnnectionTtl(int64_t ms) { _ttl = ms; }
 
-    // 空闲客户连接在timeoutMs ms后会被调用cb
-    void setConnectionTimeoutCb(int64_t timeoutMs, const ConnectionTimeoutCallback cb)
-    {
-        _connTimeout = timeoutMs;
-        _connectionTimeoutCb = std::move(cb);
-    }
     void setConnectionCb(const ConnectionCallback _cb)
     { _connectionCb = std::move(_cb); }
     void setMessageCb(const MessageCallback _cb)
@@ -73,8 +69,9 @@ public:
 private:
     void newConnection(int fd);
     void removeConnection(const TcpConnectionPtr& conn);
-
     EventLoop* getNextLoop();
+
+    void setTtlTimerIfNeeded(EventLoop *loop, const TcpConnectionPtr& conn);
 
     EventLoop *_loop;
     std::unique_ptr<Acceptor> _acceptor;
@@ -90,8 +87,7 @@ private:
     ConnectionMaps _connectionMaps;
     std::unique_ptr<ThreadPool> _threadPool;
     size_t _connId; // 所有连接的全局递增id
-    int64_t _connTimeout; // 空闲连接超时时间，类似KeepAlive
-    ConnectionTimeoutCallback _connectionTimeoutCb; // 空闲连接超时后调用
+    int64_t _ttl; // 空闲连接的存活时间
     ConnectionCallback _connectionCb;
     MessageCallback _messageCb;
     CloseCallback _closeCb;

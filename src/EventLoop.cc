@@ -129,6 +129,7 @@ void EventLoop::wakeup()
         logDebug("wake up the ioLoop");
 }
 
+// 接受被唤醒
 void EventLoop::handleRead()
 {
     uint64_t one;
