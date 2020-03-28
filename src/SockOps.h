@@ -3,15 +3,17 @@
 
 #include <arpa/inet.h>
 
+#include "InetAddr.h"
+
 namespace Angel {
 
 namespace SockOps {
 
 int socket();
-void bind(int sockfd, struct sockaddr_in *addr);
+void bind(int sockfd, InetAddr localAddr);
 void listen(int sockfd);
 int accept(int sockfd);
-int connect(int sockfd, struct sockaddr_in *addr);
+int connect(int sockfd, InetAddr peerAddr);
 
 void setnonblock(int sockfd);
 void socketpair(int sockfd[]);

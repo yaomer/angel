@@ -20,7 +20,7 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     SockOps::setReuseAddr(fd, true);
     SockOps::setNoDelay(fd, true);
     SockOps::setnonblock(fd);
-    SockOps::bind(fd, &_listenAddr.inetAddr());
+    SockOps::bind(fd, _listenAddr);
     _acceptChannel->setFd(fd);
     logInfo("listenfd = %d", fd);
 }

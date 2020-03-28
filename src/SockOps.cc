@@ -22,8 +22,9 @@ int SockOps::socket()
     return sockfd;
 }
 
-void SockOps::bind(int sockfd, struct sockaddr_in *addr)
+void SockOps::bind(int sockfd, InetAddr localAddr)
 {
+    struct sockaddr_in *addr = &localAddr.inetAddr();
     if (::bind(sockfd, sockaddr_cast(addr), sizeof(*addr)) < 0)
         logFatal("bind: %s", strerrno());
 }
@@ -44,10 +45,10 @@ int SockOps::accept(int sockfd)
     return connfd;
 }
 
-int SockOps::connect(int sockfd, struct sockaddr_in *addr)
+int SockOps::connect(int sockfd, InetAddr peerAddr)
 {
-    int ret = ::connect(sockfd, sockaddr_cast(addr), sizeof(*addr));
-    return ret;
+    struct sockaddr_in *addr = &peerAddr.inetAddr();
+    return ::connect(sockfd, sockaddr_cast(addr), sizeof(*addr));
 }
 
 void SockOps::setnonblock(int sockfd)

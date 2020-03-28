@@ -15,7 +15,7 @@ void Connector::connect()
     logInfo("connect -> [%s:%d]", _peerAddr.toIpAddr(), _peerAddr.toIpPort());
     int sockfd = SockOps::socket();
     SockOps::setnonblock(sockfd);
-    int ret = SockOps::connect(sockfd, &_peerAddr.inetAddr());
+    int ret = SockOps::connect(sockfd, _peerAddr);
     _connectChannel->setFd(sockfd);
     _loop->addChannel(_connectChannel);
     if (ret == 0) {
