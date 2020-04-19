@@ -5,7 +5,7 @@ using namespace Angel;
 
 void ThreadPool::start(size_t threadNums)
 {
-    if (threadNums < maxthreads) {
+    if (threadNums > maxthreads) {
         logWarn("A maximum of %zu task-threads can be started", maxthreads);
         return;
     }
