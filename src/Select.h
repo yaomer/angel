@@ -14,10 +14,10 @@ class Select : public Poller, noncopyable {
 public:
     Select();
     ~Select() {  };
-    int wait(EventLoop *loop, int64_t timeout);
-    void add(int fd, int events);
-    void change(int fd, int events);
-    void remove(int fd, int events);
+    int wait(EventLoop *loop, int64_t timeout) override;
+    void add(int fd, int events) override;
+    void change(int fd, int events) override;
+    void remove(int fd, int events) override;
 private:
     static const size_t fds_init_size = 64;
     fd_set _rdset;

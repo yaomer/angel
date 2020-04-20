@@ -4,6 +4,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <sys/uio.h>
+
 namespace Angel {
 
 class Buffer {
@@ -64,12 +66,33 @@ public:
             _readindex = _writeindex = 0;
     }
     void retrieveAll() { retrieve(readable()); }
-    int readFd(int fd);
-    void swap(Buffer& _buffer)
+    int readFd(int fd)
     {
-        _buf.swap(_buffer._buf);
-        std::swap(_readindex, _buffer._readindex);
-        std::swap(_writeindex, _buffer._writeindex);
+        char extrabuf[65536];
+        struct iovec iov[2];
+        ssize_t writen = writeable();
+        ssize_t n;
+
+        iov[0].iov_base = begin() + _writeindex;
+        iov[0].iov_len = writen;
+        iov[1].iov_base = extrabuf;
+        iov[1].iov_len = sizeof(extrabuf);
+
+        if ((n = readv(fd, iov, 2)) > 0) {
+            if (n <= writen)
+                _writeindex += n;
+            else {
+                _writeindex += writen;
+                append(extrabuf, n - writen);
+            }
+        }
+        return n;
+    }
+    void swap(Buffer& other)
+    {
+        _buf.swap(other._buf);
+        std::swap(_readindex, other._readindex);
+        std::swap(_writeindex, other._writeindex);
     }
     char& operator[](size_t idx) { return _buf[idx]; }
     bool strcmp(const char *s)
@@ -88,6 +111,7 @@ private:
     size_t _readindex = 0;
     size_t _writeindex = 0;
 };
+
 } // Angel
 
 #endif // _ANGEL_BUFFER_H

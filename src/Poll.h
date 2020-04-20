@@ -16,10 +16,10 @@ class Poll : public Poller, noncopyable {
 public:
     Poll() { setName("poll"); }
     ~Poll() {  }
-    int wait(EventLoop *loop, int64_t timeout);
-    void add(int fd, int events);
-    void change(int fd, int events);
-    void remove(int fd, int events);
+    int wait(EventLoop *loop, int64_t timeout) override;
+    void add(int fd, int events) override;
+    void change(int fd, int events) override;
+    void remove(int fd, int events) override;
 private:
     std::vector<struct pollfd> _pollfds;
     // <fd, index>, index for _pollfds

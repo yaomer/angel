@@ -49,10 +49,7 @@ set (SRC_HEADERS
 
 set (SRC_FILES 
     ${PROJECT_SRC_DIR}/EventLoop.cc
-    ${PROJECT_SRC_DIR}/EventLoopThread.cc
-    ${PROJECT_SRC_DIR}/EventLoopThreadPool.cc
     ${PROJECT_SRC_DIR}/Channel.cc
-    ${PROJECT_SRC_DIR}/Buffer.cc
     ${PROJECT_SRC_DIR}/TcpConnection.cc
     ${PROJECT_SRC_DIR}/InetAddr.cc
     ${PROJECT_SRC_DIR}/SockOps.cc
@@ -62,7 +59,6 @@ set (SRC_FILES
     ${PROJECT_SRC_DIR}/TcpClient.cc
     ${PROJECT_SRC_DIR}/Timer.cc
     ${PROJECT_SRC_DIR}/Signaler.cc
-    ${PROJECT_SRC_DIR}/ThreadPool.cc
     ${PROJECT_SRC_DIR}/LogStream.cc
     ${PROJECT_SRC_DIR}/Logger.cc
     ${PROJECT_SRC_DIR}/util.cc
