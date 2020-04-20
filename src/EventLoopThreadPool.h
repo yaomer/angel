@@ -13,6 +13,7 @@ public:
     EventLoopThreadPool() : _threadNums(0), _nextIndex(0)
     {
     }
+    ~EventLoopThreadPool();
     size_t threadNums() const { return _threadNums; }
     void start(size_t threadNums);
     EventLoopThread *getNextThread();

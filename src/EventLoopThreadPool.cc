@@ -33,3 +33,9 @@ EventLoopThread *EventLoopThreadPool::getNextThread()
     if (_nextIndex >= _threadNums) _nextIndex = 0;
     return _threadPool[_nextIndex++].get();
 }
+
+EventLoopThreadPool::~EventLoopThreadPool()
+{
+    for (auto& thread : _threadPool)
+        thread->quit();
+}

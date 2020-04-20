@@ -8,7 +8,6 @@ EventLoopThread::EventLoopThread()
     : _loop(nullptr),
     _thread([this]{ this->threadFunc(); })
 {
-    _thread.detach();
     logInfo("thread %s is running", getThreadIdStr());
 }
 
@@ -30,6 +29,7 @@ EventLoop *EventLoopThread::getLoop()
 void EventLoopThread::quit()
 {
     _loop->quit();
+    _thread.join();
 }
 
 void EventLoopThread::threadFunc()

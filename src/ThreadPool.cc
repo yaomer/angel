@@ -12,7 +12,6 @@ void ThreadPool::start(size_t threadNums)
     _threadNums = threadNums;
     for (size_t i = 0; i < _threadNums; i++) {
         std::thread thread([this]{ this->threadFunc(); });
-        thread.detach();
         _workers.emplace_back(std::move(thread));
     }
     logInfo("started %zu task threads", _threadNums);
@@ -51,4 +50,6 @@ void ThreadPool::quit()
 {
     _quit = true;
     _condVar.notify_all();
+    for (auto& tr : _workers)
+        tr.join();
 }
