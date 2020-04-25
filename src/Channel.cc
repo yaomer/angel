@@ -17,14 +17,14 @@ const char *Channel::ev2str(int events)
 
 void Channel::changeEvents()
 {
-    logDebug("fd=%d events is [%s]", fd(), evstr());
+    logDebug("fd=%d events is %s", fd(), evstr());
     _loop->changeEvent(fd(), events());
 }
 
 // 事件多路分发器，如果Channel上有事件发生，则根据不同的事件触发不同的回调
 void Channel::handleEvent()
 {
-    logDebug("fd=%d revents is [%s]", fd(), revstr());
+    logDebug("fd=%d revents is %s", fd(), revstr());
     if (revents() & ERROR)
         if (_errorCb) _errorCb();
     if (revents() & READ)

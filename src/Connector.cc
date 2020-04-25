@@ -31,7 +31,7 @@ void Connector::connect()
 
 void Connector::connecting(int sockfd)
 {
-    logInfo("[fd=%d] is connecting", sockfd);
+    logDebug("fd=%d is connecting", sockfd);
     _connectChannel->setEventReadCb(
             [this, sockfd]{ this->check(sockfd); });
     _connectChannel->setEventWriteCb(
@@ -42,7 +42,7 @@ void Connector::connecting(int sockfd)
 void Connector::connected(int sockfd)
 {
     if (_connected) return;
-    logInfo("[fd=%d] is connected", sockfd);
+    logDebug("fd=%d is connected", sockfd);
     _loop->removeChannel(_connectChannel);
     _connectChannel.reset();
     if (_newConnectionCb) {
@@ -62,7 +62,7 @@ void Connector::check(int sockfd)
     if (_waitRetry) return;
     int err = SockOps::getSocketError(sockfd);
     if (err) {
-        logError("connect: %s; try to reconnect after %d s", strerr(err), retry_interval);
+        logError("connect: %s, try to reconnect after %d s", strerr(err), retry_interval);
         retry(sockfd);
         return;
     }

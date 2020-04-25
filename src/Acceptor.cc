@@ -22,7 +22,6 @@ Acceptor::Acceptor(EventLoop *loop, InetAddr& listenAddr)
     SockOps::setnonblock(fd);
     SockOps::bind(fd, _listenAddr);
     _acceptChannel->setFd(fd);
-    logInfo("listenfd = %d", fd);
 }
 
 void Acceptor::listen()
@@ -30,7 +29,7 @@ void Acceptor::listen()
     SockOps::listen(_socket.fd());
     _acceptChannel->setEventReadCb([this]{ this->handleAccept(); });
     _loop->addChannel(_acceptChannel);
-    logInfo("start listening port %d", _listenAddr.toIpPort());
+    logDebug("start to listen port %d", _listenAddr.toIpPort());
 }
 
 void Acceptor::handleAccept()
@@ -55,7 +54,7 @@ void Acceptor::handleAccept()
         }
         return;
     }
-    logInfo("accept a new connection[fd=%d]", connfd);
+    logInfo("accept a new connection(fd=%d)", connfd);
     SockOps::setnonblock(connfd);
     if (_newConnectionCb)
         _newConnectionCb(connfd);

@@ -52,17 +52,19 @@ EventLoop::EventLoop()
 
 void EventLoop::addChannel(const ChannelPtr& chl)
 {
+    logDebug("add channel(fd=%d)...", chl->fd());
     runInLoop([this, chl]{ this->addChannelInLoop(chl); });
 }
 
 void EventLoop::removeChannel(const ChannelPtr& chl)
 {
+    logDebug("remove channel(fd=%d)...", chl->fd());
     runInLoop([this, chl]{ this->removeChannelInLoop(chl); });
 }
 
 void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 {
-    logInfo("channel[fd=%d] has been added to the loop", chl->fd());
+    logDebug("channel(fd=%d) has been added to the loop", chl->fd());
     chl->enableRead();
     _poller->add(chl->fd(), chl->events());
     _channelMaps.emplace(chl->fd(), chl);
@@ -70,7 +72,7 @@ void EventLoop::addChannelInLoop(const ChannelPtr& chl)
 
 void EventLoop::removeChannelInLoop(const ChannelPtr& chl)
 {
-    logInfo("channel[fd=%d] has been removed from the loop", chl->fd());
+    logDebug("channel(fd=%d) has been removed from the loop", chl->fd());
     _poller->remove(chl->fd(), chl->events());
     _channelMaps.erase(chl->fd());
 }
@@ -101,7 +103,6 @@ void EventLoop::doFunctors()
     {
     std::lock_guard<std::mutex> mlock(_mutex);
     if (!_functors.empty()) {
-        logDebug("executed %zu functors", _functors.size());
         tfuncs.swap(_functors);
         _functors.clear();
     }
@@ -126,7 +127,7 @@ void EventLoop::wakeup()
     if (n != sizeof(one)) {
         logError("write %zd bytes instead of %zu", n, sizeof(one));
     } else
-        logDebug("wake up the ioLoop");
+        logDebug("wake up the io-loop by fd=%d", _wakeFd[1]);
 }
 
 // 接受被唤醒
@@ -169,7 +170,7 @@ size_t EventLoop::runAfter(int64_t timeout, const TimerCallback cb)
     int64_t expire = nowMs() + timeout;
     TimerTask *task = new TimerTask(expire, 0, std::move(cb));
     size_t id = _timer->addTimer(task);
-    logInfo("add a timer[id=%zu] after %lld ms", id, timeout);
+    logInfo("add a timer(id=%zu) after %lld ms", id, timeout);
     return id;
 }
 
@@ -179,12 +180,12 @@ size_t EventLoop::runEvery(int64_t interval, const TimerCallback cb)
     int64_t expire = nowMs() + interval;
     TimerTask *task = new TimerTask(expire, interval, std::move(cb));
     size_t id = _timer->addTimer(task);
-    logInfo("add a timer[id=%zu] every %lld ms", id, interval);
+    logInfo("add a timer(id=%zu) every %lld ms", id, interval);
     return id;
 }
 
 void EventLoop::cancelTimer(size_t id)
 {
-    logInfo("cancel a timer[id=%zu]", id);
+    logInfo("cancel a timer(id=%zu)", id);
     _timer->cancelTimer(id);
 }

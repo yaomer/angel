@@ -31,28 +31,28 @@ TcpConnection::TcpConnection(size_t id,
     _channel->setEventReadCb([this]{ this->handleRead(); });
     _channel->setEventWriteCb([this]{ this->handleWrite(); });
     _channel->setEventErrorCb([this]{ this->handleError(); });
-    logInfo("conn: id=%d, fd=%d, state=%s [ctor]", id, sockfd, getStateString());
+    logInfo("connection(id=%d, fd=%d) is %s", id, sockfd, getStateString());
 }
 
 TcpConnection::~TcpConnection()
 {
     if (_ttlTimerId > 0)
         _loop->cancelTimer(_ttlTimerId);
-    logInfo("conn: id=%d, fd=%d, state=%s [dtor]", _id, _socket->fd(), getStateString());
+    logInfo("connection(id=%d, fd=%d) is %s", _id, _socket->fd(), getStateString());
 }
 
 void TcpConnection::connectEstablish()
 {
     _loop->addChannel(_channel);
     setState(TcpConnection::CONNECTED);
-    logInfo("conn: id=%d, fd=%d, state=%s", _id, _socket->fd(), getStateString());
+    logInfo("connection(id=%d, fd=%d) is %s", _id, _socket->fd(), getStateString());
     if (_connectionCb) _connectionCb(shared_from_this());
 }
 
 void TcpConnection::handleRead()
 {
     ssize_t n = _input.readFd(_channel->fd());
-    logDebug("read %zd bytes from [conn: id=%d, fd=%d]", n, _id, _channel->fd());
+    logDebug("read %zd bytes from connection(id=%d, fd=%d)", n, _id, _channel->fd());
     if (n > 0) {
         if (_messageCb)
             _messageCb(shared_from_this(), _input);
@@ -88,7 +88,7 @@ void TcpConnection::handleWrite()
                     forceCloseConnection();
             }
         } else {
-            logWarn("write to [conn: id=%d, fd=%d]: %s", _id, _channel->fd(), strerrno());
+            logWarn("write to connection(id=%d, fd=%d): %s", _id, _channel->fd(), strerrno());
             // 对端尚未与我们建立连接或者对端已关闭连接
             if (errno == ECONNRESET || errno == EPIPE) {
                 forceCloseConnection();
@@ -100,7 +100,7 @@ void TcpConnection::handleWrite()
 
 void TcpConnection::handleClose(bool isForced)
 {
-    logInfo("[conn: id=%d, fd=%d] will close", _id, _channel->fd());
+    logDebug("connection(id=%d, fd=%d) is %s", _id, _channel->fd(), getStateString());
     if (_state == CLOSED) return;
     if (!isForced && _output.readable() > 0) {
         setState(CLOSING);
@@ -114,7 +114,7 @@ void TcpConnection::handleClose(bool isForced)
 
 void TcpConnection::handleError()
 {
-    logError("[conn: id=%d, fd=%d]: %s", _id, _channel->fd(), strerrno());
+    logError("connection(id=%d, fd=%d): %s", _id, _channel->fd(), strerrno());
     // 对端已关闭连接
     if (errno == ECONNRESET)
         forceCloseConnection();
@@ -126,12 +126,13 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
     size_t remainBytes = len;
 
     if (_state == CLOSED) {
-        logWarn("[conn: id=%d, fd=%d] is closed, give up sending", _id, _channel->fd());
+        logWarn("connection(id=%d, fd=%d) is %s, give up sending",
+                getStateString(), _id, _channel->fd());
         return;
     }
     if (!_channel->isWriting() && _output.readable() == 0) {
         n = write(_channel->fd(), data, len);
-        logDebug("write %zd bytes to [conn: id=%d, fd=%d]", n, _id, _channel->fd());
+        logDebug("write %zd bytes to connection(id=%d, fd=%d)", n, _id, _channel->fd());
         if (n >= 0) {
             remainBytes = len - n;
             if (remainBytes == 0) {
@@ -143,7 +144,7 @@ void TcpConnection::sendInLoop(const char *data, size_t len)
                     forceCloseConnection();
             }
         } else {
-            logWarn("write to [conn: id=%d, fd=%d]: %s", _id, _channel->fd(), strerrno());
+            logWarn("write to connection(id=%d, fd=%d): %s", _id, _channel->fd(), strerrno());
             if (errno == ECONNRESET || errno == EPIPE) {
                 forceCloseConnection();
                 return;

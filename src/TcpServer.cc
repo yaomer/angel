@@ -16,7 +16,6 @@ TcpServer::TcpServer(EventLoop *loop, InetAddr listenAddr)
     _connId(1), // 预留下0，可能会用到
     _ttl(0)    // 默认禁用TTL
 {
-    logInfo("started a server [%s:%d]", listenAddr.toIpAddr(), listenAddr.toIpPort());
     _acceptor->setNewConnectionCb([this](int fd){
             this->newConnection(fd);
             });
@@ -85,6 +84,5 @@ void TcpServer::start()
 
 void TcpServer::quit()
 {
-    logInfo("server [%s:%d] is ready to exit", _listenAddr->toIpAddr(), _listenAddr->toIpPort());
     _loop->quit();
 }

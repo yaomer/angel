@@ -36,7 +36,7 @@ Signaler::Signaler(EventLoop *loop)
 
 void Signaler::start()
 {
-    logInfo("Signaler is running");
+    logDebug("Signaler is running");
     _loop->addChannel(_sigChannel);
 }
 
@@ -71,10 +71,10 @@ void Signaler::addInLoop(int signo, const SignalerCallback _cb)
     if (_cb) {
         sa.sa_handler = &sigHandler;
         _sigCallbackMaps.emplace(signo, std::move(_cb));
-        logInfo("set sigHandler for Sig[%d]", signo);
+        logDebug("set sigHandler for Sig[%d]", signo);
     } else {
         sa.sa_handler = SIG_IGN;
-        logInfo("ignore the Sig[%d]", signo);
+        logDebug("ignore the Sig[%d]", signo);
     }
     // 重启被信号中断的Syscall
     sa.sa_flags |= SA_RESTART;
@@ -96,7 +96,7 @@ void Signaler::cancelInLoop(int signo)
     if (sigaction(signo, &sa, nullptr) < 0) {
         logError("sigaction: %s", strerrno());
     } else {
-        logInfo("restores the default semantics of the Sig[%d]", signo);
+        logDebug("restores the default semantics of the Sig[%d]", signo);
     }
 }
 
