@@ -11,7 +11,7 @@ namespace Angel {
     // 默认打印所有级别的日志
     int __loggerLevel = Logger::DEBUG;
 
-    const char *levelStr[Logger::LEVEL_NUMS] = {
+    const char *levelStr[] = {
         "DEBUG: ",
         "INFO:  ",
         "WARN:  ",

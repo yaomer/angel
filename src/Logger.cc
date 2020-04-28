@@ -60,7 +60,7 @@ void Logger::creatFile()
         logWarn("can't open %s: %s, now write to stdout",
                 _filename.c_str(), strerrno());
         _logFlush = FLUSH_TO_STDOUT;
-        _fd = _logFlush;
+        _fd = STDOUT_FILENO;
         return;
     }
     _filesize = 0;

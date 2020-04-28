@@ -29,7 +29,6 @@ public:
         WARN,
         ERROR,
         FATAL,
-        LEVEL_NUMS,
     };
     void writeToBuffer(const char *s, size_t len);
     void wakeup();
