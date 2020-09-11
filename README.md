@@ -1,26 +1,5 @@
-### 什么是Angel 
+### 介绍 
 Angel是一个C++11风格的适用于Linux和Mac OS平台的多线程网络库。
-
-### 为什么要选择Angel 
-+ **支持多种网络模型，可在程序中动态配置**
-    + 单线程Reactor，接收和处理连接都在主线程
-    + 单线程Reactor + 线程池，对于耗时任务可以开启一个任务线程池去处理
-    + 多线程Reactor，主从Reactor架构，主线程负责接收新连接，然后分发给一个I/O线程池中的线程
-    + 多线程Reactor + 线程池，上面两种模型的结合
-+ **提供了一个高效易用的定时器**
-    + 利用I/O多路复用的超时参数，通过红黑树管理注册的超时事件，我们实现了一个高效的定时器，并且提供了非常便于使用的接口。而且它与其他模块没有依赖，你可以很容易将它嵌入到你的项目中。
-+ **支持信号处理**
-    + 我们将信号处理也统一到了I/O多路复用之中，可以很方便的处理你想处理的信号，包括注册对应信号的handler和动态取消注册的handler。
-+ **提供了一个高性能异步日志模块**
-    + 我们提供了不同的记录等级（DEBUG、INFO、WARN、ERROR），并且支持日志等级过滤。因为采用了前后端分离的架构，所以前端可以无阻塞的大量写入日志，而后端通过利用双缓冲机制最大限度的减少持有锁的时间，保证了前端的低延迟。日志模块也是独立的，可以很容易分离出来。
-+ **支持客户端超时处理**
-    + 用户可以为空闲连接设置一个最大存活时间，服务器在超时后会自动踢掉该连接。
-+ **支持多种I/O多路复用机制**
-    + 支持select、poll、epoll以及kqueue。在编译时Angel会根据系统选择最高效的多路复用机制，当然也可以手工选择想要的多路复用机制。
-+ **使用方便，可以快速编写TCP网络程序的服务器和客户端**
-    + 通过使用我们提供的TcpServer和TcpClient两个类，用户只需要填上对应的消息回调就可实现不同的服务器程序和客户端。
-+ **高性能，且没有额外依赖**
-    + Angel完全是自包含的，无需安装任何外部依赖库。
 
 ### 安装
 你可以通过以下命令来完成Angel的安装：
@@ -30,30 +9,27 @@ $ git clone https://github.com/yaomer/Angel
 在正式编译之前，你需要检查你的CMake和编译器的版本是否满足要求：
 ```
 CMake >= 3.1
-gcc >= 7.0 / clang >= 4.0
-```
+gcc >= 7.0 / clang >= 4.0 ```
 然后进入到你安装的Angel的主目录中，运行build.sh即可完成编译，注意该脚本需要将生成的静态库libangel.a和头文件写入到系统目录，所以可能需要root权限。
 
 ### 用法
-下面程序示例都需要包含以下头文件：
+下面程序示例需要包含以下头文件：
 ```cpp
-#include <Angel/EventLoop.h>
-#include <Angel/TcpServer.h>
-#include <Angel/TcpClient.h>
-#include <Angel/EventLoopThread.h>
-#include <Angel/LogStream.h>
+#include <angel/server.h>
+#include <angel/client.h>
+#include <angel/evloop_thread.h>
 #include <iostream>
 ```
 ##### 定时器的使用
 ```cpp
 int main(void)
 {
-    Angel::EventLoop loop;
+    angel::evloop loop;
     // 3s后打印出"hello, world"
-    loop.runAfter(3000, []{ std::cout << "hello, world\n"; });
+    loop.run_after(3000, []{ std::cout << "hello, world\n"; });
     // 一个计数器，每隔1s加1
     int count = 1;
-    loop.runEvery(1000, [&count]() mutable { std::cout << count++ << "\n"; });
+    loop.run_every(1000, [&count]() mutable { std::cout << count++ << "\n"; });
     loop.run();
     return 0;
 }
@@ -62,13 +38,13 @@ int main(void)
 ```cpp
 int main(void)
 {
-    // 信号处理需要EventLoop驱动
-    Angel::EventLoop loop;
+    // 信号处理需要evloop驱动
+    angel::evloop loop;
     // 按两次Ctr+C才可退出程序
-    Angel::addSignal(SIGINT, []{
+    angel::add_signal(SIGINT, []{
             std::cout << "SIGINT is triggered\n";
-            // 恢复信号原语义，使用addSignal(SIGINT, nullptr)可忽略SIGINT信号
-            Angel::cancelSignal(SIGINT);
+            // 恢复信号原语义，使用add_signal(SIGINT, nullptr)可忽略SIGINT信号
+            angel::cancel_signal(SIGINT);
             });
     loop.run();
     return 0;
@@ -78,12 +54,13 @@ int main(void)
 ```cpp
 int main(void)
 {
-    Angel::EventLoop loop;
-    Angel::TcpServer server(&loop, Angel::InetAddr(8888));
+    angel::evloop loop;
+    // 服务器监听端口8888
+    angel::server server(&loop, angel::inet_addr(8888));
     // 当接收到客户端发来的消息时会调用这个函数
-    server.setMessageCb([](const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf){
-            conn->formatSend("hello: %s", buf.c_str());
-            buf.retrieveAll();
+    server.set_message_handler([](const angel::connection_ptr& conn, angel::buffer& buf){
+            conn->format_send("hello: %s", buf.c_str());
+            buf.retrieve_all();
             });
     server.start();
     loop.run();
@@ -94,11 +71,11 @@ int main(void)
 int main(void)
 {
     // loop线程监听服务端的响应
-    Angel::EventLoopThread t_loop;
-    Angel::TcpClient client(t_loop.getLoop(), Angel::InetAddr(8000, "127.0.0.1"));
-    client.setMessageCb([](const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf){
+    angel::evloop_thread t_loop;
+    angel::client client(t_loop.wait_loop(), angel::inet_addr("127.0.0.1", 8888));
+    client.set_message_handler([](const angel::connection_ptr& conn, angel::buffer& buf){
             std::cout << buf.c_str() << std::endl;
-            buf.retrieveAll();
+            buf.retrieve_all();
             });
     client.start();
     // 主线程监听键盘输入
@@ -114,14 +91,14 @@ int main(void)
 ```cpp
 int main(void)
 {
-    Angel::EventLoop loop;
-    Angel::TcpServer server(&loop, Angel::InetAddr(8888));
-    server.setMessageCb([](const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf){
-            conn->formatSend("hello: %s", buf.c_str());
-            buf.retrieveAll();
+    angel::evloop loop;
+    angel::server server(&loop, angel::inet_addr(8888));
+    server.set_message_handler([](const angel::connection_ptr& conn, angel::buffer& buf){
+            conn->format_send("hello: %s", buf.c_str());
+            buf.retrieve_all();
             });
     // 主线程接收新连接，4个io线程处理连接
-    server.setIoThreadNums(4);
+    server.set_io_thread_nums(4);
     server.start();
     loop.run();
     return 0;
@@ -131,17 +108,17 @@ int main(void)
 ```cpp
 int main(void)
 {
-    Angel::EventLoop loop;
-    Angel::TcpServer server(&loop, Angel::InetAddr(8888));
-    server.setMessageCb([&server](const Angel::TcpConnectionPtr& conn, Angel::Buffer& buf){
+    angel::evloop loop;
+    angel::server server(&loop, angel::inet_addr(8888));
+    server.set_message_handler([&server](const angel::connection_ptr& conn, angel::buffer& buf){
             // 这里必须拷贝一份conn，因为离开这个函数后conn就会被析构
             server.executor([conn, &buf]{
-                    conn->formatSend("hello: %s", buf.c_str());
-                    buf.retrieveAll();
+                    conn->format_send("hello: %s", buf.c_str());
+                    buf.retrieve_all();
                     });
             });
     // 开启一个拥有4个线程的任务线程池
-    server.setTaskThreadNums(4);
+    server.set_task_thread_nums(4);
     server.start();
     loop.run();
     return 0;
@@ -152,16 +129,16 @@ int main(void)
 int main(void)
 {
     int ttl = 3000;
-    Angel::EventLoop loop;
-    Angel::TcpServer server(&loop, Angel::InetAddr(8888));
-    server.setConnectionCb([ttl](const Angel::TcpConnectionPtr& conn){
-            conn->formatSend("hello, bye bye in %d s\n", ttl / 1000);
+    angel::evloop loop;
+    angel::server server(&loop, angel::inet_addr(8888));
+    server.set_connection_handler([ttl](const angel::connection_ptr& conn){
+            conn->format_send("hello, bye bye in %d s\n", ttl / 1000);
             });
     // ttl ms后连接关闭时该回调会被触发
-    server.setCloseCb([](const Angel::TcpConnectionPtr& conn){
+    server.set_close_handler([](const angel::connection_ptr& conn){
             conn->send(">bye bye<\n");
             });
-    server.setConnnectionTtl(ttl);
+    server.set_connection_ttl(ttl);
     server.start();
     loop.run();
     return 0;
@@ -172,13 +149,13 @@ int main(void)
 int main(void)
 {
     // 日志默认输出到文件中，存储于当前目录下的.log目录中
-    // FLUSH_TO_STDOUT表示将日志打印到标准输出
-    Angel::setLoggerFlush(Angel::Logger::FLUSH_TO_STDOUT);
-    // 只打印日志级别大于等于WARN的日志，默认打印所有级别日志
-    Angel::setLoggerLevel(Angel::Logger::WARN);
-    logInfo("hello");
-    logWarn("hello");
-    logError("hello");
+    // stdout表示将日志打印到标准输出
+    angel::set_log_flush(angel::logger::flush_flags::stdout);
+    // 只打印日志级别大于等于WARN的日志，默认打印INFO级别日志
+    angel::set_log_level(angel::logger::level::warn);
+    log_info("hello");
+    log_warn("hello");
+    log_error("hello");
     return 0;
 }
 ```
