@@ -9,7 +9,8 @@ $ git clone https://github.com/yaomer/Angel
 在正式编译之前，你需要检查你的CMake和编译器的版本是否满足要求：
 ```
 CMake >= 3.1
-gcc >= 7.0 / clang >= 4.0 ```
+gcc >= 7.0 / clang >= 4.0
+```
 然后进入到你安装的Angel的主目录中，运行build.sh即可完成编译，注意该脚本需要将生成的静态库libangel.a和头文件写入到系统目录，所以可能需要root权限。
 
 ### 用法
@@ -31,7 +32,6 @@ int main(void)
     int count = 1;
     loop.run_every(1000, [&count]() mutable { std::cout << count++ << "\n"; });
     loop.run();
-    return 0;
 }
 ```
 ##### 信号处理
@@ -47,7 +47,6 @@ int main(void)
             angel::cancel_signal(SIGINT);
             });
     loop.run();
-    return 0;
 }
 ```
 ##### 一个简单的Echo服务器与客户端
@@ -64,7 +63,6 @@ int main(void)
             });
     server.start();
     loop.run();
-    return 0;
 }
 ```
 ```cpp
@@ -84,7 +82,6 @@ int main(void)
         buf[strlen(buf) - 1] = '\0';
         client.conn()->send(buf);
     }
-    return 0;
 }
 ```
 ##### 将服务器多线程化
@@ -101,7 +98,6 @@ int main(void)
     server.set_io_thread_nums(4);
     server.start();
     loop.run();
-    return 0;
 }
 ```
 ##### 使用一个线程池处理任务
@@ -121,7 +117,6 @@ int main(void)
     server.set_task_thread_nums(4);
     server.start();
     loop.run();
-    return 0;
 }
 ```
 ##### 踢掉空闲连接
@@ -141,7 +136,6 @@ int main(void)
     server.set_connection_ttl(ttl);
     server.start();
     loop.run();
-    return 0;
 }
 ```
 ##### 日志记录与控制
@@ -156,7 +150,6 @@ int main(void)
     log_info("hello");
     log_warn("hello");
     log_error("hello");
-    return 0;
 }
 ```
 ### 性能测试
