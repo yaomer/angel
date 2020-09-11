@@ -1,6 +1,6 @@
-#cmakedefine _ANGEL_HAVE_POLL
-#cmakedefine _ANGEL_HAVE_EPOLL
-#cmakedefine _ANGEL_HAVE_KQUEUE
-#cmakedefine _ANGEL_HAVE_SELECT
-#cmakedefine _ANGEL_HAVE_TCP_KEEPALIVE
-#cmakedefine _ANGEL_HAVE_SO_KEEPALIVE
+#cmakedefine ANGEL_HAVE_POLL
+#cmakedefine ANGEL_HAVE_EPOLL
+#cmakedefine ANGEL_HAVE_KQUEUE
+#cmakedefine ANGEL_HAVE_SELECT
+#cmakedefine ANGEL_HAVE_TCP_KEEPALIVE
+#cmakedefine ANGEL_HAVE_SO_KEEPALIVE
