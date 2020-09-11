@@ -34,11 +34,6 @@ public:
     { _timer_cb = std::move(cb); }
     bool is_canceled() const { return _is_canceled; }
     void cancel() { _is_canceled = true; }
-
-    bool operator()(const std::shared_ptr<timer_task_t>& other) const
-    {
-        return this->expire() < other->expire();
-    }
 private:
     size_t _id;
     // 定时器的到期时间
@@ -47,6 +42,14 @@ private:
     int64_t _interval;
     timer_callback_t _timer_cb;
     bool _is_canceled;
+};
+
+struct timer_task_cmp {
+    bool operator()(const std::shared_ptr<timer_task_t>& lhs,
+                    const std::shared_ptr<timer_task_t>& rhs) const
+    {
+        return lhs->expire() < rhs->expire();
+    }
 };
 
 class evloop;
@@ -101,7 +104,7 @@ private:
 
     evloop *loop;
     // TimerTask中的expire可能会有重复
-    std::multiset<std::shared_ptr<timer_task_t>> timer_set;
+    std::multiset<std::shared_ptr<timer_task_t>, timer_task_cmp> timer_set;
     std::unordered_map<size_t, std::shared_ptr<timer_task_t>> timer_map;
     // 唯一标识一个定时器，是全局递增的
     size_t timer_id;

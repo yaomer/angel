@@ -75,7 +75,7 @@ void timer_t::tick()
         auto task = *timer_set.begin();
         if (task->expire() > now) break;
         task->timer_cb()();
-        // task can be canceled in timerCb()
+        // task can be canceled in timer_cb()
         if (!task->is_canceled()) {
             update_timer(now);
         }

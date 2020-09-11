@@ -55,6 +55,9 @@ private:
             condvar.notify_one();
         }
         loop->run();
+        // loop不置空，当从thread_func()退出后就会成为悬挂指针
+        // 之后如果再调用quit()就会导致段错误
+        loop = nullptr;
     }
 
     evloop *loop;

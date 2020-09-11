@@ -97,7 +97,7 @@ public:
 
     static void daemon();
 
-    void set_connnection_ttl(int64_t ms) { ttl_ms = ms; }
+    void set_connection_ttl(int64_t ms) { ttl_ms = ms; }
     void set_cpu_affinity(bool on) { is_set_cpu_affinity = on; }
     void start_keepalive(bool on) { is_set_keepalive = on; }
     void start_nodelay(bool on) { is_set_nodelay = on; }
