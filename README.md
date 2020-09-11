@@ -80,7 +80,12 @@ int main(void)
     char buf[1024];
     while (::fgets(buf, sizeof(buf), stdin)) {
         buf[strlen(buf) - 1] = '\0';
-        client.conn()->send(buf);
+        if (client.is_connected()) {
+            client.conn()->send(buf);
+        } else {
+            std::cout << "disconnect with server\n";
+            break;
+        }
     }
 }
 ```
