@@ -63,11 +63,9 @@ public:
     void set_io_thread_nums(size_t thread_nums = 0)
     {
         if (thread_nums > 0)
-            io_thread_pool.reset(
-                    new evloop_thread_pool(thread_nums, is_set_cpu_affinity));
+            io_thread_pool.reset(new evloop_thread_pool(thread_nums));
         else
-            io_thread_pool.reset(
-                    new evloop_thread_pool(is_set_cpu_affinity));
+            io_thread_pool.reset(new evloop_thread_pool());
     }
     void set_task_thread_nums(size_t thread_nums = 0)
     {
@@ -98,9 +96,6 @@ public:
     static void daemon();
 
     void set_connection_ttl(int64_t ms) { ttl_ms = ms; }
-    void set_cpu_affinity(bool on) { is_set_cpu_affinity = on; }
-    void start_keepalive(bool on) { is_set_keepalive = on; }
-    void start_nodelay(bool on) { is_set_nodelay = on; }
 
     void set_connection_handler(const connection_handler_t handler)
     { connection_handler = std::move(handler); }
@@ -136,9 +131,7 @@ private:
     high_water_mark_handler_t high_water_mark_handler;
     signaler_handler_t exit_handler;
     size_t high_water_mark;
-    bool is_set_cpu_affinity;
-    bool is_set_keepalive;
-    bool is_set_nodelay;
+    // bool is_set_cpu_affinity;
 };
 
 }

@@ -10,13 +10,10 @@ server::server(evloop *loop, inet_addr listen_addr)
     listener(new listener_t(loop, listen_addr)),
     conn_id(1),
     ttl_ms(0),
-    high_water_mark(0),
-    is_set_cpu_affinity(false),
-    is_set_keepalive(false),
-    is_set_nodelay(false)
+    high_water_mark(0)
 {
-    if (is_set_cpu_affinity)
-        util::set_thread_affinity(pthread_self(), 0);
+    // if (is_set_cpu_affinity)
+        // util::set_thread_affinity(pthread_self(), 0);
 }
 
 evloop *server::get_next_loop()

@@ -21,6 +21,8 @@ void listener_t::listen()
 {
     int fd = listen_socket.fd();
     sockops::set_reuseaddr(fd, true);
+    sockops::set_nodelay(fd, true);
+    sockops::set_keepalive(fd, true);
     sockops::set_nonblock(fd);
     sockops::bind(fd, &listen_addr.addr());
     sockops::listen(fd);
