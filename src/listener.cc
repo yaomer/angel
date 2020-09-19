@@ -8,11 +8,13 @@
 
 using namespace angel;
 
-listener_t::listener_t(evloop *loop, inet_addr listen_addr)
+listener_t::listener_t(evloop *loop, inet_addr listen_addr,
+                       const new_connection_handler_t handler)
     : loop(loop),
     listen_channel(new channel(loop)),
     listen_socket(sockops::socket()),
     listen_addr(listen_addr),
+    new_connection_handler(handler),
     idle_fd(::open("/dev/null", O_RDONLY | O_CLOEXEC))
 {
 }
@@ -29,7 +31,6 @@ void listener_t::listen()
     listen_channel->set_fd(fd);
     listen_channel->set_read_handler([this]{ this->handle_accept(); });
     loop->add_channel(listen_channel);
-    log_debug("listen port is %d",  listen_addr.to_host_port());
 }
 
 void listener_t::handle_accept()
@@ -54,10 +55,7 @@ void listener_t::handle_accept()
         }
         return;
     }
-    log_info("accept a new connection, fd = %d", connfd);
+    log_info("accept a new connection(fd=%d)", connfd);
     sockops::set_nonblock(connfd);
-    if (new_connection_handler)
-        new_connection_handler(connfd);
-    else
-        ::close(connfd);
+    new_connection_handler(connfd);
 }

@@ -5,7 +5,8 @@ using namespace angel;
 
 client::client(evloop *loop, inet_addr peer_addr)
     : loop(loop),
-    connector(new connector_t(loop, peer_addr)),
+    connector(new connector_t(
+                loop, peer_addr, [this](int fd){ this->new_connection(fd); })),
     flag(flags::exit_loop),
     high_water_mark(0)
 {
@@ -34,9 +35,6 @@ void client::new_connection(int fd)
 
 void client::start()
 {
-    connector->set_new_connection_handler([this](int fd){
-            this->new_connection(fd);
-            });
     connector->connect();
 }
 
@@ -44,9 +42,11 @@ void client::close_connection(const connection_ptr& conn)
 {
     if (is_enum_true(flag & flags::disconnect))
         return;
-    if (close_handler) close_handler(conn);
-    conn->set_state(connection::state::closed);
-    loop->remove_channel(conn->get_channel());
+    if (is_connected()) {
+        if (close_handler) close_handler(conn);
+        conn->set_state(connection::state::closed);
+        loop->remove_channel(conn->get_channel());
+    }
     cli_conn.reset();
     if (is_enum_true(flag & flags::exit_loop))
         loop->quit();

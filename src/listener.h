@@ -17,13 +17,11 @@ class evloop;
 class listener_t : noncopyable {
 public:
     typedef std::function<void(int)> new_connection_handler_t;
-    listener_t(evloop *, inet_addr);
+    listener_t(evloop *, inet_addr, const new_connection_handler_t);
     ~listener_t() {  }
     void listen();
     int fd() const { return listen_socket.fd(); }
     inet_addr& addr() { return listen_addr; }
-    void set_new_connection_handler(const new_connection_handler_t handler)
-    { new_connection_handler = std::move(handler); }
 private:
     void handle_accept();
 

@@ -7,7 +7,8 @@ using namespace angel;
 
 server::server(evloop *loop, inet_addr listen_addr)
     : loop(loop),
-    listener(new listener_t(loop, listen_addr)),
+    listener(new listener_t(
+                loop, listen_addr, [this](int fd){ this->new_connection(fd); })),
     conn_id(1),
     ttl_ms(0),
     high_water_mark(0)
@@ -84,9 +85,6 @@ void server::start()
     add_signal(SIGPIPE, nullptr);
     add_signal(SIGINT, [this]{ this->clean_up(); });
     add_signal(SIGTERM, [this]{ this->clean_up(); });
-    listener->set_new_connection_handler([this](int fd){
-            this->new_connection(fd);
-            });
     listener->listen();
 }
 
