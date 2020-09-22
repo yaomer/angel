@@ -4,7 +4,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <string.h>
+
+#include <string>
 
 #include "sockops.h"
 #include "util.h"
@@ -19,19 +20,18 @@ public:
     {
         fill("0.0.0.0", port);
     }
-    inet_addr(const char *ip, int port)
+    inet_addr(const std::string& ip, int port)
     {
         fill(ip, port);
     }
-    explicit inet_addr(const char *host)
+    explicit inet_addr(const std::string& host)
     {
         std::string ip, port;
-        const char *end = host + std::strlen(host);
-        auto p = std::find(host, end, ':');
-        if (p == end) log_fatal("%s error", host);
-        ip.assign(host, p);
-        port.assign(p + 1, end);
-        fill(ip.c_str(), ::atoi(port.c_str()));
+        auto p = std::find(host.begin(), host.end(), ':');
+        if (p == host.end()) log_fatal("%s error", host.c_str());
+        ip.assign(host.begin(), p);
+        port.assign(p + 1, host.end());
+        fill(ip, atoi(port.c_str()));
     }
     inet_addr(const struct sockaddr_in& addr)
     {
@@ -62,12 +62,12 @@ private:
     {
         bzero(&sockaddr, sizeof(sockaddr));
     }
-    void fill(const char *ip, int port)
+    void fill(const std::string& ip, int port)
     {
         clear();
         sockaddr.sin_family = AF_INET;
         sockaddr.sin_port = htons(port);
-        if (inet_pton(AF_INET, ip, &sockaddr.sin_addr) <= 0)
+        if (inet_pton(AF_INET, ip.c_str(), &sockaddr.sin_addr) <= 0)
             log_fatal("inet_pton: %s", util::strerrno());
     }
 

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <string>
 
 #include <sys/uio.h>
 
@@ -60,15 +61,9 @@ public:
         std::swap(read_index, other.read_index);
         std::swap(write_index, other.write_index);
     }
-    bool strcmp(const char *s)
+    bool starts_with(const std::string& s)
     {
-        size_t len = strlen(s);
-        return readable() >= len && strncmp(peek(), s, len) == 0;
-    }
-    bool strcasecmp(const char *s)
-    {
-        size_t len = strlen(s);
-        return readable() >= len && strncasecmp(peek(), s, len) == 0;
+        return readable() >= s.size() && memcmp(peek(), s.data(), s.size()) == 0;
     }
     char& operator[](size_t idx)
     {
