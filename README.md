@@ -157,6 +157,10 @@ int main(void)
     log_error("hello");
 }
 ```
+##### 更多示例
+- 一些简单的[例子](https://github.com/yaomer/Angel/tree/master/examples)
+- 一个更有意义的例子[alice](https://github.com/yaomer/Alice)
+
 ### 性能测试
 使用示例中简陋的[HTTP服务器](https://github.com/yaomer/Angel/tree/master/examples/http)与Nginx作简单的性能对比测试
 
