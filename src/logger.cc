@@ -169,13 +169,13 @@ void logger::restart()
 
 namespace angel {
 
-    thread_local const char *log_cur_tid = get_cur_thread_id_str();
-    thread_local size_t log_cur_tid_len = strlen(log_cur_tid);
+    static thread_local std::string log_cur_tid = get_cur_thread_id_str();
+    static thread_local const size_t log_cur_tid_len = strlen(log_cur_tid.c_str());
 
-    thread_local char log_time_buf[32];
-    thread_local time_t log_last_second = 0;
+    static thread_local char log_time_buf[32];
+    static thread_local time_t log_last_second = 0;
 
-    thread_local char log_output_buf[65536];
+    static thread_local char log_output_buf[65536];
 }
 
 const char *logger::format_time()
@@ -247,7 +247,7 @@ void logger::format(level level, const char *file, int line,
     ptr += strlen(ptr);
     memcpy(ptr, " - ", 3);
     ptr += 3;
-    memcpy(ptr, log_cur_tid, log_cur_tid_len);
+    memcpy(ptr, log_cur_tid.data(), log_cur_tid_len);
     ptr += log_cur_tid_len;
     *ptr++ = '\n';
     *ptr = '\0';

@@ -98,9 +98,11 @@ int sockops::to_host_port(in_port_t port)
 }
 
 namespace angel {
+    namespace sockops {
 
-    thread_local char sockops_ipaddr[32];
-    thread_local char sockops_host[48];
+        static thread_local char sockops_ipaddr[32];
+        static thread_local char sockops_host[48];
+    }
 }
 
 const char *sockops::to_host_ip(const struct in_addr *addr)

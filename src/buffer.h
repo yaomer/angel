@@ -75,10 +75,10 @@ private:
     {
         if (len > writeable()) {
             if (len <= writeable() + prependable()) {
-                size_t readBytes = readable();
-                std::copy(peek(), peek() + readBytes, begin());
+                size_t read_bytes = readable();
+                std::copy(peek(), peek() + read_bytes, begin());
                 read_index = 0;
-                write_index = read_index + readBytes;
+                write_index = read_index + read_bytes;
             } else
                 buf.resize(write_index + len);
         }

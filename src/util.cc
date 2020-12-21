@@ -14,9 +14,10 @@
 using namespace angel;
 
 namespace angel {
+    namespace util {
 
-    thread_local char errno_buf[256];
-    thread_local char thread_id_buf[32];
+        static thread_local char errno_buf[256];
+    }
 }
 
 // 线程安全的strerror
@@ -36,12 +37,11 @@ size_t util::get_cur_thread_id()
     return std::hash<std::thread::id>()(std::this_thread::get_id());
 }
 
-const char *util::get_cur_thread_id_str()
+std::string util::get_cur_thread_id_str()
 {
     std::ostringstream oss;
     oss << std::this_thread::get_id();
-    strncpy(thread_id_buf, oss.str().c_str(), sizeof(thread_id_buf));
-    return thread_id_buf;
+    return oss.str();
 }
 
 int64_t util::get_cur_time_ms()

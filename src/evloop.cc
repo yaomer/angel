@@ -22,7 +22,7 @@ using namespace angel::util;
 
 namespace angel {
 
-    thread_local evloop *this_thread_loop = nullptr;
+    static thread_local evloop *this_thread_loop = nullptr;
 }
 
 evloop::evloop()

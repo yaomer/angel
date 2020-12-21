@@ -11,7 +11,7 @@ const char *strerrno();
 const char *strerr(int err);
 
 size_t get_cur_thread_id();
-const char *get_cur_thread_id_str();
+std::string get_cur_thread_id_str();
 
 int64_t get_cur_time_ms();
 int64_t get_cur_time_us();

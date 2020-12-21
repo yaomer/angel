@@ -196,7 +196,7 @@ void connection::send(const void *v, size_t len)
 
 namespace angel {
 
-    thread_local char conn_format_send_buf[65536];
+    static thread_local char conn_format_send_buf[65536];
 }
 
 void connection::format_send(const char *fmt, ...)
