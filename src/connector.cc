@@ -9,7 +9,8 @@
 using namespace angel;
 
 connector_t::connector_t(evloop *loop, inet_addr peer_addr,
-                         const new_connection_handler_t handler)
+                         const new_connection_handler_t handler,
+                         int64_t retry_interval_ms)
     : loop(loop),
     peer_addr(peer_addr),
     connect_channel(new channel(loop)),
@@ -17,7 +18,8 @@ connector_t::connector_t(evloop *loop, inet_addr peer_addr,
     has_connected(false),
     retry_timer_id(0),
     wait_retry(false),
-    sockfd(-1)
+    sockfd(-1),
+    retry_interval(retry_interval_ms)
 {
 }
 
@@ -82,7 +84,7 @@ void connector_t::check()
     if (wait_retry) return;
     int err = sockops::get_socket_error(sockfd);
     if (err) {
-        log_error("connect(fd=%d): %s, try to reconnect after %d s",
+        log_error("connect(fd=%d): %s, try to reconnect after %d ms",
                   sockfd, util::strerr(err), retry_interval);
         retry();
         return;
@@ -93,7 +95,7 @@ void connector_t::check()
 void connector_t::retry()
 {
     loop->remove_channel(connect_channel);
-    retry_timer_id = loop->run_after(1000 * retry_interval, [this]{ this->connect(); });
+    retry_timer_id = loop->run_after(retry_interval, [this]{ this->connect(); });
     wait_retry = true;
     close(sockfd);
 }

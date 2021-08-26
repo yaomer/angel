@@ -18,12 +18,13 @@ public:
         exit_loop   = 01,
         disconnect  = 02,
     };
-    client(evloop *, inet_addr);
+    client(evloop *, inet_addr, int64_t reconnect_interval_ms = 3000);
     ~client();
     void start();
     const connection_ptr& conn() const { return cli_conn; }
     void not_exit_loop() { flag &= ~flags::exit_loop; };
     bool is_connected() { return connector->is_connected() && cli_conn; }
+    // void set_reconnect_time(int64_t ms) {  }
     void set_connection_handler(const connection_handler_t handler)
     { connection_handler = std::move(handler); }
     void set_message_handler(const message_handler_t handler)

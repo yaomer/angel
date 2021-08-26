@@ -3,10 +3,10 @@
 
 using namespace angel;
 
-client::client(evloop *loop, inet_addr peer_addr)
+client::client(evloop *loop, inet_addr peer_addr, int64_t reconnect_interval_ms)
     : loop(loop),
-    connector(new connector_t(
-                loop, peer_addr, [this](int fd){ this->new_connection(fd); })),
+    connector(new connector_t(loop, peer_addr,
+                [this](int fd){ this->new_connection(fd); }, reconnect_interval_ms)),
     flag(flags::exit_loop),
     high_water_mark(0)
 {

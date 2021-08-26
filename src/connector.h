@@ -15,16 +15,13 @@ class evloop;
 class connector_t : noncopyable {
 public:
     typedef std::function<void(int)> new_connection_handler_t;
-    connector_t(evloop *, inet_addr, const new_connection_handler_t);
+    connector_t(evloop *, inet_addr, const new_connection_handler_t, int64_t retry_interval_ms);
     ~connector_t();
     void connect();
     bool is_connected() { return has_connected; }
     int connfd() const { return connect_channel->fd(); }
     inet_addr& addr() { return peer_addr; }
-
 private:
-    static const int retry_interval = 3;
-
     void connecting();
     void connected();
     void check();
@@ -38,6 +35,7 @@ private:
     size_t retry_timer_id;
     bool wait_retry;
     int sockfd;
+    int retry_interval;
 };
 }
 
