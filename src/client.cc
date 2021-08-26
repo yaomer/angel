@@ -3,11 +3,12 @@
 
 using namespace angel;
 
-client::client(evloop *loop, inet_addr peer_addr, int64_t reconnect_interval_ms)
+client::client(evloop *loop, inet_addr peer_addr, bool is_reconnect, int64_t retry_interval_ms)
     : loop(loop),
-    connector(new connector_t(loop, peer_addr,
-                [this](int fd){ this->new_connection(fd); }, reconnect_interval_ms)),
     flag(flags::exit_loop),
+    peer_addr(peer_addr),
+    is_reconnect(is_reconnect),
+    retry_interval_ms(retry_interval_ms),
     high_water_mark(0)
 {
 }
@@ -27,6 +28,10 @@ void client::new_connection(int fd)
     cli_conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     cli_conn->set_close_handler([this](const connection_ptr& conn){
             this->close_connection(conn);
+            if (this->is_reconnect) {
+                flag &= ~flags::disconnect;
+                this->start();
+            }
             });
     loop->run_in_loop([conn = cli_conn]{
             conn->establish();
@@ -35,6 +40,8 @@ void client::new_connection(int fd)
 
 void client::start()
 {
+    auto handler = [this](int fd){ this->new_connection(fd); };
+    connector.reset(new connector_t(loop, peer_addr, handler, retry_interval_ms));
     connector->connect();
 }
 
