@@ -45,6 +45,14 @@ void client::start()
     connector->connect();
 }
 
+void client::restart(inet_addr peer_addr)
+{
+    this->peer_addr = peer_addr;
+    close_connection(cli_conn);
+    flag &= ~flags::disconnect;
+    start();
+}
+
 void client::close_connection(const connection_ptr& conn)
 {
     if (is_enum_true(flag & flags::disconnect))

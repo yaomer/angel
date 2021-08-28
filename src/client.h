@@ -18,9 +18,12 @@ public:
         exit_loop   = 01,
         disconnect  = 02,
     };
+    // is_reconnect: 与对端断开连接后是否尝试重连
+    // retry_interval_ms: connect()调用失败后的重试间隔时间
     client(evloop *, inet_addr, bool is_reconnect = false, int64_t retry_interval_ms = 3000);
     ~client();
     void start();
+    void restart(inet_addr);
     const connection_ptr& conn() const { return cli_conn; }
     void not_exit_loop() { flag &= ~flags::exit_loop; };
     bool is_connected() { return connector->is_connected() && cli_conn; }
