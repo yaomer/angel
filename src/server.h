@@ -80,7 +80,7 @@ public:
     void executor(const task_callback_t task)
     {
         if (!task_thread_pool) {
-            log_warn("task_thread_pool is null");
+            log_error("task_thread_pool is null");
             return;
         }
         task_thread_pool->executor(task);

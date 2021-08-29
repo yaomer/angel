@@ -5,9 +5,9 @@ using namespace angel;
 
 client::client(evloop *loop, inet_addr peer_addr, bool is_reconnect, int64_t retry_interval_ms)
     : loop(loop),
-    flag(flags::exit_loop),
     peer_addr(peer_addr),
     is_reconnect(is_reconnect),
+    is_exit_loop(true),
     retry_interval_ms(retry_interval_ms),
     high_water_mark(0)
 {
@@ -28,10 +28,7 @@ void client::new_connection(int fd)
     cli_conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     cli_conn->set_close_handler([this](const connection_ptr& conn){
             this->close_connection(conn);
-            if (this->is_reconnect) {
-                flag &= ~flags::disconnect;
-                this->start();
-            }
+            if (this->is_reconnect) this->start();
             });
     loop->run_in_loop([conn = cli_conn]{
             conn->establish();
@@ -49,21 +46,16 @@ void client::restart(inet_addr peer_addr)
 {
     this->peer_addr = peer_addr;
     close_connection(cli_conn);
-    flag &= ~flags::disconnect;
     start();
 }
 
 void client::close_connection(const connection_ptr& conn)
 {
-    if (is_enum_true(flag & flags::disconnect))
-        return;
-    if (is_connected()) {
-        if (close_handler) close_handler(conn);
-        conn->set_state(connection::state::closed);
-        loop->remove_channel(conn->get_channel());
-    }
+    if (!conn) return;
+    if (conn->is_closed()) return;
+    if (close_handler) close_handler(conn);
+    conn->set_state(connection::state::closed);
+    loop->remove_channel(conn->get_channel());
     cli_conn.reset();
-    if (is_enum_true(flag & flags::exit_loop))
-        loop->quit();
-    flag |= flags::disconnect;
+    if (is_exit_loop) loop->quit();
 }
