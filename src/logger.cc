@@ -57,7 +57,7 @@ std::string logger::get_filename()
     time_t seconds = get_cur_time_ms() / 1000;
 
     gmtime_r(&seconds, &tm);
-    tm.tm_hour += TIME_ZONE_OFF;
+    tm.tm_hour = (tm.tm_hour + TIME_ZONE_OFF) % 24;
 
     char buf[32] = { 0 };
     snprintf(buf, sizeof(buf), "%4d-%02d-%02d-%02d:%02d:%02d",
@@ -186,7 +186,7 @@ const char *logger::format_time()
 
     if (seconds != log_last_second) {
         gmtime_r(&seconds, &tm);
-        tm.tm_hour += TIME_ZONE_OFF;
+        tm.tm_hour = (tm.tm_hour + TIME_ZONE_OFF) % 24;
         snprintf(log_time_buf, sizeof(log_time_buf),
                 "%4d-%02d-%02d %02d:%02d:%02d.%03lld",
                 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
