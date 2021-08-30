@@ -53,9 +53,9 @@ void client::close_connection(const connection_ptr& conn)
 {
     if (!conn) return;
     if (conn->is_closed()) return;
-    if (close_handler) close_handler(conn);
     conn->set_state(connection::state::closed);
     loop->remove_channel(conn->get_channel());
+    if (close_handler) close_handler(conn);
     cli_conn.reset();
     if (is_exit_loop) loop->quit();
 }

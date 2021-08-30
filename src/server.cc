@@ -48,9 +48,9 @@ void server::remove_connection(const connection_ptr& conn)
     // 而conn->send()中会更新连接的ttl timer，从而会导致conn的生命期被延长，
     // 即再经过ttl时间后才会被关闭
     conn->set_ttl(0, 0);
-    if (close_handler) close_handler(conn);
     conn->set_state(connection::state::closed);
     conn->get_loop()->remove_channel(conn->get_channel());
+    if (close_handler) close_handler(conn);
     // 必须在主线程的evloop中移除一个连接，否则多个线程就有可能并发
     // 修改connection_map
     // 例如，主线程接收到一个新连接，之后调用new_connection将它添加到
