@@ -34,17 +34,16 @@ public:
     {
         log_level = level;
     }
-    void set_flush(flush_flags flag)
+    void set_flush(flush_flags where)
     {
-        flush_to = flag;
+        flush_to = where;
         restart();
     }
     bool is_filter(level level)
     {
         return level < log_level;
     }
-    void format(level level, const char *file, int line,
-            const char *func, const char *fmt, ...);
+    void format(level level, const char *file, int line, const char *fmt, ...);
     void restart();
     void quit();
 private:
@@ -81,24 +80,24 @@ extern angel::logger __logger;
 void set_log_dir(std::string dir);
 void set_log_name(std::string name);
 void set_log_level(logger::level level);
-void set_log_flush(logger::flush_flags flag);
+void set_log_flush(logger::flush_flags where);
 
 }
 
 #define log_debug(...) \
     if (!angel::__logger.is_filter(angel::logger::level::debug)) \
-        angel::__logger.format(angel::logger::level::debug, __FILE__, __LINE__, __func__, __VA_ARGS__)
+        angel::__logger.format(angel::logger::level::debug, __FILE__, __LINE__, __VA_ARGS__)
 #define log_info(...) \
     if (!angel::__logger.is_filter(angel::logger::level::info)) \
-        angel::__logger.format(angel::logger::level::info, __FILE__, __LINE__, __func__, __VA_ARGS__)
+        angel::__logger.format(angel::logger::level::info, __FILE__, __LINE__, __VA_ARGS__)
 #define log_warn(...) \
     if (!angel::__logger.is_filter(angel::logger::level::warn)) \
-        angel::__logger.format(angel::logger::level::warn, __FILE__, __LINE__, __func__, __VA_ARGS__)
+        angel::__logger.format(angel::logger::level::warn, __FILE__, __LINE__, __VA_ARGS__)
 #define log_error(...) \
     if (!angel::__logger.is_filter(angel::logger::level::error)) \
-        angel::__logger.format(angel::logger::level::error, __FILE__, __LINE__, __func__, __VA_ARGS__)
+        angel::__logger.format(angel::logger::level::error, __FILE__, __LINE__, __VA_ARGS__)
 #define log_fatal(...) \
     if (!angel::__logger.is_filter(angel::logger::level::fatal)) \
-        angel::__logger.format(angel::logger::level::fatal, __FILE__, __LINE__, __func__, __VA_ARGS__)
+        angel::__logger.format(angel::logger::level::fatal, __FILE__, __LINE__, __VA_ARGS__)
 
 #endif // _ANGEL_LOGGER_H

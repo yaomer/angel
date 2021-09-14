@@ -225,8 +225,7 @@ const char *logger::get_level_str(level level)
     }
 }
 
-void logger::format(level level, const char *file, int line,
-        const char *func, const char *fmt, ...)
+void logger::format(level level, const char *file, int line, const char *fmt, ...)
 {
     char *ptr = log_output_buf;
     char *eptr = log_output_buf + sizeof(log_output_buf);
@@ -238,11 +237,6 @@ void logger::format(level level, const char *file, int line,
     memcpy(ptr, format_time(), 23);
     ptr += 23;
     *ptr++ = ' ';
-    len = strlen(func);
-    memcpy(ptr, func, len);
-    ptr += len;
-    memcpy(ptr, ": ", 2);
-    ptr += 2;
     vsnprintf(ptr, eptr - 256 - ptr, fmt, ap);
     va_end(ap);
     ptr += strlen(ptr);
@@ -282,7 +276,7 @@ void angel::set_log_level(logger::level level)
     __logger.set_level(level);
 }
 
-void angel::set_log_flush(logger::flush_flags flag)
+void angel::set_log_flush(logger::flush_flags where)
 {
-    __logger.set_flush(flag);
+    __logger.set_flush(where);
 }
