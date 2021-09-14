@@ -28,7 +28,8 @@ public:
 
     logger();
     ~logger();
-    void set_name(const std::string& name);
+    void set_dir(std::string dir);
+    void set_name(std::string name);
     void set_level(level level)
     {
         log_level = level;
@@ -48,8 +49,8 @@ public:
     void quit();
 private:
     void thread_func();
-    std::string get_new_filename();
-    void create_new_file(const std::string& filename);
+    std::string get_new_file();
+    void create_new_file();
     void roll_file();
     void set_flush();
     void flush();
@@ -65,6 +66,7 @@ private:
     std::condition_variable condvar;
     std::atomic_bool is_quit;
     int cur_fd;
+    std::string dir;
     std::string filename;
     size_t cur_file_size;
     flush_flags flush_to;
@@ -76,7 +78,8 @@ private:
 
 extern angel::logger __logger;
 
-void set_log_name(const std::string& name);
+void set_log_dir(std::string dir);
+void set_log_name(std::string name);
 void set_log_level(logger::level level);
 void set_log_flush(logger::flush_flags flag);
 

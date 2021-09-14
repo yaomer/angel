@@ -32,6 +32,7 @@ logger::logger()
     : cur_thread(std::thread([this]{ this->thread_func(); })),
     is_quit(false),
     cur_fd(-1),
+    dir(".log/"),
     cur_file_size(0),
     flush_to(flush_flags::file),
     log_level(level::info),
@@ -49,17 +50,23 @@ logger::~logger()
     quit();
 }
 
-void logger::set_name(const std::string& name)
+void logger::set_dir(std::string dir)
 {
-    this->name = name;
-    if (filename != "") {
-        auto newfile = get_new_filename();
-        rename(filename.c_str(), newfile.c_str());
-        create_new_file(newfile);
+    if (dir != this->dir) {
+        if (mkdir(dir.c_str(), 0777) < 0 && errno != EEXIST)
+            log_fatal("mkdir(%s) error: %s", dir.c_str(), strerrno());
+        if (dir.back() != '/') dir.push_back('/');
+        this->dir = dir;
     }
 }
 
-std::string logger::get_new_filename()
+void logger::set_name(std::string name)
+{
+    this->name = name;
+    if (filename != "") create_new_file();
+}
+
+std::string logger::get_new_file()
 {
     struct tm tm;
     time_t seconds = get_cur_time_ms() / 1000;
@@ -71,23 +78,20 @@ std::string logger::get_new_filename()
             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
             tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-    std::string filename(".log/");
-    if (name != "") filename += name + "-";
-    filename += buf;
-    filename += ".log";
+    std::string newfile(dir);
+    if (name != "") newfile += name + "-";
+    newfile += buf;
+    newfile += ".log";
 
-    return filename;
+    return newfile;
 }
 
-void logger::create_new_file(const std::string& filename)
+void logger::create_new_file()
 {
-    this->filename = filename;
+    filename = get_new_file();
     cur_fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0664);
     if (cur_fd < 0) {
-        log_warn("can't open %s: %s, now write to stdout", filename.c_str(), strerrno());
-        flush_to = flush_flags::stdout;
-        cur_fd = STDOUT_FILENO;
-        return;
+        log_fatal("open(%s) error: %s", filename.c_str(), strerrno());
     }
     cur_file_size = 0;
 }
@@ -95,8 +99,8 @@ void logger::create_new_file(const std::string& filename)
 void logger::roll_file()
 {
     if (cur_file_size >= log_roll_file_size) {
-        ::close(cur_fd);
-        create_new_file(get_new_filename());
+        close(cur_fd);
+        create_new_file();
     }
 }
 
@@ -104,9 +108,10 @@ void logger::set_flush()
 {
     switch (flush_to) {
     case flush_flags::file:
-        create_new_file(get_new_filename());
+        create_new_file();
         break;
     case flush_flags::stdout:
+        if (cur_fd > 0) close(cur_fd);
         cur_fd = STDOUT_FILENO;
         break;
     }
@@ -262,7 +267,12 @@ void logger::format(level level, const char *file, int line,
     }
 }
 
-void angel::set_log_name(const std::string& name)
+void angel::set_log_dir(std::string dir)
+{
+    __logger.set_dir(dir);
+}
+
+void angel::set_log_name(std::string name)
 {
     __logger.set_name(name);
 }
