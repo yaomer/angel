@@ -49,7 +49,17 @@ logger::~logger()
     quit();
 }
 
-std::string logger::get_filename()
+void logger::set_name(const std::string& name)
+{
+    this->name = name;
+    if (filename != "") {
+        auto newfile = get_new_filename();
+        rename(filename.c_str(), newfile.c_str());
+        create_new_file(newfile);
+    }
+}
+
+std::string logger::get_new_filename()
 {
     struct tm tm;
     time_t seconds = get_cur_time_ms() / 1000;
@@ -62,15 +72,16 @@ std::string logger::get_filename()
             tm.tm_hour, tm.tm_min, tm.tm_sec);
 
     std::string filename(".log/");
+    if (name != "") filename += name + "-";
     filename += buf;
     filename += ".log";
 
     return filename;
 }
 
-void logger::create_new_file()
+void logger::create_new_file(const std::string& filename)
 {
-    filename = get_filename();
+    this->filename = filename;
     cur_fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0664);
     if (cur_fd < 0) {
         log_warn("can't open %s: %s, now write to stdout", filename.c_str(), strerrno());
@@ -85,7 +96,7 @@ void logger::roll_file()
 {
     if (cur_file_size >= log_roll_file_size) {
         ::close(cur_fd);
-        create_new_file();
+        create_new_file(get_new_filename());
     }
 }
 
@@ -93,13 +104,10 @@ void logger::set_flush()
 {
     switch (flush_to) {
     case flush_flags::file:
-        create_new_file();
+        create_new_file(get_new_filename());
         break;
     case flush_flags::stdout:
         cur_fd = STDOUT_FILENO;
-        break;
-    case flush_flags::stderr:
-        cur_fd = STDERR_FILENO;
         break;
     }
 }
@@ -252,6 +260,11 @@ void logger::format(level level, const char *file, int line,
         // raise() will only return after the signal handler has returned
         raise(SIGTERM);
     }
+}
+
+void angel::set_log_name(const std::string& name)
+{
+    __logger.set_name(name);
 }
 
 void angel::set_log_level(logger::level level)

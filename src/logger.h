@@ -17,7 +17,6 @@ public:
     enum class flush_flags {
         file    = 1,
         stdout  = 2,
-        stderr  = 3,
     };
     enum class level {
         debug   = 1,
@@ -29,6 +28,7 @@ public:
 
     logger();
     ~logger();
+    void set_name(const std::string& name);
     void set_level(level level)
     {
         log_level = level;
@@ -48,8 +48,8 @@ public:
     void quit();
 private:
     void thread_func();
-    std::string get_filename();
-    void create_new_file();
+    std::string get_new_filename();
+    void create_new_file(const std::string& filename);
     void roll_file();
     void set_flush();
     void flush();
@@ -57,6 +57,7 @@ private:
     const char *format_time();
     const char *get_level_str(level level);
 
+    std::string name;
     buffer write_buf;
     buffer flush_buf;
     std::thread cur_thread;
@@ -75,6 +76,7 @@ private:
 
 extern angel::logger __logger;
 
+void set_log_name(const std::string& name);
 void set_log_level(logger::level level);
 void set_log_flush(logger::flush_flags flag);
 
