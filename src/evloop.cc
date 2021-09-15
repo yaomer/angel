@@ -105,11 +105,11 @@ void evloop::do_functors()
 {
     std::vector<functor> tfuncs;
     {
-    std::lock_guard<std::mutex> mlock(mutex);
-    if (!functors.empty()) {
-        tfuncs.swap(functors);
-        functors.clear();
-    }
+        std::lock_guard<std::mutex> mlock(mutex);
+        if (!functors.empty()) {
+            tfuncs.swap(functors);
+            functors.clear();
+        }
     }
     for (auto& func : tfuncs)
         func();

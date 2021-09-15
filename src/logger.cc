@@ -111,7 +111,8 @@ void logger::set_flush()
         create_new_file();
         break;
     case flush_flags::stdout:
-        if (cur_fd > 0) close(cur_fd);
+        // we don't close stdin(0), stdout(1), stderr(2)
+        if (cur_fd > 2) close(cur_fd);
         cur_fd = STDOUT_FILENO;
         break;
     }
