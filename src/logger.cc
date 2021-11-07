@@ -12,13 +12,12 @@
 #include "logger.h"
 #include "util.h"
 
-using namespace angel;
-using namespace angel::util;
 
 namespace angel {
 
-    angel::logger __logger;
-}
+using namespace util;
+
+angel::logger __logger;
 
 static void log_term_handler(int signo)
 {
@@ -178,16 +177,13 @@ void logger::restart()
     cur_thread = std::move(new_thread);
 }
 
-namespace angel {
+static thread_local std::string log_cur_tid = get_cur_thread_id_str();
+static thread_local const size_t log_cur_tid_len = strlen(log_cur_tid.c_str());
 
-    static thread_local std::string log_cur_tid = get_cur_thread_id_str();
-    static thread_local const size_t log_cur_tid_len = strlen(log_cur_tid.c_str());
+static thread_local char log_time_buf[32];
+static thread_local time_t log_last_second = 0;
 
-    static thread_local char log_time_buf[32];
-    static thread_local time_t log_last_second = 0;
-
-    static thread_local char log_output_buf[65536];
-}
+static thread_local char log_output_buf[65536];
 
 const char *logger::format_time()
 {
@@ -262,22 +258,24 @@ void logger::format(level level, const char *file, int line, const char *fmt, ..
     }
 }
 
-void angel::set_log_dir(std::string dir)
+void set_log_dir(std::string dir)
 {
     __logger.set_dir(dir);
 }
 
-void angel::set_log_name(std::string name)
+void set_log_name(std::string name)
 {
     __logger.set_name(name);
 }
 
-void angel::set_log_level(logger::level level)
+void set_log_level(logger::level level)
 {
     __logger.set_level(level);
 }
 
-void angel::set_log_flush(logger::flush_flags where)
+void set_log_flush(logger::flush_flags where)
 {
     __logger.set_flush(where);
+}
+
 }

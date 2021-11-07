@@ -10,8 +10,9 @@
 #include "epoll.h"
 #include "logger.h"
 
-using namespace angel;
-using namespace angel::util;
+namespace angel {
+
+using namespace util;
 
 epoll_base_t::epoll_base_t()
     : added_fds(0)
@@ -89,6 +90,8 @@ int epoll_base_t::wait(evloop *loop, int64_t timeout)
             log_error("epoll_wait: %s", strerrno());
     }
     return nevents;
+}
+
 }
 
 #endif

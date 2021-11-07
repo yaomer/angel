@@ -2,7 +2,7 @@
 #include "evloop.h"
 #include "logger.h"
 
-using namespace angel;
+namespace angel {
 
 channel::channel(evloop *loop)
     : loop(loop),
@@ -45,4 +45,6 @@ const char *channel::ev2str(event events)
     case we_event: return "EV_WRITE|EV_ERROR";
     default: return "NONE";
     }
+}
+
 }

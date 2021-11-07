@@ -8,15 +8,18 @@
 #include "util.h"
 #include "logger.h"
 
-using namespace angel;
-using namespace angel::util;
+namespace angel {
+
+using namespace util;
+
+namespace sockops {
 
 static inline struct sockaddr *sockaddr_cast(struct sockaddr_in *addr)
 {
     return reinterpret_cast<struct sockaddr *>(addr);
 }
 
-int sockops::socket()
+int socket()
 {
     int sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
@@ -24,7 +27,7 @@ int sockops::socket()
     return sockfd;
 }
 
-void sockops::bind(int sockfd, struct sockaddr_in *localAddr)
+void bind(int sockfd, struct sockaddr_in *localAddr)
 {
     if (::bind(sockfd, sockaddr_cast(localAddr), sizeof(*localAddr)) < 0)
         log_fatal("bind: %s", strerrno());
@@ -32,13 +35,13 @@ void sockops::bind(int sockfd, struct sockaddr_in *localAddr)
 
 #define LISTENQ 1024
 
-void sockops::listen(int sockfd)
+void listen(int sockfd)
 {
     if (::listen(sockfd, LISTENQ) < 0)
         log_fatal("listen: %s", strerrno());
 }
 
-int sockops::accept(int sockfd)
+int accept(int sockfd)
 {
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
@@ -46,24 +49,24 @@ int sockops::accept(int sockfd)
     return connfd;
 }
 
-int sockops::connect(int sockfd, struct sockaddr_in *peerAddr)
+int connect(int sockfd, struct sockaddr_in *peerAddr)
 {
     return ::connect(sockfd, sockaddr_cast(peerAddr), sizeof(*peerAddr));
 }
 
-void sockops::set_nonblock(int sockfd)
+void set_nonblock(int sockfd)
 {
     int oflag = ::fcntl(sockfd, F_GETFL, 0);
     ::fcntl(sockfd, F_SETFL, oflag | O_NONBLOCK);
 }
 
-void sockops::socketpair(int sockfd[])
+void socketpair(int sockfd[])
 {
     if (::socketpair(AF_LOCAL, SOCK_STREAM, 0, sockfd) < 0)
         log_fatal("socketpair: %s", strerrno());
 }
 
-struct sockaddr_in sockops::get_local_addr(int sockfd)
+struct sockaddr_in get_local_addr(int sockfd)
 {
     struct sockaddr_in addr;
     bzero(&addr, sizeof(addr));
@@ -73,7 +76,7 @@ struct sockaddr_in sockops::get_local_addr(int sockfd)
     return addr;
 }
 
-struct sockaddr_in sockops::get_peer_addr(int sockfd)
+struct sockaddr_in get_peer_addr(int sockfd)
 {
     struct sockaddr_in addr;
     bzero(&addr, sizeof(addr));
@@ -83,7 +86,7 @@ struct sockaddr_in sockops::get_peer_addr(int sockfd)
     return addr;
 }
 
-int sockops::get_socket_error(int sockfd)
+int get_socket_error(int sockfd)
 {
     socklen_t err;
     socklen_t len = sizeof(err);
@@ -92,27 +95,22 @@ int sockops::get_socket_error(int sockfd)
     return static_cast<int>(err);
 }
 
-int sockops::to_host_port(in_port_t port)
+int to_host_port(in_port_t port)
 {
     return ntohs(port);
 }
 
-namespace angel {
-    namespace sockops {
+static thread_local char sockops_ipaddr[32];
+static thread_local char sockops_host[48];
 
-        static thread_local char sockops_ipaddr[32];
-        static thread_local char sockops_host[48];
-    }
-}
-
-const char *sockops::to_host_ip(const struct in_addr *addr)
+const char *to_host_ip(const struct in_addr *addr)
 {
     if (inet_ntop(AF_INET, addr, sockops_ipaddr, sizeof(sockops_ipaddr)) == nullptr)
         log_error("inet_ntop: %s", strerrno());
     return sockops_ipaddr;
 }
 
-const char *sockops::to_host(const struct sockaddr_in *addr)
+const char *to_host(const struct sockaddr_in *addr)
 {
     int port = to_host_port(addr->sin_port);
     const char *ip = to_host_ip(&addr->sin_addr);
@@ -125,7 +123,7 @@ const char *sockops::to_host(const struct sockaddr_in *addr)
 #include <sys/stat.h>
 #endif
 
-int sockops::send_file(int fd, int sockfd)
+int send_file(int fd, int sockfd)
 {
 #if defined (__APPLE__)
     off_t len = 0;
@@ -141,7 +139,7 @@ int sockops::send_file(int fd, int sockfd)
     return -1;
 }
 
-void sockops::set_keepalive(int fd, bool on)
+void set_keepalive(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
 #if defined (ANGEL_HAVE_TCP_KEEPALIVE)
@@ -154,7 +152,7 @@ void sockops::set_keepalive(int fd, bool on)
     log_info("%s TCP_KEEPALIVE", (on ? "enable" : "disable"));
 }
 
-void sockops::set_nodelay(int fd, bool on)
+void set_nodelay(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, TCP_NODELAY, &opt, sizeof(opt)) < 0)
@@ -162,7 +160,7 @@ void sockops::set_nodelay(int fd, bool on)
     log_info("%s TCP_NODELAY", (on ? "enable" : "disable"));
 }
 
-void sockops::set_reuseaddr(int fd, bool on)
+void set_reuseaddr(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
@@ -170,10 +168,13 @@ void sockops::set_reuseaddr(int fd, bool on)
     log_info("%s SO_REUSEADDR", (on ? "enable" : "disable"));
 }
 
-void sockops::set_reuseport(int fd, bool on)
+void set_reuseport(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
         log_fatal("[setsockopt -> SO_REUSEPORT]: %s", strerrno());
     log_info("%s SO_REUSEPORT", (on ? "enable" : "disable"));
+}
+
+}
 }

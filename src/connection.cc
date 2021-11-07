@@ -9,8 +9,9 @@
 #include "connection.h"
 #include "logger.h"
 
-using namespace angel;
-using namespace angel::util;
+namespace angel {
+
+using namespace util;
 
 connection::connection(size_t id, evloop *loop, int sockfd)
     : conn_id(id),
@@ -194,10 +195,7 @@ void connection::send(const void *v, size_t len)
     send(reinterpret_cast<const char*>(v), len);
 }
 
-namespace angel {
-
-    static thread_local char conn_format_send_buf[65536];
-}
+static thread_local char conn_format_send_buf[65536];
 
 void connection::format_send(const char *fmt, ...)
 {
@@ -243,4 +241,6 @@ const char *connection::get_state_str()
     case state::closed: return "CLOSED";
     default: return "NONE";
     }
+}
+
 }

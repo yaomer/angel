@@ -6,8 +6,9 @@
 #include "select.h"
 #include "logger.h"
 
-using namespace angel;
-using namespace angel::util;
+namespace angel {
+
+using namespace util;
 
 select_base_t::select_base_t()
 {
@@ -90,6 +91,8 @@ int select_base_t::wait(evloop *loop, int64_t timeout)
             log_error("select: %s", strerrno());
     }
     return rets;
+}
+
 }
 
 #endif

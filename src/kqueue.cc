@@ -9,8 +9,9 @@
 #include "evloop.h"
 #include "logger.h"
 
-using namespace angel;
-using namespace angel::util;
+namespace angel {
+
+using namespace util;
 
 kqueue_base_t::kqueue_base_t()
     : added_fds(0)
@@ -109,6 +110,8 @@ int kqueue_base_t::wait(evloop *loop, int64_t timeout)
         }
     }
     return nevents;
+}
+
 }
 
 #endif

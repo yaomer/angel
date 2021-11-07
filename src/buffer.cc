@@ -1,11 +1,8 @@
 #include "buffer.h"
 
-using namespace angel;
-
 namespace angel {
 
-    static thread_local char extrabuf[65536];
-}
+static thread_local char extrabuf[65536];
 
 int buffer::read_fd(int fd)
 {
@@ -27,4 +24,6 @@ int buffer::read_fd(int fd)
         }
     }
     return n;
+}
+
 }

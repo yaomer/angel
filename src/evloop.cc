@@ -17,13 +17,11 @@
 #include "select.h"
 #endif
 
-using namespace angel;
-using namespace angel::util;
-
 namespace angel {
 
-    static thread_local evloop *this_thread_loop = nullptr;
-}
+using namespace util;
+
+static thread_local evloop *this_thread_loop = nullptr;
 
 evloop::evloop()
     : timer(new timer_t(this)),
@@ -198,4 +196,6 @@ void evloop::quit()
 {
     is_quit = true;
     wakeup();
+}
+
 }

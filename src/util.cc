@@ -11,59 +11,56 @@
 #include "util.h"
 #include "logger.h"
 
-using namespace angel;
-
 namespace angel {
-    namespace util {
 
-        static thread_local char errno_buf[256];
-    }
-}
+namespace util {
+
+static thread_local char errno_buf[256];
 
 // 线程安全的strerror
-const char *util::strerr(int err)
+const char *strerr(int err)
 {
     strerror_r(err, errno_buf, sizeof(errno_buf));
     return errno_buf;
 }
 
-const char *util::strerrno()
+const char *strerrno()
 {
     return strerr(errno);
 }
 
-size_t util::get_cur_thread_id()
+size_t get_cur_thread_id()
 {
     return std::hash<std::thread::id>()(std::this_thread::get_id());
 }
 
-std::string util::get_cur_thread_id_str()
+std::string get_cur_thread_id_str()
 {
     std::ostringstream oss;
     oss << std::this_thread::get_id();
     return oss.str();
 }
 
-int64_t util::get_cur_time_ms()
+int64_t get_cur_time_ms()
 {
     struct timeval tv;
     gettimeofday(&tv, nullptr);
     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-int64_t util::get_cur_time_us()
+int64_t get_cur_time_us()
 {
     struct timeval tv;
     gettimeofday(&tv, nullptr);
     return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
-int util::get_ncpus()
+int get_ncpus()
 {
     return std::thread::hardware_concurrency();
 }
 
-void util::set_thread_affinity(pthread_t tid, int cpu_number)
+void set_thread_affinity(pthread_t tid, int cpu_number)
 {
 #if defined (__APPLE__)
     log_warn("OS X Not support to set thread affinity");
@@ -77,7 +74,7 @@ void util::set_thread_affinity(pthread_t tid, int cpu_number)
 #endif
 }
 
-void util::daemon()
+void daemon()
 {
     pid_t pid;
 
@@ -109,4 +106,7 @@ void util::daemon()
 
     if (fd > STDERR_FILENO)
         close(fd);
+}
+
+}
 }

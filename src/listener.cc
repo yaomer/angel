@@ -6,7 +6,7 @@
 #include "sockops.h"
 #include "logger.h"
 
-using namespace angel;
+namespace angel {
 
 listener_t::listener_t(evloop *loop, inet_addr listen_addr,
                        const new_connection_handler_t handler)
@@ -58,4 +58,6 @@ void listener_t::handle_accept()
     log_info("accept a new connection(fd=%d)", connfd);
     sockops::set_nonblock(connfd);
     new_connection_handler(connfd);
+}
+
 }

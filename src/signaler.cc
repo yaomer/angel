@@ -10,26 +10,25 @@
 #include "sockops.h"
 #include "logger.h"
 
-using namespace angel;
-using namespace angel::util;
-
 namespace angel {
-    // 保护__signaler_ptr，使之正确初始化
-    // 由于信号的特殊性，所以每个进程只能存在一个signaler实例，
-    // 即它只能绑定在一个evloop上
-    std::mutex _SYNC_SIG_INIT_LOCK;
-    angel::signaler_t *__signaler_ptr = nullptr;
 
-    static int signal_fd = -1;
+using namespace util;
 
-    std::unordered_map<int, const char*> signal_map = {
-        {  1, "SIGHUP"  },
-        {  2, "SIGINT"  },
-        {  3, "SIGQUIT" },
-        { 13, "SIGPIPE" },
-        { 15, "SIGTERM" },
-    };
-}
+// 保护__signaler_ptr，使之正确初始化
+// 由于信号的特殊性，所以每个进程只能存在一个signaler实例，
+// 即它只能绑定在一个evloop上
+std::mutex _SYNC_SIG_INIT_LOCK;
+angel::signaler_t *__signaler_ptr = nullptr;
+
+static int signal_fd = -1;
+
+std::unordered_map<int, const char*> signal_map = {
+    {  1, "SIGHUP"  },
+    {  2, "SIGINT"  },
+    {  3, "SIGQUIT" },
+    { 13, "SIGPIPE" },
+    { 15, "SIGTERM" },
+};
 
 static const char *signal_str(int signo)
 {
@@ -132,15 +131,16 @@ void signaler_t::sig_catch()
     }
 }
 
-void angel::add_signal(int signo, const signaler_handler_t handler)
+void add_signal(int signo, const signaler_handler_t handler)
 {
     if (__signaler_ptr)
         __signaler_ptr->add_signal(signo, std::move(handler));
 }
 
-void angel::cancel_signal(int signo)
+void cancel_signal(int signo)
 {
     if (__signaler_ptr)
         __signaler_ptr->cancel_signal(signo);
 }
 
+}

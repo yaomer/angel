@@ -3,7 +3,7 @@
 
 #include "server.h"
 
-using namespace angel;
+namespace angel {
 
 server::server(evloop *loop, inet_addr listen_addr)
     : loop(loop),
@@ -98,4 +98,6 @@ void server::daemon()
 void server::quit()
 {
     loop->quit();
+}
+
 }

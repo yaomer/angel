@@ -6,7 +6,7 @@
 #include "connector.h"
 #include "logger.h"
 
-using namespace angel;
+namespace angel {
 
 connector_t::connector_t(evloop *loop, inet_addr peer_addr,
                          const new_connection_handler_t handler,
@@ -98,4 +98,6 @@ void connector_t::retry()
     retry_timer_id = loop->run_after(retry_interval, [this]{ this->connect(); });
     wait_retry = true;
     close(sockfd);
+}
+
 }

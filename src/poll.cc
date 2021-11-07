@@ -8,8 +8,9 @@
 #include "evloop.h"
 #include "logger.h"
 
-using namespace angel;
-using namespace angel::util;
+namespace angel {
+
+using namespace util;
 
 static inline void evset(struct pollfd& ev, int fd, event events)
 {
@@ -77,6 +78,8 @@ int poll_base_t::wait(evloop *loop, int64_t timeout)
             log_error("poll: %s", strerrno());
     }
     return ret;
+}
+
 }
 
 #endif

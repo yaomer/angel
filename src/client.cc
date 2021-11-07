@@ -1,7 +1,7 @@
 #include "client.h"
 #include "logger.h"
 
-using namespace angel;
+namespace angel {
 
 client::client(evloop *loop, inet_addr peer_addr, bool is_reconnect, int64_t retry_interval_ms)
     : loop(loop),
@@ -58,4 +58,6 @@ void client::close_connection(const connection_ptr& conn)
     if (close_handler) close_handler(conn);
     cli_conn.reset();
     if (is_exit_loop) loop->quit();
+}
+
 }

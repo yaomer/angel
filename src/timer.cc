@@ -2,7 +2,7 @@
 #include "timer.h"
 #include "logger.h"
 
-using namespace angel;
+namespace angel {
 
 size_t timer_t::add_timer(timer_task_t *task)
 {
@@ -80,4 +80,6 @@ void timer_t::tick()
             update_timer(now);
         }
     }
+}
+
 }
