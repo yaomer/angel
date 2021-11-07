@@ -7,19 +7,19 @@
              |___/
 ```
 ### 介绍 
-Angel是一个C++11风格的适用于Linux和Mac OS平台的多线程网络库。
+angel是一个C++11风格的适用于Linux和Mac OS平台的多线程网络库。
 
 ### 安装
-你可以通过以下命令来完成Angel的安装：
+你可以通过以下命令来完成angel的安装：
 ```
-$ git clone https://github.com/yaomer/Angel
+$ git clone https://github.com/yaomer/angel
 ```
 在正式编译之前，你需要检查你的CMake和编译器的版本是否满足要求：
 ```
 CMake >= 3.1
 gcc >= 7.0 / clang >= 4.0
 ```
-然后进入到你安装的Angel的主目录中，运行build.sh即可完成编译，注意该脚本需要将生成的静态库libangel.a和头文件写入到系统目录，所以可能需要root权限。
+然后进入到你安装的angel的主目录中，运行build.sh即可完成编译，注意该脚本需要将生成的静态库libangel.a和头文件写入到系统目录，所以可能需要root权限。
 
 ### 用法
 下面程序示例需要包含以下头文件：
@@ -166,11 +166,11 @@ int main(void)
 }
 ```
 ##### 更多示例
-- 一些简单的[例子](https://github.com/yaomer/Angel/tree/master/examples)
+- 一些简单的[例子](https://github.com/yaomer/angel/tree/master/examples)
 - 一个更有意义的例子[alice](https://github.com/yaomer/Alice)
 
 ### 性能测试
-使用示例中简陋的[HTTP服务器](https://github.com/yaomer/Angel/tree/master/examples/http)与Nginx作简单的性能对比测试
+使用示例中简陋的[HTTP服务器](https://github.com/yaomer/angel/tree/master/examples/http)与Nginx作简单的性能对比测试
 
 我的测试环境如下：
 ```
@@ -185,7 +185,3 @@ ab -c [clients] -n 100000 [url]; clients = { 1, 10, 100, 200, 500, 1000 }
 每种情况测3次，取平均值，下面是测试结果绘制的折线图
 
 ![](https://github.com/yaomer/pictures/blob/master/webbench.png?raw=true)
-
-### 后续优化与展望
-+ 考虑使用REUSEPORT，由内核作负载均衡
-+ 考虑加入多进程模式，为用户提供更多选择
