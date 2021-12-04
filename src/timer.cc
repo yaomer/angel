@@ -4,6 +4,23 @@
 
 namespace angel {
 
+timer_t::timer_t(evloop *loop) : loop(loop), timer_id(1)
+{
+}
+
+timer_t::~timer_t() = default;
+
+int64_t timer_t::timeout()
+{
+    int64_t timeval;
+    if (!timer_set.empty()) {
+        timeval = timer_set.begin()->get()->expire - util::get_cur_time_ms();
+        timeval = timeval > 0 ? timeval : 0;
+    } else
+        timeval = -1;
+    return timeval;
+}
+
 size_t timer_t::add_timer(timer_task_t *task)
 {
     size_t id = timer_id++;
@@ -21,7 +38,7 @@ void timer_t::cancel_timer(size_t id)
 // Add a TimerTask is O(log n)
 void timer_t::add_timer_in_loop(timer_task_t *task, size_t id)
 {
-    task->set_id(id);
+    task->id = id;
     auto it = std::shared_ptr<timer_task_t>(task);
     timer_set.emplace(it);
     timer_map.emplace(id, it);
@@ -43,9 +60,9 @@ void timer_t::cancel_timer_in_loop(size_t id)
         // 这两种方法实际上是大同小异的，看个人喜好了
         auto range = timer_set.equal_range(it->second);
         for (auto it = range.first; it != range.second; ++it) {
-            if ((*it)->id() == id) {
+            if ((*it)->id == id) {
                 log_debug("timer(id=%d) has been canceled", id);
-                (*it)->cancel();
+                (*it)->canceled = true;
                 del_timer(it);
                 break;
             }
@@ -56,13 +73,13 @@ void timer_t::cancel_timer_in_loop(size_t id)
 void timer_t::update_timer(int64_t now)
 {
     auto& task = *timer_set.begin();
-    if (task->interval() > 0) {
-        timer_task_t *new_task = new timer_task_t(now + task->interval(),
-                task->interval(), task->timer_cb());
-        new_task->set_id(task->id());
+    if (task->interval > 0) {
+        timer_task_t *new_task = new timer_task_t(now + task->interval,
+                task->interval, task->timer_cb);
+        new_task->id = task->id;
         // 必须先删除旧的task，再添加更新后的task，以保证正确的执行顺序
         del_timer();
-        add_timer_in_loop(new_task, new_task->id());
+        add_timer_in_loop(new_task, new_task->id);
     } else {
         del_timer();
     }
@@ -73,10 +90,10 @@ void timer_t::tick()
     int64_t now = util::get_cur_time_ms();
     while (!timer_set.empty()) {
         auto task = *timer_set.begin();
-        if (task->expire() > now) break;
-        task->timer_cb()();
+        if (task->expire > now) break;
+        task->timer_cb();
         // task can be canceled in timer_cb()
-        if (!task->is_canceled()) {
+        if (!task->canceled) {
             update_timer(now);
         }
     }

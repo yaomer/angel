@@ -8,28 +8,34 @@
 #include <vector>
 #include <map>
 
-#include "poller.h"
 #include "channel.h"
-#include "timer.h"
-#include "signaler.h"
-#include "noncopyable.h"
 
 namespace angel {
 
+class poller;
+
+class timer_t;
+typedef std::function<void()> timer_callback_t;
+
+class signaler_t;
+typedef std::function<void()> signaler_handler_t;
+
 // reactor模式的核心，事件循环的驱动
-class evloop : noncopyable {
+class evloop {
 public:
     typedef std::function<void()> functor;
     typedef std::shared_ptr<channel> channel_ptr;
 
     evloop();
+    ~evloop();
+    evloop(const evloop&) = delete;
+    evloop& operator=(const evloop&) = delete;
     // 向loop中注册一个事件
     void add_channel(const channel_ptr& chl);
     // 从loop中删除一个事件
     void remove_channel(const channel_ptr& chl);
-
-    void change_event(int fd, event events)
-    { poller->change(fd, events); }
+    // 修改fd上关联的事件
+    void change_event(int fd, int events);
 
     channel_ptr search_channel(int fd)
     { return channel_map.find(fd)->second; }

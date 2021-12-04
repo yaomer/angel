@@ -7,44 +7,52 @@ namespace angel {
 channel::channel(evloop *loop)
     : loop(loop),
     evfd(-1),
-    filter(),
-    trigger()
+    filter(0),
+    trigger(0)
 {
 }
 
-void channel::change_events()
+channel::~channel() = default;
+
+void channel::enable_read()
 {
-    log_debug("fd=%d events is %s", fd(), ev2str(filter));
+    filter |= Read;
+}
+
+void channel::enable_write()
+{
+    filter |= Write;
     loop->change_event(evfd, filter);
 }
 
-// 事件多路分发器，如果channel上有事件发生，则根据不同的事件触发不同的回调
+void channel::disable_write()
+{
+    filter &= ~Write;
+    loop->change_event(evfd, filter);
+}
+
+static const char *ev2str(int events)
+{
+    switch (events) {
+    case Read: return "Read";
+    case Write: return "Write";
+    case Error: return "Error";
+    case Read | Write: return "Read|Write";
+    case Read | Error: return "Read|Error";
+    case Write | Error: return "Write|Error";
+    default: return "None";
+    }
+}
+
 void channel::handle_event()
 {
     log_debug("fd=%d revents is %s", fd(), ev2str(trigger));
-    if (is_enum_true(trigger & event::error))
+    if (trigger & Error)
         if (error_handler) error_handler();
-    if (is_enum_true(trigger & event::read))
+    if (trigger & Read)
         if (read_handler) read_handler();
-    if (is_enum_true(trigger & event::write))
+    if (trigger & Write)
         if (write_handler) write_handler();
-}
-
-static constexpr event rw_event = event::read | event::write;
-static constexpr event re_event = event::read | event::error;
-static constexpr event we_event = event::write | event::error;
-
-const char *channel::ev2str(event events)
-{
-    switch (events) {
-    case event::read: return "EV_READ";
-    case event::write: return "EV_WRITE";
-    case event::error: return "EV_ERROR";
-    case rw_event: return "EV_READ|EV_WRITE";
-    case re_event: return "EV_READ|EV_ERROR";
-    case we_event: return "EV_WRITE|EV_ERROR";
-    default: return "NONE";
-    }
 }
 
 }

@@ -12,7 +12,6 @@
 #include "logger.h"
 #include "util.h"
 
-
 namespace angel {
 
 using namespace util;

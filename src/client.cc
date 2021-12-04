@@ -1,3 +1,4 @@
+#include "connector.h"
 #include "client.h"
 #include "logger.h"
 
@@ -16,6 +17,16 @@ client::client(evloop *loop, inet_addr peer_addr, bool is_reconnect, int64_t ret
 client::~client()
 {
     close_connection(cli_conn);
+}
+
+void client::not_exit_loop()
+{
+    is_exit_loop = false;
+}
+
+bool client::is_connected()
+{
+    return connector->is_connected() && cli_conn;
 }
 
 void client::new_connection(int fd)
@@ -58,6 +69,25 @@ void client::close_connection(const connection_ptr& conn)
     if (close_handler) close_handler(conn);
     cli_conn.reset();
     if (is_exit_loop) loop->quit();
+}
+
+void client::set_task_thread_nums(size_t thread_nums)
+{
+    if (thread_nums > 0)
+        task_thread_pool.reset(
+                new thread_pool(thread_pool::policy::fixed, thread_nums));
+    else
+        task_thread_pool.reset(
+                new thread_pool(thread_pool::policy::fixed));
+
+}
+void client::executor(const task_callback_t task)
+{
+    if (!task_thread_pool) {
+        log_error("task_thread_pool is null");
+        return;
+    }
+    task_thread_pool->executor(task);
 }
 
 }

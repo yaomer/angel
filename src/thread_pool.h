@@ -8,14 +8,11 @@
 #include <mutex>
 #include <condition_variable>
 
-#include "logger.h"
-#include "noncopyable.h"
-
 namespace angel {
 
 typedef std::function<void()> task_callback_t;
 
-class thread_pool : noncopyable {
+class thread_pool {
 public:
     enum class policy {
         fixed   = 1,
@@ -37,16 +34,12 @@ public:
     {
         shutdown();
     }
+    thread_pool(const thread_pool&) = delete;
+    thread_pool& operator=(const thread_pool&) = delete;
     void executor(const task_callback_t task)
     {
-        if (state != state::running) {
-            log_warn("thread_pool state is not running\n");
-            return;
-        }
-        if (workers.empty()) {
-            log_warn("There are no available threads\n");
-            return;
-        }
+        assert(state == state::running);
+        assert(!workers.empty());
         std::lock_guard<std::mutex> mlock(mutex);
         if (policy == policy::cached) {
             if (qtask.size() == workers.size()) {

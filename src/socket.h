@@ -3,16 +3,14 @@
 
 #include <unistd.h>
 
-#include "noncopyable.h"
-
 namespace angel {
 
-class socket : noncopyable {
+class socket {
 public:
-    explicit socket(int fd) : sockfd(fd)
-    {
-    }
+    explicit socket(int fd) : sockfd(fd) {  }
     ~socket() { close(sockfd); };
+    socket(const socket&) = delete;
+    socket& operator=(const socket&) = delete;
     int fd() const { return sockfd; }
 private:
     const int sockfd;

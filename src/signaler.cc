@@ -9,6 +9,7 @@
 #include "socket.h"
 #include "sockops.h"
 #include "logger.h"
+#include "util.h"
 
 namespace angel {
 
@@ -50,6 +51,8 @@ signaler_t::signaler_t(evloop *loop)
     signal_fd = pair_fd[1];
     sig_channel->set_read_handler([this]{ this->sig_catch(); });
 }
+
+signaler_t::~signaler_t() = default;
 
 void signaler_t::start()
 {

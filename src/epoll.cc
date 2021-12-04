@@ -14,6 +14,8 @@ namespace angel {
 
 using namespace util;
 
+static const size_t evlist_init_size = 64;
+
 epoll_base_t::epoll_base_t()
     : added_fds(0)
 {
@@ -27,17 +29,17 @@ epoll_base_t::~epoll_base_t()
     close(epfd);
 }
 
-static inline void evset(struct epoll_event& ev, int fd, event events)
+static inline void evset(struct epoll_event& ev, int fd, int events)
 {
     ev.data.fd = fd;
     ev.events = 0;
-    if (is_enum_true(events & event::read))
+    if (events & Read)
         ev.events |= EPOLLIN;
-    if (is_enum_true(events & event::write))
+    if (events & Write)
         ev.events |= EPOLLOUT;
 }
 
-void epoll_base_t::add(int fd, event events)
+void epoll_base_t::add(int fd, int events)
 {
     struct epoll_event ev;
     evset(ev, fd, events);
@@ -48,7 +50,7 @@ void epoll_base_t::add(int fd, event events)
     }
 }
 
-void epoll_base_t::change(int fd, event events)
+void epoll_base_t::change(int fd, int events)
 {
     struct epoll_event ev;
     evset(ev, fd, events);
@@ -56,7 +58,7 @@ void epoll_base_t::change(int fd, event events)
         log_error("[epoll_ctl -> EPOLL_CTL_MOD]: %s", strerrno());
 }
 
-void epoll_base_t::remove(int fd, event events)
+void epoll_base_t::remove(int fd, int events)
 {
     UNUSED(events);
     if (epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL) < 0)
@@ -64,16 +66,13 @@ void epoll_base_t::remove(int fd, event events)
     added_fds--;
 }
 
-static event evret(int events)
+static int evret(int events)
 {
-    event rets{};
-    if (events & EPOLLIN)
-        rets |= event::read;
-    if (events & EPOLLOUT)
-        rets |= event::write;
-    if (events & EPOLLERR)
-        rets |= event::error;
-    return rets;
+    int revs = 0;
+    if (events & EPOLLIN) revs |= Read;
+    if (events & EPOLLOUT) revs |= Write;
+    if (events & EPOLLERR) revs |= Error;
+    return revs;
 }
 
 int epoll_base_t::wait(evloop *loop, int64_t timeout)

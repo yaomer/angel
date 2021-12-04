@@ -1,6 +1,69 @@
 #include "buffer.h"
 
+#include <sys/uio.h>
+
 namespace angel {
+
+static const size_t init_size = 1024;
+
+buffer::buffer() : buf(init_size)
+{
+}
+
+buffer::buffer(size_t size) : buf(size)
+{
+}
+
+buffer::~buffer() = default;
+
+int buffer::find(char *s, const char *pattern)
+{
+    const char *p = std::search(
+            s, begin() + write_index, pattern, pattern + strlen(pattern));
+    return p == begin() + write_index ? -1 : p - s;
+}
+
+void buffer::make_space(size_t len)
+{
+    if (len > writeable()) {
+        if (len <= writeable() + prependable()) {
+            size_t read_bytes = readable();
+            std::copy(peek(), peek() + read_bytes, begin());
+            read_index = 0;
+            write_index = read_index + read_bytes;
+        } else
+            buf.resize(write_index + len);
+    }
+}
+
+void buffer::append(const char *data, size_t len)
+{
+    make_space(len);
+    std::copy(data, data + len, buf.begin() + write_index);
+    write_index += len;
+}
+
+void buffer::retrieve(size_t len)
+{
+    if (len < readable())
+        read_index += len;
+    else
+        read_index = write_index = 0;
+}
+
+const char *buffer::c_str()
+{
+    make_space(1);
+    buf[write_index] = '\0';
+    return peek();
+}
+
+void buffer::swap(buffer& other)
+{
+    buf.swap(other.buf);
+    std::swap(read_index, other.read_index);
+    std::swap(write_index, other.write_index);
+}
 
 static thread_local char extrabuf[65536];
 

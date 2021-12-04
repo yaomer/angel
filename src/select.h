@@ -6,20 +6,20 @@
 #include <map>
 
 #include "poller.h"
-#include "noncopyable.h"
 
 namespace angel {
 
-class select_base_t : public poller, noncopyable {
+class select_base_t : public poller {
 public:
     select_base_t();
-    ~select_base_t() {  };
+    ~select_base_t();
+    select_base_t(const select_base_t&) = delete;
+    select_base_t& operator=(const select_base_t&) = delete;
     int wait(evloop *loop, int64_t timeout) override;
-    void add(int fd, event events) override;
-    void change(int fd, event events) override;
-    void remove(int fd, event events) override;
+    void add(int fd, int events) override;
+    void change(int fd, int events) override;
+    void remove(int fd, int events) override;
 private:
-    static const size_t fds_init_size = 64;
     fd_set rdset;
     fd_set wrset;
     std::vector<int> fds;

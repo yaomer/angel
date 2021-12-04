@@ -1,6 +1,9 @@
 #include <signal.h>
 #include <stdlib.h>
 
+#include "listener.h"
+#include "signaler.h"
+#include "evloop_thread_pool.h"
 #include "server.h"
 
 namespace angel {
@@ -15,6 +18,13 @@ server::server(evloop *loop, inet_addr listen_addr)
 {
     // if (is_set_cpu_affinity)
         // util::set_thread_affinity(pthread_self(), 0);
+}
+
+server::~server() = default;
+
+inet_addr& server::listen_addr()
+{
+    return listener->addr();
 }
 
 evloop *server::get_next_loop()
@@ -67,6 +77,34 @@ void server::set_ttl_timer_if_needed(evloop *loop, const connection_ptr& conn)
     if (ttl_ms <= 0) return;
     size_t id = loop->run_after(ttl_ms, [conn]{ conn->close(); });
     conn->set_ttl(id, ttl_ms);
+}
+
+void server::set_io_thread_nums(size_t thread_nums)
+{
+    if (thread_nums > 0)
+        io_thread_pool.reset(new evloop_thread_pool(thread_nums));
+    else
+        io_thread_pool.reset(new evloop_thread_pool());
+}
+
+void server::set_task_thread_nums(size_t thread_nums)
+{
+    if (thread_nums > 0)
+        task_thread_pool.reset(
+                new thread_pool(thread_pool::policy::fixed, thread_nums));
+    else
+        task_thread_pool.reset(
+                new thread_pool(thread_pool::policy::fixed));
+
+}
+
+void server::executor(const task_callback_t task)
+{
+    if (!task_thread_pool) {
+        log_error("task_thread_pool is null");
+        return;
+    }
+    task_thread_pool->executor(task);
 }
 
 void server::clean_up()

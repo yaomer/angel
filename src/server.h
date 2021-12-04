@@ -5,27 +5,31 @@
 #include <functional>
 #include <memory>
 
-#include "listener.h"
+#include "evloop.h"
 #include "connection.h"
-#include "evloop_thread_pool.h"
 #include "thread_pool.h"
-#include "noncopyable.h"
 #include "logger.h"
 
 namespace angel {
+
+class listener_t;
+class evloop_thread_pool;
 
 // server支持以下几种运行方式：
 // 1. [单线程reactor]
 // 2. [单线程reactor + thread pool](set_task_thread_nums())
 // 3. [多线程reactor](set_io_thread_nums())
 // 4. [多线程reactor + thread pool](set_io_thread_nums(), set_task_thread_nums())
-class server : noncopyable {
+class server {
 public:
     typedef std::function<void(const connection_ptr&)> for_each_functor_t;
 
     explicit server(evloop *, inet_addr);
+    ~server();
+    server(const server&) = delete;
+    server& operator=(const server&) = delete;
 
-    inet_addr& listen_addr() { return listener->addr(); }
+    inet_addr& listen_addr();
 
     // must be call in main-thread
     connection_ptr get_connection(size_t id)
@@ -60,31 +64,9 @@ public:
     }
 
     // select by angel if thread_nums = 0
-    void set_io_thread_nums(size_t thread_nums = 0)
-    {
-        if (thread_nums > 0)
-            io_thread_pool.reset(new evloop_thread_pool(thread_nums));
-        else
-            io_thread_pool.reset(new evloop_thread_pool());
-    }
-    void set_task_thread_nums(size_t thread_nums = 0)
-    {
-        if (thread_nums > 0)
-            task_thread_pool.reset(
-                    new thread_pool(thread_pool::policy::fixed, thread_nums));
-        else
-            task_thread_pool.reset(
-                    new thread_pool(thread_pool::policy::fixed));
-
-    }
-    void executor(const task_callback_t task)
-    {
-        if (!task_thread_pool) {
-            log_error("task_thread_pool is null");
-            return;
-        }
-        task_thread_pool->executor(task);
-    }
+    void set_io_thread_nums(size_t thread_nums = 0);
+    void set_task_thread_nums(size_t thread_nums = 0);
+    void executor(const task_callback_t task);
     void set_exit_handler(const signaler_handler_t handler)
     {
         exit_handler = std::move(handler);

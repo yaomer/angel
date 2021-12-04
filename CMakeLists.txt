@@ -22,29 +22,20 @@ configure_file (
     "${SRC_DIR}/config.h"
 )
 
-set (SRC_HEADERS
-    ${SRC_DIR}/listener.h
-    ${SRC_DIR}/connector.h
+set (PUBLIC_HEADERS
     ${SRC_DIR}/buffer.h
     ${SRC_DIR}/channel.h
     ${SRC_DIR}/evloop.h
     ${SRC_DIR}/evloop_thread.h
-    ${SRC_DIR}/evloop_thread_pool.h
     ${SRC_DIR}/connection.h
     ${SRC_DIR}/inet_addr.h
     ${SRC_DIR}/socket.h
     ${SRC_DIR}/sockops.h
     ${SRC_DIR}/server.h
     ${SRC_DIR}/client.h
-    ${SRC_DIR}/timer.h
-    ${SRC_DIR}/signaler.h
     ${SRC_DIR}/thread_pool.h
     ${SRC_DIR}/logger.h
-    ${SRC_DIR}/poller.h
     ${SRC_DIR}/util.h
-    ${SRC_DIR}/event.h
-    ${SRC_DIR}/noncopyable.h
-    ${SRC_DIR}/enum_bitwise.h
 )
 
 set (SRC_FILES 
@@ -85,4 +76,4 @@ install(TARGETS angel
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib)
 
-install(FILES ${SRC_HEADERS} DESTINATION include/angel)
+install(FILES ${PUBLIC_HEADERS} DESTINATION include/angel)

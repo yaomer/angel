@@ -5,12 +5,11 @@
 #include <memory>
 
 #include "evloop_thread.h"
-#include "noncopyable.h"
 #include "util.h"
 
 namespace angel {
 
-class evloop_thread_pool : noncopyable {
+class evloop_thread_pool {
 public:
     explicit evloop_thread_pool(
             size_t nums = std::thread::hardware_concurrency(),
@@ -35,9 +34,9 @@ public:
                 ;
         }
     }
-    ~evloop_thread_pool()
-    {
-    }
+    ~evloop_thread_pool() = default;
+    evloop_thread_pool(const evloop_thread_pool&) = delete;
+    evloop_thread_pool& operator=(const evloop_thread_pool&) = delete;
     size_t threads() const { return thread_nums; }
     // 使用[round-robin]挑选出下一个[io thread]
     evloop *get_next_loop()

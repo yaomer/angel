@@ -6,17 +6,18 @@
 
 #include "inet_addr.h"
 #include "channel.h"
-#include "noncopyable.h"
 
 namespace angel {
 
 class evloop;
 
-class connector_t : noncopyable {
+class connector_t {
 public:
     typedef std::function<void(int)> new_connection_handler_t;
     connector_t(evloop *, inet_addr, const new_connection_handler_t, int64_t retry_interval_ms);
     ~connector_t();
+    connector_t(const connector_t&) = delete;
+    connector_t& operator=(const connector_t&) = delete;
     void connect();
     bool is_connected() { return has_connected; }
     int connfd() const { return connect_channel->fd(); }

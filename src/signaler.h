@@ -7,7 +7,6 @@
 #include <mutex>
 
 #include "channel.h"
-#include "noncopyable.h"
 
 namespace angel {
 
@@ -22,10 +21,12 @@ typedef std::function<void()> signaler_handler_t;
 // 我们就向fd[1]中写入1 byte，这1 byte实际上就是该信号的信号值，
 // 然后当我们在loop中监听到有sig_channel的可读事件发生时，我们就会
 // 根据读到的信号值去调用用户注册的不同的信号处理函数
-class signaler_t : noncopyable {
+class signaler_t {
 public:
     explicit signaler_t(evloop *);
-    ~signaler_t() {  };
+    ~signaler_t();
+    signaler_t(const signaler_t&) = delete;
+    signaler_t& operator=(const signaler_t&) = delete;
     void add_signal(int signo, const signaler_handler_t handler);
     void cancel_signal(int signo);
     void start();

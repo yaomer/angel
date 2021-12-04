@@ -19,6 +19,8 @@ listener_t::listener_t(evloop *loop, inet_addr listen_addr,
 {
 }
 
+listener_t::~listener_t() = default;
+
 void listener_t::listen()
 {
     int fd = listen_socket.fd();

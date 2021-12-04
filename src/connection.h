@@ -10,7 +10,6 @@
 #include "buffer.h"
 #include "inet_addr.h"
 #include "socket.h"
-#include "noncopyable.h"
 
 namespace angel {
 
@@ -35,8 +34,7 @@ typedef std::function<void()> error_handler_t;
 //
 // 相比于channel更上层的封装，专门用于管理TCP连接
 //
-class connection : noncopyable,
-    public std::enable_shared_from_this<connection> {
+class connection : public std::enable_shared_from_this<connection> {
 public:
     enum class state {
         connecting, // 连接正在建立
@@ -47,6 +45,8 @@ public:
 
     connection(size_t id, evloop *loop, int sockfd);
     ~connection();
+    connection(const connection&) = delete;
+    connection& operator=(const connection&) = delete;
     size_t id() const { return conn_id; }
     void send(const char *s);
     void send(const std::string& s);

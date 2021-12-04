@@ -7,12 +7,11 @@
 #include <condition_variable>
 
 #include "evloop.h"
-#include "noncopyable.h"
 
 namespace angel {
 
 // One-loop-per-thread
-class evloop_thread : noncopyable {
+class evloop_thread {
 public:
     evloop_thread()
         : loop(nullptr),
@@ -23,6 +22,8 @@ public:
     {
         quit();
     }
+    evloop_thread(const evloop_thread&) = delete;
+    evloop_thread& operator=(const evloop_thread&) = delete;
     std::thread& get_thread()
     {
         return thread;
@@ -31,8 +32,7 @@ public:
     {
         std::unique_lock<std::mutex> ulock(mutex);
         // 等待loop初始化完成
-        while (loop == nullptr)
-            condvar.wait(ulock);
+        condvar.wait(ulock, [this]{ return this->loop; });
         return loop;
     }
     evloop *get_loop()
@@ -48,10 +48,10 @@ public:
 private:
     void thread_func()
     {
-        evloop _loop;
+        evloop t_loop;
         {
             std::lock_guard<std::mutex> mlock(mutex);
-            loop = &_loop;
+            loop = &t_loop;
             condvar.notify_one();
         }
         loop->run();

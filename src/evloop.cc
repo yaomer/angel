@@ -1,6 +1,9 @@
 #include "evloop.h"
 #include "socket.h"
 #include "sockops.h"
+#include "poller.h"
+#include "timer.h"
+#include "signaler.h"
 #include "config.h"
 #include "logger.h"
 
@@ -52,6 +55,8 @@ evloop::evloop()
     }
 }
 
+evloop::~evloop() = default;
+
 void evloop::add_channel(const channel_ptr& chl)
 {
     log_debug("add channel(fd=%d)...", chl->fd());
@@ -62,6 +67,11 @@ void evloop::remove_channel(const channel_ptr& chl)
 {
     log_debug("remove channel(fd=%d)...", chl->fd());
     run_in_loop([this, chl]{ this->remove_channel_in_loop(chl); });
+}
+
+void evloop::change_event(int fd, int events)
+{
+    poller->change(fd, events);
 }
 
 void evloop::add_channel_in_loop(const channel_ptr& chl)

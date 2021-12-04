@@ -5,10 +5,13 @@
 #include "evloop.h"
 #include "select.h"
 #include "logger.h"
+#include "util.h"
 
 namespace angel {
 
 using namespace util;
+
+static const size_t fds_init_size = 64;
 
 select_base_t::select_base_t()
 {
@@ -19,7 +22,9 @@ select_base_t::select_base_t()
     set_name("select");
 }
 
-void select_base_t::add(int fd, event events)
+select_base_t::~select_base_t() = default;
+
+void select_base_t::add(int fd, int events)
 {
     fds.push_back(fd);
     indexs.emplace(fd, fds.size() - 1);
@@ -27,20 +32,20 @@ void select_base_t::add(int fd, event events)
     maxfd = std::max(maxfd, fd, std::greater<int>());
 }
 
-void select_base_t::change(int fd, event events)
+void select_base_t::change(int fd, int events)
 {
     // 要修改关联到fd上的事件，必须先从rdset和wrset中
     // 清除掉原先注册的fd，然后再重新注册，不然就可能会
     // 出现重复注册同一个fd
     FD_CLR(fd, &rdset);
     FD_CLR(fd, &wrset);
-    if (is_enum_true(events & event::read))
+    if (events & Read)
         FD_SET(fd, &rdset);
-    if (is_enum_true(events & event::write))
+    if (events & Write)
         FD_SET(fd, &wrset);
 }
 
-void select_base_t::remove(int fd, event events)
+void select_base_t::remove(int fd, int events)
 {
     UNUSED(events);
     auto it = indexs.find(fd);
@@ -48,7 +53,7 @@ void select_base_t::remove(int fd, event events)
     std::swap(fds[it->second], fds[end]);
     fds.pop_back();
     indexs.erase(fd);
-    change(fd, event());
+    change(fd, 0);
     if (fd == maxfd)
         maxfd--;
 }
@@ -73,17 +78,17 @@ int select_base_t::wait(evloop *loop, int64_t timeout)
     int rets = nevents;
     if (nevents > 0) {
         for (auto& it : fds) {
-            event revs{};
+            int revs = 0;
             if (FD_ISSET(it, &rdset1))
-                revs |= event::read;
+                revs |= Read;
             if (FD_ISSET(it, &wrset1))
-                revs |= event::write;
+                revs |= Write;
             if (FD_ISSET(it, &errset))
-                revs |= event::error;
+                revs |= Error;
             auto chl = loop->search_channel(it);
             chl->set_trigger_events(revs);
             loop->fill_active_channel(chl);
-            if (angel::get_enum_value(revs) && --nevents == 0)
+            if (revs && --nevents == 0)
                 break;
         }
     } else if (nevents < 0) {

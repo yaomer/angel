@@ -5,22 +5,22 @@
 #include <vector>
 
 #include "poller.h"
-#include "noncopyable.h"
 
 namespace angel {
 
 class evloop;
 
-class epoll_base_t : public poller, noncopyable {
+class epoll_base_t : public poller {
 public:
     epoll_base_t();
     ~epoll_base_t();
+    epoll_base_t(const epoll_base_t&) = delete;
+    epoll_base_t& operator=(const epoll_base_t&) = delete;
     int wait(evloop *loop, int64_t timeout) override;
-    void add(int fd, event events) override;
-    void change(int fd, event events) override;
-    void remove(int fd, event events) override;
+    void add(int fd, int events) override;
+    void change(int fd, int events) override;
+    void remove(int fd, int events) override;
 private:
-    static const size_t evlist_init_size = 64;
     int epfd;
     size_t added_fds;
     std::vector<struct epoll_event> evlist;

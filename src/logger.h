@@ -8,11 +8,10 @@
 #include <string>
 
 #include "buffer.h"
-#include "noncopyable.h"
 
 namespace angel {
 
-class logger : noncopyable {
+class logger {
 public:
     enum class flush_flags {
         file    = 1,
@@ -28,6 +27,9 @@ public:
 
     logger();
     ~logger();
+    logger(const logger&) = delete;
+    logger& operator=(const logger&) = delete;
+
     void set_dir(std::string dir);
     void set_name(std::string name);
     void set_level(level level)

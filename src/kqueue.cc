@@ -8,10 +8,13 @@
 #include "kqueue.h"
 #include "evloop.h"
 #include "logger.h"
+#include "util.h"
 
 namespace angel {
 
 using namespace util;
+
+static const size_t evlist_init_size = 64;
 
 kqueue_base_t::kqueue_base_t()
     : added_fds(0)
@@ -26,7 +29,7 @@ kqueue_base_t::~kqueue_base_t()
     ::close(kqfd);
 }
 
-void kqueue_base_t::add(int fd, event events)
+void kqueue_base_t::add(int fd, int events)
 {
     change(fd, events);
     if (++added_fds >= evlist.size()) {
@@ -34,31 +37,31 @@ void kqueue_base_t::add(int fd, event events)
     }
 }
 
-void kqueue_base_t::change(int fd, event events)
+void kqueue_base_t::change(int fd, int events)
 {
     struct kevent kev;
-    if (is_enum_true(events & event::read)) {
+    if (events & Read) {
         EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
             log_error("[kevent -> EV_ADD]: %s", strerrno());
     }
-    if (is_enum_true(events & event::write)) {
+    if (events & Write) {
         EV_SET(&kev, fd, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
             log_error("[kevent -> EV_ADD]: %s", strerrno());
     }
 }
 
-void kqueue_base_t::remove(int fd, event events)
+void kqueue_base_t::remove(int fd, int events)
 {
     struct kevent kev;
     // 删除fd上注册的所有事件，kqueue即会从内核事件列表中移除fd
-    if (is_enum_true(events & event::read)) {
+    if (events & Read) {
         EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
             log_error("[kevent -> EV_DELETE]: %s", strerrno());
     }
-    if (is_enum_true(events & event::write)) {
+    if (events & Write) {
         EV_SET(&kev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
             log_error("[kevent -> EV_DELETE]: %s", strerrno());
@@ -66,13 +69,13 @@ void kqueue_base_t::remove(int fd, event events)
     added_fds--;
 }
 
-static event evret(struct kevent& ev)
+static int evret(struct kevent& ev)
 {
-    event events{};
+    int revs = 0;
     if (ev.filter == EVFILT_READ)
-        events = event::read;
+        revs = Read;
     else if (ev.filter == EVFILT_WRITE)
-        events = event::write;
+        revs = Write;
     else if (ev.flags) {
         switch (ev.flags) {
         case ENOENT:
@@ -83,11 +86,11 @@ static event evret(struct kevent& ev)
             break;
         default:
             errno = ev.data;
-            events = event::error;
+            revs = Error;
             break;
         }
     }
-    return events;
+    return revs;
 }
 
 int kqueue_base_t::wait(evloop *loop, int64_t timeout)

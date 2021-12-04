@@ -7,23 +7,31 @@
 #include "poll.h"
 #include "evloop.h"
 #include "logger.h"
+#include "util.h"
 
 namespace angel {
 
 using namespace util;
 
-static inline void evset(struct pollfd& ev, int fd, event events)
+poll_base_t::poll_base_t()
+{
+    set_name("poll");
+}
+
+poll_base_t::~poll_base_t() = default;
+
+static inline void evset(struct pollfd& ev, int fd, int events)
 {
     ev.fd = fd;
     ev.events = 0;
     ev.revents = 0;
-    if (is_enum_true(events & event::read))
+    if (events & Read)
         ev.events |= POLLIN;
-    if (is_enum_true(events & event::write))
+    if (events & Write)
         ev.events |= POLLOUT;
 }
 
-void poll_base_t::add(int fd, event events)
+void poll_base_t::add(int fd, int events)
 {
     struct pollfd ev;
     evset(ev, fd, events);
@@ -31,14 +39,14 @@ void poll_base_t::add(int fd, event events)
     indexs.emplace(ev.fd, poll_fds.size() - 1);
 }
 
-void poll_base_t::change(int fd, event events)
+void poll_base_t::change(int fd, int events)
 {
     auto it = indexs.find(fd);
     struct pollfd *pfd = &poll_fds[it->second];
     evset(*pfd, fd, events);
 }
 
-void poll_base_t::remove(int fd, event events)
+void poll_base_t::remove(int fd, int events)
 {
     auto it = indexs.find(fd);
     size_t end = poll_fds.size() - 1;
@@ -47,16 +55,13 @@ void poll_base_t::remove(int fd, event events)
     indexs.erase(fd);
 }
 
-static event evret(int events)
+static int evret(int events)
 {
-    event rets{};
-    if (events & POLLIN)
-        rets |= event::read;
-    if (events & POLLOUT)
-        rets |= event::write;
-    if (events & POLLERR)
-        rets |= event::error;
-    return rets;
+    int revs = 0;
+    if (events & POLLIN) revs |= Read;
+    if (events & POLLOUT) revs |= Write;
+    if (events & POLLERR) revs |= Error;
+    return revs;
 }
 
 int poll_base_t::wait(evloop *loop, int64_t timeout)

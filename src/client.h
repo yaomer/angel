@@ -4,24 +4,26 @@
 #include <string>
 
 #include "evloop.h"
-#include "connector.h"
 #include "connection.h"
 #include "thread_pool.h"
-#include "noncopyable.h"
 
 namespace angel {
 
-class client : noncopyable {
+class connector_t;
+
+class client {
 public:
     // is_reconnect: 与对端断开连接后是否尝试重连
     // retry_interval_ms: connect()调用失败后的重试间隔时间
     client(evloop *, inet_addr, bool is_reconnect = false, int64_t retry_interval_ms = 3000);
     ~client();
+    client(const client&) = delete;
+    client& operator=(const client&) = delete;
     void start();
     void restart(inet_addr);
+    void not_exit_loop();
+    bool is_connected();
     const connection_ptr& conn() const { return cli_conn; }
-    void not_exit_loop() { is_exit_loop = false; }
-    bool is_connected() { return connector->is_connected() && cli_conn; }
     inet_addr get_peer_addr() { return peer_addr; }
     void set_connection_handler(const connection_handler_t handler)
     { connection_handler = std::move(handler); }
@@ -36,24 +38,9 @@ public:
         high_water_mark = size;
         high_water_mark_handler = std::move(handler);
     }
-    void set_task_thread_nums(size_t thread_nums = 0)
-    {
-        if (thread_nums > 0)
-            task_thread_pool.reset(
-                    new thread_pool(thread_pool::policy::fixed, thread_nums));
-        else
-            task_thread_pool.reset(
-                    new thread_pool(thread_pool::policy::fixed));
-
-    }
-    void executor(const task_callback_t task)
-    {
-        if (!task_thread_pool) {
-            log_error("task_thread_pool is null");
-            return;
-        }
-        task_thread_pool->executor(task);
-    }
+    // select by angel if thread_nums = 0
+    void set_task_thread_nums(size_t thread_nums = 0);
+    void executor(const task_callback_t task);
 private:
     void new_connection(int fd);
     void close_connection(const connection_ptr&);

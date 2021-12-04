@@ -8,17 +8,18 @@
 #include "socket.h"
 #include "buffer.h"
 #include "channel.h"
-#include "noncopyable.h"
 
 namespace angel {
 
 class evloop;
 
-class listener_t : noncopyable {
+class listener_t {
 public:
     typedef std::function<void(int)> new_connection_handler_t;
     listener_t(evloop *, inet_addr, const new_connection_handler_t);
-    ~listener_t() {  }
+    ~listener_t();
+    listener_t(const listener_t&) = delete;
+    listener_t& operator=(const listener_t&) = delete;
     void listen();
     int fd() const { return listen_socket.fd(); }
     inet_addr& addr() { return listen_addr; }
