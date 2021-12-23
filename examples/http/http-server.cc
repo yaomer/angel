@@ -13,12 +13,12 @@ void message_handler(const angel::connection_ptr& conn, angel::buffer& buf)
         int crlf = buf.find_crlf();
         if (crlf < 0) break;
         switch (context.get_state()) {
-        case http_context::PARSE_LINE:
+        case http_context::Line:
             context.parse_line(buf.peek(), buf.peek() + crlf + 2);
             break;
-        case http_context::PARSE_HEADER:
+        case http_context::Header:
             context.parse_header(buf.peek(), buf.peek() + crlf + 2);
-            if (context.get_state() == http_context::PARSE_LINE)
+            if (context.get_state() == http_context::Line)
                 context.send_response(conn);
             break;
         }
