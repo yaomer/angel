@@ -58,13 +58,13 @@ void message_handler(const angel::connection_ptr& conn, angel::buffer& buf)
     while (buf.readable() >= 1) {
         int lf = buf.find_lf();
         if (lf >= 0) {
-            if (buf.strcmp("help")) {
+            if (buf.starts_with("help")) {
                 conn->send(help);
                 buf.retrieve(lf + 1);
-            } else if (buf.strcmp("ls")) {
+            } else if (buf.starts_with("ls")) {
                 send_online_users(conn);
                 buf.retrieve(lf + 1);
-            } else if (buf.strcmp("grp ")) {
+            } else if (buf.starts_with("grp ")) {
                 // broadcast msg to all clients
                 buf.retrieve(4);
                 g_serv->for_each([&sbuf, &buf, lf](const angel::connection_ptr& conn){
@@ -72,7 +72,7 @@ void message_handler(const angel::connection_ptr& conn, angel::buffer& buf)
                         conn->send(buf.c_str(), lf + 1 - 4);
                         });
                 buf.retrieve(lf + 1 - 4);
-            } else if (buf.strcmp("id ")) {
+            } else if (buf.starts_with("id ")) {
                 // send msg to id
                 buf.retrieve(3);
                 int i = 0;
