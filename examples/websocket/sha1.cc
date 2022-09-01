@@ -90,7 +90,23 @@ static void chunk_cal(const char *chunk, uint32_t h[5])
     h[4] += e;
 }
 
+// Convert to a 20-byte string
 static std::string to_digest(uint32_t h[5])
+{
+    std::string buf;
+
+    buf.reserve(20);
+    for (int i = 0; i < 5; i++) {
+        buf.push_back((h[i] >> 8 * 3) & 0xff);
+        buf.push_back((h[i] >> 8 * 2) & 0xff);
+        buf.push_back((h[i] >> 8 * 1) & 0xff);
+        buf.push_back((h[i] >> 8 * 0) & 0xff);
+    }
+    return buf;
+}
+
+// Convert to a 40-byte hex string
+static std::string to_hex_digest(uint32_t h[5])
 {
     std::string buf;
     static const char *tohex = "0123456789ABCDEF";
@@ -107,10 +123,9 @@ static std::string to_digest(uint32_t h[5])
         buf.push_back(tohex[(h[i] >> 4 * 0) & 0x0f]);
     }
     return buf;
-
 }
 
-std::string sha1(const std::string& data)
+std::string sha1(const std::string& data, bool normal)
 {
     auto buf = data;
 
@@ -123,5 +138,5 @@ std::string sha1(const std::string& data)
         chunk_cal(p, h);
         p += ChunkBytes;
     }
-    return to_digest(h);
+    return normal ? to_digest(h) : to_hex_digest(h);
 }
