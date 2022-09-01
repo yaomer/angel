@@ -29,7 +29,7 @@ std::string base64_encode(const char *data, size_t len)
     std::string res;
     res.reserve(len);
     unsigned char a, b, c;
-    char i1, i2, i3, i4;
+    unsigned char i1, i2, i3, i4;
     size_t i = 0;
     while (true) {
         if (i + 3 > len) break;
