@@ -10,4 +10,4 @@ elif [ "$PLATFORM" == "Linux" ]; then
     CXXFLAGS="$CXXFLAGS -lpthread"
 fi
 
-$CXX $CXXFLAGS ws-server.cc -langel -o ws
+$CXX $CXXFLAGS sha1.cc base64.cc ws-server.cc -langel -o ws
