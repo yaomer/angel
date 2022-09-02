@@ -1,7 +1,7 @@
 #include <string>
 #include <assert.h>
 
-#include "hton.h"
+#include <angel/sockops.h>
 
 static inline void assert_little_endian()
 {
@@ -30,7 +30,8 @@ static void padding(std::string& buf, uint64_t origin_bits)
     int k = r <= 448 ? 0 : 1;
     buf.insert(buf.size(), (k * 512 + 448 - r) / 8, (char)0x00);
     // Padding 64-bits(8-bytes) origin data bits
-    detail::hton(buf, origin_bits);
+    uint64_t encoded_bits = angel::sockops::hton64(origin_bits);
+    buf.append((const char*)&encoded_bits, 8);
     assert(buf.size() % ChunkBytes == 0);
 }
 
@@ -88,11 +89,13 @@ static void chunk_cal(const char *chunk, uint32_t h[5])
 // Convert to a 20-byte string
 static std::string to_digest(uint32_t h[5])
 {
+    uint32_t u32;
     std::string buf;
     // digest = h0 + h1 + h2 + h3 + h4;
     buf.reserve(20);
     for (int i = 0; i < 5; i++) {
-        detail::hton(buf, h[i]);
+        u32 = htonl(h[i]);
+        buf.append((const char*)&u32, 4);
     }
     return buf;
 }
