@@ -1,6 +1,8 @@
 #include <string>
 #include <assert.h>
 
+#include "hton.h"
+
 static inline void assert_little_endian()
 {
     int a = 1;
@@ -28,14 +30,7 @@ static void padding(std::string& buf, uint64_t origin_bits)
     int k = r <= 448 ? 0 : 1;
     buf.insert(buf.size(), (k * 512 + 448 - r) / 8, (char)0x00);
     // Padding 64-bits(8-bytes) origin data bits
-    buf.push_back((origin_bits >> 8 * 7) & 0xff);
-    buf.push_back((origin_bits >> 8 * 6) & 0xff);
-    buf.push_back((origin_bits >> 8 * 5) & 0xff);
-    buf.push_back((origin_bits >> 8 * 4) & 0xff);
-    buf.push_back((origin_bits >> 8 * 3) & 0xff);
-    buf.push_back((origin_bits >> 8 * 2) & 0xff);
-    buf.push_back((origin_bits >> 8 * 1) & 0xff);
-    buf.push_back((origin_bits >> 8 * 0) & 0xff);
+    detail::hton(buf, origin_bits);
     assert(buf.size() % ChunkBytes == 0);
 }
 
@@ -94,13 +89,10 @@ static void chunk_cal(const char *chunk, uint32_t h[5])
 static std::string to_digest(uint32_t h[5])
 {
     std::string buf;
-
+    // digest = h0 + h1 + h2 + h3 + h4;
     buf.reserve(20);
     for (int i = 0; i < 5; i++) {
-        buf.push_back((h[i] >> 8 * 3) & 0xff);
-        buf.push_back((h[i] >> 8 * 2) & 0xff);
-        buf.push_back((h[i] >> 8 * 1) & 0xff);
-        buf.push_back((h[i] >> 8 * 0) & 0xff);
+        detail::hton(buf, h[i]);
     }
     return buf;
 }
@@ -110,7 +102,7 @@ static std::string to_hex_digest(uint32_t h[5])
 {
     std::string buf;
     static const char *tohex = "0123456789ABCDEF";
-    // digest = h0 + h1 + h2 + h3 + h4;
+
     buf.reserve(40);
     for (int i = 0; i < 5; i++) {
         buf.push_back(tohex[(h[i] >> 4 * 7) & 0x0f]);
