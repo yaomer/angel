@@ -7,6 +7,24 @@ namespace angel {
 
 namespace sockops {
 
+static inline uint64_t hton64(uint64_t host)
+{
+#if __LITTLE_ENDIAN__
+    return ((uint64_t)htonl(host & 0xffffffff) << 32) | htonl(host >> 32);
+#else
+    return host;
+#endif
+}
+
+static inline uint64_t ntoh64(uint64_t net)
+{
+#if __LITTLE_ENDIAN__
+    return ((uint64_t)ntohl(net & 0xffffffff) << 32) | ntohl(net >> 32);
+#else
+    return net;
+#endif
+}
+
 int socket();
 void bind(int sockfd, struct sockaddr_in *addr);
 void listen(int sockfd);
