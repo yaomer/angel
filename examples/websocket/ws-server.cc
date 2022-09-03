@@ -40,16 +40,19 @@ void WebSocketContext::message_handler(const angel::connection_ptr& conn, angel:
             case WebSocketContext::Ok:
                 if (ws->on_message) ws->on_message(context);
                 break;
-            case WebSocketContext::Ping:
-                frame = 0x8A;
-                conn->send(&frame, 1);
-                break;
             case WebSocketContext::Close:
                 if (ws->on_close) ws->on_close(context);
                 frame = 0x88;
                 conn->send(&frame, 1);
                 conn->close();
                 return;
+            case WebSocketContext::Ping:
+                frame = 0x8A;
+                conn->send(&frame, 1);
+                break;
+            case WebSocketContext::Pong:
+                // 单向心跳，表明发送方进程还在
+                break;
             case WebSocketContext::Error:
                 conn->close();
                 return;
@@ -211,7 +214,7 @@ int WebSocketContext::decode(angel::buffer& raw_buf)
     case 0x3: case 0x4: case 0x5: case 0x6: case 0x7: break;
     case 0x8: return Close;
     case 0x9: return Ping;
-    case 0xA: return Error;
+    case 0xA: return Pong;
     case 0xB: case 0xC: case 0xD: case 0xE: case 0xF: break;
     }
 

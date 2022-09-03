@@ -51,7 +51,7 @@ public:
     std::string host;
 private:
     enum { Handshake, HandshakeOK, HandshakeError, Establish };
-    enum { Ok, Error, NotEnough, Ping, Close };
+    enum { Ok, Error, NotEnough, Ping, Pong, Close };
     static void message_handler(const angel::connection_ptr& conn, angel::buffer& buf);
     int handshake(const angel::connection_ptr& conn, angel::buffer& buf);
     int handshake(const char *line, const char *end);
