@@ -31,7 +31,7 @@ static void padding(std::string& buf, uint64_t origin_bits)
     buf.insert(buf.size(), (k * 512 + 448 - r) / 8, (char)0x00);
     // Padding 64-bits(8-bytes) origin data bits
     uint64_t encoded_bits = angel::sockops::hton64(origin_bits);
-    buf.append((const char*)&encoded_bits, 8);
+    buf.append(reinterpret_cast<const char*>(&encoded_bits), 8);
     assert(buf.size() % ChunkBytes == 0);
 }
 
@@ -95,7 +95,7 @@ static std::string to_digest(uint32_t h[5])
     buf.reserve(20);
     for (int i = 0; i < 5; i++) {
         u32 = htonl(h[i]);
-        buf.append((const char*)&u32, 4);
+        buf.append(reinterpret_cast<const char*>(&u32), 4);
     }
     return buf;
 }
