@@ -13,6 +13,10 @@
 namespace angel {
 
 class poller;
+class select_base_t;
+class poll_base_t;
+class kqueue_base_t;
+class epoll_base_t;
 
 class timer_t;
 typedef std::function<void()> timer_callback_t;
@@ -40,11 +44,7 @@ public:
     channel_ptr search_channel(int fd)
     { return channel_map.find(fd)->second; }
 
-    void fill_active_channel(channel_ptr& chl)
-    { active_channels.emplace_back(chl); }
-
     void run();
-    void wakeup();
     bool is_io_loop_thread();
     void run_in_loop(const functor cb);
     void queue_in_loop(const functor cb);
@@ -54,6 +54,7 @@ public:
     void quit();
 private:
     void wakeup_init();
+    void wakeup();
     void handle_read();
     void add_channel_in_loop(const channel_ptr& chl);
     void remove_channel_in_loop(const channel_ptr& chl);
@@ -71,6 +72,11 @@ private:
     std::mutex mutex;
     int wake_fd[2];
     size_t nloops;
+
+    friend class select_base_t;
+    friend class poll_base_t;
+    friend class kqueue_base_t;
+    friend class epoll_base_t;
 };
 
 } // angel

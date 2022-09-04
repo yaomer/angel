@@ -109,7 +109,7 @@ int kqueue_base_t::wait(evloop *loop, int64_t timeout)
         for (int i = 0; i < nevents; i++) {
             auto chl = loop->search_channel(evlist[i].ident);
             chl->set_trigger_events(evret(evlist[i]));
-            loop->fill_active_channel(chl);
+            loop->active_channels.emplace_back(chl);
         }
     }
     return nevents;

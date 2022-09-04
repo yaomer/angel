@@ -73,7 +73,7 @@ int poll_base_t::wait(evloop *loop, int64_t timeout)
             if (it.revents > 0) {
                 auto chl = loop->search_channel(it.fd);
                 chl->set_trigger_events(evret(it.revents));
-                loop->fill_active_channel(chl);
+                loop->active_channels.emplace_back(chl);
                 if (--nevents == 0)
                     break;
             }

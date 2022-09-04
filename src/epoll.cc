@@ -82,7 +82,7 @@ int epoll_base_t::wait(evloop *loop, int64_t timeout)
         for (int i = 0; i < nevents; i++) {
             auto chl = loop->search_channel(evlist[i].data.fd);
             chl->set_trigger_events(evret(evlist[i].events));
-            loop->fill_active_channel(chl);
+            loop->active_channels.emplace_back(chl);
         }
     } else if (nevents < 0) {
         if (errno != EINTR)

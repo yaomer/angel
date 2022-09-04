@@ -87,7 +87,7 @@ int select_base_t::wait(evloop *loop, int64_t timeout)
                 revs |= Error;
             auto chl = loop->search_channel(it);
             chl->set_trigger_events(revs);
-            loop->fill_active_channel(chl);
+            loop->active_channels.emplace_back(chl);
             if (revs && --nevents == 0)
                 break;
         }
