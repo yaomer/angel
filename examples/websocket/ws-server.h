@@ -10,35 +10,20 @@ class WebSocketContext;
 
 class WebSocketServer {
 public:
-    typedef std::function<void(WebSocketContext&)> WsConnectionHandler;
-    typedef std::function<void(WebSocketContext&)> WsMessageHandler;
-    typedef std::function<void(WebSocketContext&)> WsCloseHandler;
+    typedef std::function<void(WebSocketContext&)> WebSocketHandler;
 
     WebSocketServer(const WebSocketServer&) = delete;
     WebSocketServer& operator=(const WebSocketServer&) = delete;
 
     WebSocketServer(angel::evloop *, angel::inet_addr);
-    void set_connection_handler(const WsConnectionHandler handler)
-    {
-        on_connection = std::move(handler);
-    }
-    void set_message_handler(const WsMessageHandler handler)
-    {
-        on_message = std::move(handler);
-    }
-    void set_close_handler(const WsCloseHandler handler)
-    {
-        on_close = std::move(handler);
-    }
-    void start()
-    {
-        server.start();
-    }
+    void start() { server.start(); }
+
+    WebSocketHandler onopen;
+    WebSocketHandler onmessage;
+    WebSocketHandler onclose;
+    WebSocketHandler onerror;
 private:
     angel::server server;
-    WsConnectionHandler on_connection;
-    WsMessageHandler on_message;
-    WsCloseHandler on_close;
     friend class WebSocketContext;
 };
 
@@ -47,6 +32,7 @@ public:
     WebSocketContext(WebSocketServer *, angel::connection *);
     void send(const std::string& data);
     std::string decoded_buffer; // 解码好的数据
+    bool is_binary_type;
     std::string origin;
     std::string host;
 private:
@@ -72,6 +58,7 @@ private:
     // std::string status_message;
     bool read_request_line;
     int required_request_headers;
+    bool fragment;
     friend class WebSocketServer;
 };
 

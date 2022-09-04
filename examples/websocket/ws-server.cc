@@ -1,3 +1,8 @@
+//
+// WebSocket Server
+// See https://www.rfc-editor.org/rfc/rfc6455.txt
+//
+
 #include <iostream>
 #include <numeric>
 
@@ -14,14 +19,14 @@ WebSocketServer::WebSocketServer(angel::evloop *loop, angel::inet_addr listen_ad
 
 WebSocketContext::WebSocketContext(WebSocketServer *ws, angel::connection *conn)
     : state(Handshake), ws(ws), conn(conn), read_request_line(true),
-    required_request_headers(6)
+    required_request_headers(6), fragment(false)
 {
 }
 
 // 主要程序逻辑
 void WebSocketContext::message_handler(const angel::connection_ptr& conn, angel::buffer& buf)
 {
-    unsigned char frame;
+    uint16_t frame;
     WebSocketContext& context = std::any_cast<WebSocketContext&>(conn->get_context());
     WebSocketServer *ws = context.ws;
     while (buf.readable() > 0) {
@@ -29,31 +34,35 @@ void WebSocketContext::message_handler(const angel::connection_ptr& conn, angel:
         case WebSocketContext::Handshake:
             switch (context.handshake(conn, buf)) {
             case WebSocketContext::HandshakeOK:
-                if (ws->on_connection) ws->on_connection(context);
+                if (ws->onopen) ws->onopen(context);
                 break;
             case WebSocketContext::HandshakeError:
+                if (ws->onerror) ws->onerror(context);
+                conn->close();
                 return;
             }
             break;
         case WebSocketContext::Establish:
             switch (context.decode(buf)) {
             case WebSocketContext::Ok:
-                if (ws->on_message) ws->on_message(context);
+                if (!context.fragment && ws->onmessage)
+                    ws->onmessage(context);
                 break;
             case WebSocketContext::Close:
-                if (ws->on_close) ws->on_close(context);
-                frame = 0x88;
-                conn->send(&frame, 1);
+                if (ws->onclose) ws->onclose(context);
+                frame = (0x88 << 8) | 0x00;
+                conn->send(&frame, sizeof(frame));
                 conn->close();
                 return;
             case WebSocketContext::Ping:
-                frame = 0x8A;
-                conn->send(&frame, 1);
+                frame = (0x8A << 8) | 0x00;
+                conn->send(&frame, sizeof(frame));
                 break;
             case WebSocketContext::Pong:
                 // 单向心跳，表明发送方进程还在
                 break;
             case WebSocketContext::Error:
+                if (ws->onerror) ws->onerror(context);
                 conn->close();
                 return;
             case WebSocketContext::NotEnough:
@@ -158,7 +167,6 @@ int WebSocketContext::handshake(const angel::connection_ptr& conn, angel::buffer
             return HandshakeOK;
         case WebSocketContext::HandshakeError:
             context.handshake_error(conn);
-            conn->close();
             return HandshakeError;
         }
         buf.retrieve(crlf + 2);
@@ -186,71 +194,92 @@ int WebSocketContext::handshake(const angel::connection_ptr& conn, angel::buffer
 // +---------------------------------------------------------------+
 //
 // opcode:
-// 0x0(连续帧), 0x1(文本帧), 0x2(二进制帧), 0x3-0x7(保留帧)
-// 0x8(连接关闭), 0x9(ping), 0xA(pong), 0xB-0xF(保留的控制帧)
+// 0x0(连续帧)用于分片
+// 数据帧: 0x1(文本), 0x2(二进制), 0x3-0x7(保留用于其他)
+// 控制帧: 0x8(Close), 0x9(Ping), 0xA(Pong), 0xB-0xF(保留的控制帧)
 //
-int WebSocketContext::decode(angel::buffer& raw_buf)
+
+static bool decode_payload_len(uint64_t& payload_len, const char*& masking_key,
+                               const char*& b, uint64_t readable,
+                               uint8_t mask)
 {
-    bool fin; // last frame ?
-    bool rsv1, rsv2, rsv3;
-    uint8_t opcode;
-    bool mask;
-    uint64_t payload_len;
-    const char *masking_key;
-
-    const char *b = raw_buf.peek();
-    uint64_t readable = raw_buf.readable();
-    const char *start = b;
-
-    fin = b[0] >> 7;
-    rsv1 = (b[0] >> 6) & 0x01;
-    rsv2 = (b[0] >> 5) & 0x01;
-    rsv3 = (b[0] >> 4) & 0x01;
-    opcode = b[0] & 0x0f;
-    switch (opcode) {
-    case 0x0: break;
-    case 0x1: break;
-    case 0x2: break;
-    case 0x3: case 0x4: case 0x5: case 0x6: case 0x7: break;
-    case 0x8: return Close;
-    case 0x9: return Ping;
-    case 0xA: return Pong;
-    case 0xB: case 0xC: case 0xD: case 0xE: case 0xF: break;
-    }
-
     uint64_t i, raw_len;
-    if (readable < 2) return NotEnough;
-    mask = b[1] >> 7;
-    payload_len = b[1] & 0x7f;
     switch (payload_len) {
     case 127:
         i = 10;
-        if (readable < i) return NotEnough;
+        if (readable < i) return false;
         raw_len = *reinterpret_cast<const uint64_t*>(&b[2]);
         payload_len = angel::sockops::ntoh64(raw_len);
         break;
     case 126:
         i = 4;
-        if (readable < i) return NotEnough;
+        if (readable < i) return false;
         raw_len = *reinterpret_cast<const uint16_t*>(&b[2]);
         payload_len = ntohs(raw_len);
         break;
-    default:
+    default: // payload_len(1~125)
         i = 2;
         break;
     }
+    // 如果mask为真，则payload_len后面跟有一个32-bit的masking_key
+    int key_len = mask ? 4 : 0;
+    if (readable < i + key_len + payload_len) return false;
+    if (mask) masking_key = &b[i];
+    b = &b[i + key_len];
+    return true;
+}
 
-    if (mask) {
-        if (readable < i + 4 + payload_len) return NotEnough;
-        masking_key = &b[i];
-        b = &b[i + 4];
-    } else {
-        if (readable < i + payload_len) return NotEnough;
-        b = &b[i];
+int WebSocketContext::decode(angel::buffer& raw_buf)
+{
+    const char *b = raw_buf.peek();
+    uint64_t readable = raw_buf.readable();
+    const char *start = b;
+
+    // 我们至少需要2-byte才能开始进行解码
+    if (readable < 2) return NotEnough;
+
+    bool fin = b[0] >> 7;
+    bool rsv1 = (b[0] >> 6) & 0x01;
+    bool rsv2 = (b[0] >> 5) & 0x01;
+    bool rsv3 = (b[0] >> 4) & 0x01;
+    uint8_t opcode = b[0] & 0x0f;
+
+    (void)(rsv1); (void)(rsv2); (void)(rsv3);
+
+    // fragment:
+    // 1) one first-frame: fin=0, opcode!=0
+    // 2) 0 or more middle-frame: fin=0, opcode=0
+    // 3) one last-frame: fin=1, opcode=0
+    if (!fin) {
+        if (!fragment) { // first-frame
+            if (!opcode) return Error;
+        } else { // middle-frame
+            if (opcode) return Error;
+        }
+    } else if (fragment) { // last-frame
+        if (opcode) return Error;
     }
 
-    decoded_buffer.clear();
-    decoded_buffer.reserve(payload_len);
+    bool mask = b[1] >> 7;
+    uint64_t payload_len = b[1] & 0x7f;
+
+    // 所有控制帧的有效负载长度必须小于或等于125
+    if (opcode >= 0x8) {
+        if (payload_len > 125) return Error;
+    }
+
+    const char *masking_key;
+
+    if (!decode_payload_len(payload_len, masking_key, b, readable, mask))
+        return NotEnough;
+
+    if (!fragment) {
+        decoded_buffer.clear();
+        decoded_buffer.reserve(payload_len);
+    } else {
+        decoded_buffer.reserve(decoded_buffer.size() + payload_len);
+    }
+
     if (mask) {
         for (size_t i = 0; i < payload_len; i++) {
             decoded_buffer.push_back(b[i] ^ masking_key[i % 4]);
@@ -260,6 +289,20 @@ int WebSocketContext::decode(angel::buffer& raw_buf)
     }
 
     raw_buf.retrieve(b - start + payload_len);
+
+    fragment = fin ? false : true;
+
+    switch (opcode) {
+    case 0x0: break;
+    case 0x1: is_binary_type = false; break;
+    case 0x2: is_binary_type = true; break;
+    case 0x3: case 0x4: case 0x5: case 0x6: case 0x7: break;
+    case 0x8: return Close;
+    case 0x9: return Ping;
+    case 0xA: return Pong;
+    case 0xB: case 0xC: case 0xD: case 0xE: case 0xF: break;
+    }
+
     return Ok;
 }
 
@@ -295,15 +338,19 @@ int main()
 {
     angel::evloop loop;
     WebSocketServer ws(&loop, angel::inet_addr(8000));
-    ws.set_connection_handler([](WebSocketContext& c){
-            printf("new client (%s) to host (%s)\n", c.origin.c_str(), c.host.c_str());
-            });
-    ws.set_message_handler([](WebSocketContext& c){
-            c.send(c.decoded_buffer);
-            });
-    ws.set_close_handler([](WebSocketContext& c){
-            printf("disconnect with client (%s)\n", c.origin.c_str());
-            });
+    ws.onopen = [](WebSocketContext& c){
+        printf("new client (%s) to host (%s)\n", c.origin.c_str(), c.host.c_str());
+    };
+    ws.onmessage = [](WebSocketContext& c){
+        printf("%s: %s\n", c.origin.c_str(), c.decoded_buffer.c_str());
+        c.send(c.decoded_buffer);
+    };
+    ws.onclose = [](WebSocketContext& c){
+        printf("disconnect with client (%s)\n", c.origin.c_str());
+    };
+    ws.onerror = [](WebSocketContext& c){
+        printf("%s: %s\n", c.origin.c_str(), c.decoded_buffer.c_str());
+    };
     ws.start();
     loop.run();
 }
