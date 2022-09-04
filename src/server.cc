@@ -72,6 +72,39 @@ void server::remove_connection(const connection_ptr& conn)
             });
 }
 
+connection_ptr server::get_connection(size_t id)
+{
+    auto it = connection_map.find(id);
+    if (it != connection_map.cend())
+        return it->second;
+    else
+        return nullptr;
+}
+
+size_t server::get_connection_nums() const
+{
+    return connection_map.size();
+}
+
+void server::for_one(size_t id, const for_each_functor_t functor)
+{
+    if (!functor) return;
+    loop->run_in_loop([this, id = id, functor = std::move(functor)]{
+            auto it = connection_map.find(id);
+            if (it == connection_map.cend()) return;
+            functor(it->second);
+            });
+}
+
+void server::for_each(const for_each_functor_t functor)
+{
+    if (!functor) return;
+    loop->run_in_loop([this, functor = std::move(functor)]{
+            for (auto& it : this->connection_map)
+                functor(it.second);
+            });
+}
+
 void server::set_ttl_timer_if_needed(evloop *loop, const connection_ptr& conn)
 {
     if (ttl_ms <= 0) return;

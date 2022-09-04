@@ -29,7 +29,7 @@ void send_online_users(const angel::connection_ptr& conn)
 
 void connection_handler(const angel::connection_ptr& conn)
 {
-    size_t clients = g_serv->get_all_connections().size();
+    size_t clients = g_serv->get_connection_nums();
     conn->format_send("> Welcome to chat-room, your chat-id is %zu, "
                       "there %s %zu people is online\n",
                       conn->id(),

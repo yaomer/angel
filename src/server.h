@@ -30,38 +30,14 @@ public:
     server& operator=(const server&) = delete;
 
     inet_addr& listen_addr();
-
     // must be call in main-thread
-    connection_ptr get_connection(size_t id)
-    {
-        auto it = connection_map.find(id);
-        if (it != connection_map.cend())
-            return it->second;
-        else
-            return nullptr;
-    }
-    std::map<size_t, connection_ptr>& get_all_connections()
-    {
-        return connection_map;
-    }
+    connection_ptr get_connection(size_t id);
+    size_t get_connection_nums() const;
 
-    // thread-safe
-    void for_one(size_t id, const for_each_functor_t functor)
-    {
-        loop->run_in_loop([this, id = id, functor = functor]{
-                auto it = connection_map.find(id);
-                if (it == connection_map.cend())
-                    return;
-                functor(it->second);
-                });
-    }
-    void for_each(const for_each_functor_t functor)
-    {
-        loop->run_in_loop([this, functor = functor]{
-                for (auto& it : this->connection_map)
-                    functor(it.second);
-                });
-    }
+    // traverse one connection by id (thread-safe)
+    void for_one(size_t id, const for_each_functor_t functor);
+    // traverse all connections (thread-safe)
+    void for_each(const for_each_functor_t functor);
 
     // select by angel if thread_nums = 0
     void set_io_thread_nums(size_t thread_nums = 0);

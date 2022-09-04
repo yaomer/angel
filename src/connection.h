@@ -47,6 +47,7 @@ public:
     ~connection();
     connection(const connection&) = delete;
     connection& operator=(const connection&) = delete;
+
     size_t id() const { return conn_id; }
     void send(const char *s);
     void send(const std::string& s);
@@ -100,8 +101,10 @@ private:
     inet_addr peer_addr;
     // 保存连接所需的上下文
     // context不应包含一个connection_ptr，否则将会造成循环引用
+    // 若有需要，<connection*>即可
     std::any context;
-    std::atomic<state> conn_state; // 标识一个连接的状态
+    // 标识一个连接的状态
+    std::atomic<state> conn_state;
     size_t ttl_timer_id;
     int64_t ttl_ms;
     connection_handler_t connection_handler;
