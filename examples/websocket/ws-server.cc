@@ -1,6 +1,6 @@
 //
 // WebSocket Server
-// See https://www.rfc-editor.org/rfc/rfc6455.txt
+// See https://www.rfc-editor.org/rfc/rfc6455.html
 //
 
 #include <iostream>
@@ -15,6 +15,15 @@ WebSocketServer::WebSocketServer(angel::evloop *loop, angel::inet_addr listen_ad
             conn->set_context(WebSocketContext(this, conn.get()));
             });
     server.set_message_handler(WebSocketContext::message_handler);
+}
+
+void WebSocketServer::for_each(const WebSocketHandler handler)
+{
+    if (!handler) return;
+    server.for_each([handler = std::move(handler)](const angel::connection_ptr& conn){
+            WebSocketContext& context = std::any_cast<WebSocketContext&>(conn->get_context());
+            handler(context);
+            });
 }
 
 WebSocketContext::WebSocketContext(WebSocketServer *ws, angel::connection *conn)
@@ -88,7 +97,7 @@ int WebSocketContext::handshake(const char *line, const char *end)
     if (read_request_line) {
         read_request_line = false;
         if (strncmp(line, "GET ", 4)) return HandshakeError;
-        std::string uri;
+        std::string uri; // 用于识别websocket服务端点
         const char *p = std::find_if(line + 4, end, isspace);
         uri.assign(line + 4, p);
         if (strncmp(p + 1, "HTTP/1.1", 8))

@@ -16,6 +16,7 @@ public:
     WebSocketServer& operator=(const WebSocketServer&) = delete;
 
     WebSocketServer(angel::evloop *, angel::inet_addr);
+    void for_each(const WebSocketHandler handler);
     void start() { server.start(); }
 
     WebSocketHandler onopen;
