@@ -42,6 +42,7 @@ set (SRC_FILES
     ${SRC_DIR}/evloop.cc
     ${SRC_DIR}/channel.cc
     ${SRC_DIR}/connection.cc
+    ${SRC_DIR}/inet_addr.cc
     ${SRC_DIR}/sockops.cc
     ${SRC_DIR}/listener.cc
     ${SRC_DIR}/connector.cc

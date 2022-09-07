@@ -20,6 +20,7 @@ public:
     ~listener_t();
     listener_t(const listener_t&) = delete;
     listener_t& operator=(const listener_t&) = delete;
+
     void listen();
     int fd() const { return listen_socket.fd(); }
     inet_addr& addr() { return listen_addr; }

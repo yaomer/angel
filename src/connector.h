@@ -18,6 +18,7 @@ public:
     ~connector_t();
     connector_t(const connector_t&) = delete;
     connector_t& operator=(const connector_t&) = delete;
+
     void connect();
     bool is_connected() { return has_connected; }
     int connfd() const { return connect_channel->fd(); }

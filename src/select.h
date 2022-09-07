@@ -15,6 +15,7 @@ public:
     ~select_base_t();
     select_base_t(const select_base_t&) = delete;
     select_base_t& operator=(const select_base_t&) = delete;
+
     int wait(evloop *loop, int64_t timeout) override;
     void add(int fd, int events) override;
     void change(int fd, int events) override;

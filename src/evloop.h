@@ -34,6 +34,7 @@ public:
     ~evloop();
     evloop(const evloop&) = delete;
     evloop& operator=(const evloop&) = delete;
+
     // 向loop中注册一个事件
     void add_channel(const channel_ptr& chl);
     // 从loop中删除一个事件

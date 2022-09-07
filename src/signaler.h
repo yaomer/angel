@@ -27,6 +27,7 @@ public:
     ~signaler_t();
     signaler_t(const signaler_t&) = delete;
     signaler_t& operator=(const signaler_t&) = delete;
+
     void add_signal(int signo, const signaler_handler_t handler);
     void cancel_signal(int signo);
     void start();

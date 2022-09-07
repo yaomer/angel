@@ -13,17 +13,8 @@ namespace angel {
 
 class logger {
 public:
-    enum class flush_flags {
-        file    = 1,
-        stdout  = 2,
-    };
-    enum class level {
-        debug   = 1,
-        info    = 2,
-        warn    = 3,
-        error   = 4,
-        fatal   = 5,
-    };
+    enum class flush_flags { file, stdout };
+    enum class level { debug, info, warn, error, fatal };
 
     logger();
     ~logger();
@@ -32,19 +23,9 @@ public:
 
     void set_dir(std::string dir);
     void set_name(std::string name);
-    void set_level(level level)
-    {
-        log_level = level;
-    }
-    void set_flush(flush_flags where)
-    {
-        flush_to = where;
-        restart();
-    }
-    bool is_filter(level level)
-    {
-        return level < log_level;
-    }
+    void set_level(level level);
+    void set_flush(flush_flags where);
+    bool is_filter(level level);
     void format(level level, const char *file, int line, const char *fmt, ...);
     void restart();
     void quit();

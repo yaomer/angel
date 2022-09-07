@@ -16,6 +16,7 @@ public:
     ~epoll_base_t();
     epoll_base_t(const epoll_base_t&) = delete;
     epoll_base_t& operator=(const epoll_base_t&) = delete;
+
     int wait(evloop *loop, int64_t timeout) override;
     void add(int fd, int events) override;
     void change(int fd, int events) override;

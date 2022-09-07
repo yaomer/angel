@@ -64,6 +64,22 @@ void logger::set_name(std::string name)
     if (filename != "") create_new_file();
 }
 
+void logger::set_level(level level)
+{
+    log_level = level;
+}
+
+void logger::set_flush(flush_flags where)
+{
+    flush_to = where;
+    restart();
+}
+
+bool logger::is_filter(level level)
+{
+    return level < log_level;
+}
+
 std::string logger::get_new_file()
 {
     struct tm tm;

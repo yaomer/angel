@@ -19,6 +19,7 @@ public:
     ~client();
     client(const client&) = delete;
     client& operator=(const client&) = delete;
+
     void start();
     void restart(inet_addr);
     void not_exit_loop();

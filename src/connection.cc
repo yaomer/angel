@@ -6,8 +6,10 @@
 #include "inet_addr.h"
 #include "socket.h"
 #include "channel.h"
+#include "sockops.h"
 #include "connection.h"
 #include "logger.h"
+#include "util.h"
 
 namespace angel {
 

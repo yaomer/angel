@@ -17,6 +17,7 @@ public:
     ~poll_base_t();
     poll_base_t(const poll_base_t&) = delete;
     poll_base_t& operator=(const poll_base_t&) = delete;
+
     int wait(evloop *loop, int64_t timeout) override;
     void add(int fd, int events) override;
     void change(int fd, int events) override;

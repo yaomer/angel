@@ -5,6 +5,7 @@
 #include "sockops.h"
 #include "connector.h"
 #include "logger.h"
+#include "util.h"
 
 namespace angel {
 
