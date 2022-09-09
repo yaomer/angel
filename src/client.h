@@ -43,7 +43,8 @@ public:
         high_water_mark_handler = std::move(handler);
     }
     // select by angel if thread_nums = 0
-    void set_task_thread_nums(size_t thread_nums = 0);
+    void start_task_threads(size_t thread_nums = 0,
+                            enum thread_pool::policy policy = thread_pool::policy::fixed);
     void executor(const task_callback_t task);
 private:
     void new_connection(int fd);

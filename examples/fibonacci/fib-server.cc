@@ -30,7 +30,7 @@ int main()
             buf.retrieve_all();
             });
     // 用一个thread pool来计算fibonacci
-    serv.set_task_thread_nums();
+    serv.start_task_threads();
     serv.start();
     loop.run();
 }

@@ -112,7 +112,7 @@ void server::set_ttl_timer_if_needed(evloop *loop, const connection_ptr& conn)
     conn->set_ttl(id, ttl_ms);
 }
 
-void server::set_io_thread_nums(size_t thread_nums)
+void server::start_io_threads(size_t thread_nums)
 {
     if (thread_nums > 0)
         io_thread_pool.reset(new evloop_thread_pool(thread_nums));
@@ -120,15 +120,12 @@ void server::set_io_thread_nums(size_t thread_nums)
         io_thread_pool.reset(new evloop_thread_pool());
 }
 
-void server::set_task_thread_nums(size_t thread_nums)
+void server::start_task_threads(size_t thread_nums, enum thread_pool::policy policy)
 {
     if (thread_nums > 0)
-        task_thread_pool.reset(
-                new thread_pool(thread_pool::policy::fixed, thread_nums));
+        task_thread_pool.reset(new thread_pool(policy, thread_nums));
     else
-        task_thread_pool.reset(
-                new thread_pool(thread_pool::policy::fixed));
-
+        task_thread_pool.reset(new thread_pool(policy));
 }
 
 void server::executor(const task_callback_t task)

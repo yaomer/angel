@@ -14,18 +14,10 @@ typedef std::function<void()> task_callback_t;
 
 class thread_pool {
 public:
-    enum class policy {
-        fixed   = 1,
-        cached  = 2,
-    };
-    enum class state {
-        running     = 1,
-        shutdown    = 2,
-        stop        = 3,
-    };
+    enum class policy { fixed, cached };
+    enum class state { running, shutdown, stop };
     thread_pool(policy policy, unsigned nums = std::thread::hardware_concurrency())
-        : policy(policy),
-        state(state::running)
+        : policy(policy), state(state::running)
     {
         for (unsigned i = 0; i < nums; i++)
             add_new_worker();
@@ -34,8 +26,10 @@ public:
     {
         shutdown();
     }
+
     thread_pool(const thread_pool&) = delete;
     thread_pool& operator=(const thread_pool&) = delete;
+
     void executor(const task_callback_t task)
     {
         assert(state == state::running);

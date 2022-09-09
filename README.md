@@ -108,7 +108,7 @@ int main(void)
             buf.retrieve_all();
             });
     // 主线程接收新连接，4个io线程处理连接
-    server.set_io_thread_nums(4);
+    server.start_io_threads(4);
     server.start();
     loop.run();
 }
@@ -127,7 +127,7 @@ int main(void)
                     });
             });
     // 开启一个拥有4个线程的任务线程池
-    server.set_task_thread_nums(4);
+    server.start_task_threads(4);
     server.start();
     loop.run();
 }

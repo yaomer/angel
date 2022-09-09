@@ -62,16 +62,14 @@ void client::close_connection(const connection_ptr& conn)
     if (ops.is_quit_loop) loop->quit();
 }
 
-void client::set_task_thread_nums(size_t thread_nums)
+void client::start_task_threads(size_t thread_nums, enum thread_pool::policy policy)
 {
     if (thread_nums > 0)
-        task_thread_pool.reset(
-                new thread_pool(thread_pool::policy::fixed, thread_nums));
+        task_thread_pool.reset(new thread_pool(policy, thread_nums));
     else
-        task_thread_pool.reset(
-                new thread_pool(thread_pool::policy::fixed));
-
+        task_thread_pool.reset(new thread_pool(policy));
 }
+
 void client::executor(const task_callback_t task)
 {
     if (!task_thread_pool) {
