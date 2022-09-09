@@ -11,18 +11,21 @@ namespace angel {
 
 class connector_t;
 
+struct client_options {
+    bool is_reconnect = false; // 与对端断开连接后是否尝试重连
+    int64_t retry_interval_ms = 3000; // connect()调用失败后的重试间隔时间
+    bool is_quit_loop = true; // 连接断开后是否loop->quit()
+};
+
 class client {
 public:
-    // is_reconnect: 与对端断开连接后是否尝试重连
-    // retry_interval_ms: connect()调用失败后的重试间隔时间
-    client(evloop *, inet_addr, bool is_reconnect = false, int64_t retry_interval_ms = 3000);
+    client(evloop *, inet_addr, client_options ops = client_options());
     ~client();
     client(const client&) = delete;
     client& operator=(const client&) = delete;
 
     void start();
     void restart(inet_addr);
-    void not_exit_loop();
     bool is_connected();
     const connection_ptr& conn() const { return cli_conn; }
     inet_addr get_peer_addr() { return peer_addr; }
@@ -47,6 +50,7 @@ private:
     void close_connection(const connection_ptr&);
 
     evloop *loop;
+    client_options ops;
     std::unique_ptr<connector_t> connector;
     std::shared_ptr<connection> cli_conn;
     std::unique_ptr<thread_pool> task_thread_pool;
@@ -56,9 +60,6 @@ private:
     close_handler_t close_handler;
     high_water_mark_handler_t high_water_mark_handler;
     inet_addr peer_addr;
-    bool is_reconnect;
-    bool is_exit_loop;
-    int64_t retry_interval_ms;
     size_t high_water_mark;
 };
 

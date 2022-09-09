@@ -4,12 +4,8 @@
 
 namespace angel {
 
-client::client(evloop *loop, inet_addr peer_addr, bool is_reconnect, int64_t retry_interval_ms)
-    : loop(loop),
-    peer_addr(peer_addr),
-    is_reconnect(is_reconnect),
-    is_exit_loop(true),
-    retry_interval_ms(retry_interval_ms),
+client::client(evloop *loop, inet_addr peer_addr, client_options ops)
+    : loop(loop), ops(ops), peer_addr(peer_addr),
     high_water_mark(0)
 {
 }
@@ -17,11 +13,6 @@ client::client(evloop *loop, inet_addr peer_addr, bool is_reconnect, int64_t ret
 client::~client()
 {
     close_connection(cli_conn);
-}
-
-void client::not_exit_loop()
-{
-    is_exit_loop = false;
 }
 
 bool client::is_connected()
@@ -39,7 +30,7 @@ void client::new_connection(int fd)
     cli_conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     cli_conn->set_close_handler([this](const connection_ptr& conn){
             this->close_connection(conn);
-            if (this->is_reconnect) this->start();
+            if (this->ops.is_reconnect) this->start();
             });
     loop->run_in_loop([conn = cli_conn]{
             conn->establish();
@@ -49,7 +40,7 @@ void client::new_connection(int fd)
 void client::start()
 {
     auto handler = [this](int fd){ this->new_connection(fd); };
-    connector.reset(new connector_t(loop, peer_addr, handler, retry_interval_ms));
+    connector.reset(new connector_t(loop, peer_addr, handler, ops.retry_interval_ms));
     connector->connect();
 }
 
@@ -68,7 +59,7 @@ void client::close_connection(const connection_ptr& conn)
     loop->remove_channel(conn->get_channel());
     if (close_handler) close_handler(conn);
     cli_conn.reset();
-    if (is_exit_loop) loop->quit();
+    if (ops.is_quit_loop) loop->quit();
 }
 
 void client::set_task_thread_nums(size_t thread_nums)

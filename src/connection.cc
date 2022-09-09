@@ -36,8 +36,9 @@ connection::connection(size_t id, evloop *loop, int sockfd)
 
 connection::~connection()
 {
-    if (ttl_timer_id == 0) return;
-    loop->cancel_timer(ttl_timer_id);
+    if (ttl_timer_id > 0) {
+        loop->cancel_timer(ttl_timer_id);
+    }
     log_info("connection(id=%d, fd=%d) is %s", conn_id, conn_socket->fd(), get_state_str());
 }
 
