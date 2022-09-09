@@ -2,6 +2,7 @@
 #define _ANGEL_UTIL_H
 
 #include <thread>
+#include <vector>
 
 namespace angel {
 
@@ -9,6 +10,11 @@ namespace util {
 
 const char *strerrno();
 const char *strerr(int err);
+
+// if c == ','
+// for [a,b,c,d] return [a][b][c][d]
+std::vector<std::string>
+split(const char *s, const char *es, char c);
 
 size_t get_cur_thread_id();
 std::string get_cur_thread_id_str();

@@ -29,6 +29,22 @@ const char *strerrno()
     return strerr(errno);
 }
 
+std::vector<std::string>
+split(const char *s, const char *es, char c)
+{
+    const char *p;
+    std::vector<std::string> vlist;
+
+    while (true) {
+        p = std::find(s, es, c);
+        if (p == es) break;
+        vlist.emplace_back(s, p);
+        s = p + 1;
+    }
+    vlist.emplace_back(s, p);
+    return vlist;
+}
+
 size_t get_cur_thread_id()
 {
     return std::hash<std::thread::id>()(std::this_thread::get_id());
