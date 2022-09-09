@@ -6,6 +6,8 @@
 #include <iostream>
 #include <numeric>
 
+#include <angel/sockops.h>
+
 #include "ws-server.h"
 
 WebSocketServer::WebSocketServer(angel::evloop *loop, angel::inet_addr listen_addr)
