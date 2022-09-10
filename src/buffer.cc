@@ -16,10 +16,10 @@ buffer::buffer(size_t size) : buf(size)
 
 buffer::~buffer() = default;
 
-int buffer::find(char *s, const char *pattern)
+int buffer::find(char *s, std::string_view pattern)
 {
     const char *p = std::search(
-            s, begin() + write_index, pattern, pattern + strlen(pattern));
+            s, begin() + write_index, pattern.begin(), pattern.end());
     return p == begin() + write_index ? -1 : p - s;
 }
 
@@ -34,6 +34,11 @@ void buffer::make_space(size_t len)
         } else
             buf.resize(write_index + len);
     }
+}
+
+void buffer::append(std::string_view s)
+{
+    append(s.data(), s.size());
 }
 
 void buffer::append(const char *data, size_t len)
