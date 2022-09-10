@@ -3,7 +3,7 @@
 
 #include <arpa/inet.h>
 
-#include <string>
+#include <string_view>
 
 namespace angel {
 
@@ -27,7 +27,7 @@ static inline uint64_t ntoh64(uint64_t net)
 #endif
 }
 
-int socket(std::string protocol = "tcp");
+int socket(std::string_view protocol = "tcp");
 void bind(int sockfd, struct sockaddr_in *addr);
 void listen(int sockfd);
 int accept(int sockfd);

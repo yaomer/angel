@@ -183,12 +183,7 @@ void connection::send(const char *s, size_t len)
     update_ttl_timer_if_needed();
 }
 
-void connection::send(const char *s)
-{
-    send(s, strlen(s));
-}
-
-void connection::send(const std::string& s)
+void connection::send(std::string_view s)
 {
     send(s.data(), s.size());
 }

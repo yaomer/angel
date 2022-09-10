@@ -17,7 +17,7 @@ public:
     connector_t(evloop *, inet_addr,
                 const new_connection_handler_t,
                 int64_t retry_interval_ms,
-                std::string protocol);
+                std::string_view protocol);
     ~connector_t();
     connector_t(const connector_t&) = delete;
     connector_t& operator=(const connector_t&) = delete;

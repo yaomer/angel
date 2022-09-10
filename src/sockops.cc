@@ -19,7 +19,7 @@ static inline struct sockaddr *sockaddr_cast(struct sockaddr_in *addr)
     return reinterpret_cast<struct sockaddr *>(addr);
 }
 
-int socket(std::string protocol)
+int socket(std::string_view protocol)
 {
     int sockfd = -1;
     if (protocol == "tcp") {

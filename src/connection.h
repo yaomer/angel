@@ -49,8 +49,7 @@ public:
     connection& operator=(const connection&) = delete;
 
     size_t id() const { return conn_id; }
-    void send(const char *s);
-    void send(const std::string& s);
+    void send(std::string_view s);
     void send(const char *s, size_t len);
     void send(const void *v, size_t len);
     void format_send(const char *fmt, ...);
