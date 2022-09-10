@@ -40,7 +40,9 @@ void client::new_connection(int fd)
 void client::start()
 {
     auto handler = [this](int fd){ this->new_connection(fd); };
-    connector.reset(new connector_t(loop, peer_addr, handler, ops.retry_interval_ms));
+    connector.reset(new connector_t(loop, peer_addr, handler,
+                                    ops.retry_interval_ms,
+                                    ops.protocol));
     connector->connect();
 }
 

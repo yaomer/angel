@@ -104,7 +104,7 @@ void connection::handle_write()
 
 void connection::handle_close(bool is_forced)
 {
-    log_debug("connection(id=%d, fd=%d) is %s", conn_id, conn_channel->fd(), get_state_str());
+    log_info("connection(id=%d, fd=%d) is %s", conn_id, conn_channel->fd(), get_state_str());
     if (conn_state == state::closed) return;
     if (!is_forced && output_buf.readable() > 0) {
         set_state(state::closing);
@@ -238,11 +238,11 @@ void connection::update_ttl_timer_if_needed()
 const char *connection::get_state_str()
 {
     switch (conn_state) {
-    case state::connecting: return "CONNECTING";
-    case state::connected: return "CONNECTED";
-    case state::closing: return "CLOSING";
-    case state::closed: return "CLOSED";
-    default: return "NONE";
+    case state::connecting: return "<Connecting>";
+    case state::connected: return "<Connected>";
+    case state::closing: return "<Closing>";
+    case state::closed: return "<Closed>";
+    default: return "<None>";
     }
 }
 

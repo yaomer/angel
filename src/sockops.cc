@@ -19,9 +19,16 @@ static inline struct sockaddr *sockaddr_cast(struct sockaddr_in *addr)
     return reinterpret_cast<struct sockaddr *>(addr);
 }
 
-int socket()
+int socket(std::string protocol)
 {
-    int sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
+    int sockfd = -1;
+    if (protocol == "tcp") {
+        sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
+    } else if (protocol == "udp") {
+        sockfd = ::socket(AF_INET, SOCK_DGRAM, 0);
+    } else {
+        log_fatal("protocol should be set (tcp or udp)");
+    }
     if (sockfd < 0)
         log_fatal("socket: %s", strerrno());
     return sockfd;

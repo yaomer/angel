@@ -11,7 +11,8 @@ namespace angel {
 
 connector_t::connector_t(evloop *loop, inet_addr peer_addr,
                          const new_connection_handler_t handler,
-                         int64_t retry_interval_ms)
+                         int64_t retry_interval_ms,
+                         std::string protocol)
     : loop(loop),
     peer_addr(peer_addr),
     connect_channel(new channel(loop)),
@@ -20,7 +21,8 @@ connector_t::connector_t(evloop *loop, inet_addr peer_addr,
     retry_timer_id(0),
     wait_retry(false),
     sockfd(-1),
-    retry_interval(retry_interval_ms)
+    retry_interval(retry_interval_ms),
+    protocol(protocol)
 {
 }
 
@@ -38,7 +40,7 @@ connector_t::~connector_t()
 void connector_t::connect()
 {
     wait_retry = false;
-    sockfd = sockops::socket();
+    sockfd = sockops::socket(protocol);
     sockops::set_nonblock(sockfd);
     int ret = sockops::connect(sockfd, &peer_addr.addr());
     connect_channel->set_fd(sockfd);

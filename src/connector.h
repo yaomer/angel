@@ -14,7 +14,10 @@ class evloop;
 class connector_t {
 public:
     typedef std::function<void(int)> new_connection_handler_t;
-    connector_t(evloop *, inet_addr, const new_connection_handler_t, int64_t retry_interval_ms);
+    connector_t(evloop *, inet_addr,
+                const new_connection_handler_t,
+                int64_t retry_interval_ms,
+                std::string protocol);
     ~connector_t();
     connector_t(const connector_t&) = delete;
     connector_t& operator=(const connector_t&) = delete;
@@ -38,6 +41,7 @@ private:
     bool wait_retry;
     int sockfd;
     int retry_interval;
+    std::string protocol;
 };
 }
 
