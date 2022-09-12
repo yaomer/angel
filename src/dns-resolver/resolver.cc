@@ -201,7 +201,10 @@ int resolver::unpack(angel::buffer& res_buf)
     result res;
     switch (q_type) {
     case TYPE_A: res = a_res_t(); break;
+    case TYPE_NS: res = ns_res_t(); break;
+    case TYPE_CNAME: res = cname_res_t(); break;
     case TYPE_MX: res = mx_res_t(); break;
+    case TYPE_TXT: res = txt_res_t(); break;
     }
 
     for (int i = 0; i < answer; i++) {
@@ -216,11 +219,30 @@ int resolver::unpack(angel::buffer& res_buf)
                 std::get<a_res_t>(res).emplace_back(to_ip(p));
             }
             break;
+        case TYPE_NS:
+            {
+                auto ns_name = parse_dns_name(res_buf.peek(), p);
+                std::get<ns_res_t>(res).emplace_back(std::move(ns_name));
+            }
+            break;
+        case TYPE_CNAME:
+            {
+                auto cname = parse_dns_name(res_buf.peek(), p);
+                std::get<cname_res_t>(res) = std::move(cname);
+            }
+            break;
         case TYPE_MX:
             {
                 uint16_t preference = ntohs(u16(p)); // lower values are preferred
                 auto exchange_name = parse_dns_name(res_buf.peek(), p);
                 std::get<mx_res_t>(res).emplace_back(preference, std::move(exchange_name));
+            }
+            break;
+        case TYPE_TXT:
+            {
+                uint8_t txt_len = *p++;
+                std::get<txt_res_t>(res).emplace_back(p, p + txt_len);
+                p += txt_len;
             }
             break;
         }

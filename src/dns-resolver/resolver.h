@@ -17,10 +17,16 @@ namespace dns {
 
 // <ip1, ip2, ...>
 typedef std::vector<std::string> a_res_t;
+typedef std::vector<std::string> ns_res_t;
+// A domain name can usually only point to one authoritative domain name
+typedef std::string cname_res_t;
 // <<preference1, exchange_name1>, <preference2, exchange_name2>, ...>
 typedef std::vector<std::pair<uint16_t, std::string>> mx_res_t;
+typedef std::vector<std::string> txt_res_t;
 
-typedef std::variant<a_res_t, mx_res_t> result;
+typedef std::variant<std::string,
+                     std::vector<std::string>,
+                     std::vector<std::pair<uint16_t, std::string>> > result;
 typedef std::shared_future<result> result_future;
 
 static inline const a_res_t& get_a(const result& res)
@@ -28,9 +34,24 @@ static inline const a_res_t& get_a(const result& res)
     return std::get<a_res_t>(res);
 }
 
+static inline const ns_res_t& get_ns(const result& res)
+{
+    return std::get<ns_res_t>(res);
+}
+
+static inline const cname_res_t& get_cname(const result& res)
+{
+    return std::get<cname_res_t>(res);
+}
+
 static inline const mx_res_t& get_mx(const result& res)
 {
     return std::get<mx_res_t>(res);
+}
+
+static inline const txt_res_t& get_txt(const result& res)
+{
+    return std::get<txt_res_t>(res);
 }
 
 struct query_context {
