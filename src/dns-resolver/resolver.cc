@@ -319,9 +319,24 @@ void resolver::unpack(angel::buffer& res_buf)
     }
 }
 
+void query_context::set_retransmit_timer(resolver *r)
+{
+    // TODO: 指数退避
+    retransmit_timer_id = r->loop->run_after(3000, [r, qc = shared_from_this()](){
+            lock_t lk(r->query_map_mutex);
+            if (r->query_map.count(qc->id)) {
+                r->cli->conn()->send(qc->buf);
+                qc->set_retransmit_timer(r);
+            } else {
+                r->loop->cancel_timer(qc->retransmit_timer_id);
+            }
+            });
+}
+
 void resolver::delay_send(resolver *r, query_context *qc)
 {
     r->cli->conn()->send(qc->buf);
+    qc->set_retransmit_timer(r);
 }
 
 result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q_class)
@@ -345,6 +360,7 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
         }
     } else {
         cli->conn()->send(qc->buf);
+        qc->set_retransmit_timer(this);
     }
     return f;
 }

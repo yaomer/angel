@@ -130,14 +130,18 @@ static inline const char *get_err(const rr_base_ptr& rr)
     return rr->name.c_str();
 }
 
-struct query_context {
+class resolver;
+
+struct query_context : public std::enable_shared_from_this<query_context> {
     uint16_t id;
     std::string name;
     uint16_t q_type;
     uint16_t q_class;
     std::string buf;
     std::promise<result> recv_promise;
+    size_t retransmit_timer_id;
     void pack();
+    void set_retransmit_timer(resolver *);
 };
 
 typedef std::lock_guard<std::mutex> lock_t;
@@ -159,12 +163,14 @@ private:
     angel::evloop *loop; // -> loop_thread.get_loop()
     std::unique_ptr<angel::client> cli;
     std::atomic_size_t id = 1;
-    typedef std::unordered_map<uint16_t, std::unique_ptr<query_context>> QueryMap;
+    typedef std::unordered_map<uint16_t, std::shared_ptr<query_context>> QueryMap;
     typedef std::queue<std::packaged_task<void()>> DelayTaskQueue;
     QueryMap query_map;
     std::mutex query_map_mutex;
     DelayTaskQueue delay_task_queue;
     std::mutex delay_task_queue_mutex;
+
+    friend struct query_context;
 };
 
 }
