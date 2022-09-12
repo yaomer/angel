@@ -15,6 +15,40 @@ namespace dns {
 #define DNS_SERVER_IP   "192.168.43.1"
 #define DNS_SERVER_PORT 53
 
+//  Header
+//    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                      ID                       |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |QR|   Opcode  |AA|TC|RD|RA| Z|AD|CD|   RCODE   |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    QDCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    ANCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    NSCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    ARCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  QR       0   query
+//           1   response
+//  OPCODE   0   standard query
+//  (4)      1   inverse query
+//           2   server status request
+//           3-15 reserved
+//  AA       authoritative answer
+//  TC       truncate
+//  RD       recursion desired
+//  RA       recursion available
+//  Z,AD,CD  0
+//  RCODE    0   no error
+//  (4)      1   format error
+//           2   server failure
+//           3   name error
+//           4   not implemented
+//           5   refused
+//           6-15 reserved
+
 template <typename Ptr>
 static inline const char *charptr(Ptr p)
 {

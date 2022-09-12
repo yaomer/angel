@@ -30,6 +30,8 @@ enum type {
     ERROR   = 17, // query error
 };
 
+// RR(Resource record) Common
+// for (Answer, Authority and Additional)
 struct rr_base {
     rr_base() = default;
     rr_base(const rr_base&) = default;
