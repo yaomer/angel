@@ -20,10 +20,10 @@ enum type {
     NS      =  2, // an authoritative name server
     CNAME   =  5, // the canonical name for an alias
     SOA     =  6, // marks the start of a zone of authority
-    WKS     = 11, // a well known service description
+    // WKS     = 11, // a well known service description
     PTR     = 12, // a domain name pointer
-    HINFO   = 13, // host information
-    MINFO   = 14, // mailbox or mail list information
+    // HINFO   = 13, // host information
+    // MINFO   = 14, // mailbox or mail list information
     MX      = 15, // mail exchange
     TXT     = 16, // text strings
     //============================
@@ -67,6 +67,23 @@ struct txt_rdata : rr_base {
     std::string str;
 };
 
+// most used by name server
+struct soa_rdata : rr_base {
+    soa_rdata(const rr_base& rr) : rr_base(rr) {  }
+    std::string mname;
+    std::string rname;
+    uint32_t    serial;  // version number
+    uint32_t    refresh; // time interval(s)
+    uint32_t    retry;   // time interval(s)
+    uint32_t    expire;  // time value(s)
+    uint32_t    minimum; // minimum ttl(s)
+};
+
+struct ptr_rdata : rr_base {
+    ptr_rdata(const rr_base& rr) : rr_base(rr) {  }
+    std::string ptr_name;
+};
+
 typedef std::unique_ptr<rr_base> rr_base_ptr;
 typedef std::vector<rr_base_ptr> result;
 typedef std::shared_future<result> result_future;
@@ -96,6 +113,16 @@ static inline const txt_rdata *get_txt(const rr_base_ptr& rr)
     return static_cast<const txt_rdata*>(rr.get());
 }
 
+static inline const soa_rdata *get_soa(const rr_base_ptr& rr)
+{
+    return static_cast<const soa_rdata*>(rr.get());
+}
+
+static inline const ptr_rdata *get_ptr(const rr_base_ptr& rr)
+{
+    return static_cast<const ptr_rdata*>(rr.get());
+}
+
 static inline const char *get_err(const rr_base_ptr& rr)
 {
     return rr->name.c_str();
@@ -103,9 +130,12 @@ static inline const char *get_err(const rr_base_ptr& rr)
 
 struct query_context {
     uint16_t id;
+    std::string name;
+    uint16_t q_type;
+    uint16_t q_class;
     std::string buf;
     std::promise<result> recv_promise;
-    void pack(std::string_view name, uint16_t q_type, uint16_t q_class);
+    void pack();
 };
 
 typedef std::lock_guard<std::mutex> lock_t;

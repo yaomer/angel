@@ -91,7 +91,7 @@ struct dns_header {
     uint16_t additional;
 };
 
-void query_context::pack(std::string_view name, uint16_t q_type, uint16_t q_class)
+void query_context::pack()
 {
     dns_header hdr;
     hdr.id          = htons(id);
@@ -150,6 +150,86 @@ static const std::unordered_map<int, std::string_view> rcode_map = {
     { Refused,          "Refused" },
 };
 
+static void parse_answer_rrs(result& res, const char*& p, const char *start, int answer)
+{
+    rr_base rr;
+    for (int i = 0; i < answer; i++) {
+        rr.name     = parse_dns_name(start, p);
+        rr.type     = ntohs(u16(p));
+        rr._class   = ntohs(u16(p));
+        rr.ttl      = ntohl(u32(p));
+        rr.len      = ntohs(u16(p));
+        switch (rr.type) {
+        case A:
+            {
+                a_rdata *a = new a_rdata(rr);
+                a->addr = std::move(to_ip(p));
+                res.emplace_back(dynamic_cast<rr_base*>(a));
+            }
+            break;
+        case NS:
+            {
+                ns_rdata *ns = new ns_rdata(rr);
+                ns->ns_name = parse_dns_name(start, p);
+                res.emplace_back(dynamic_cast<rr_base*>(ns));
+            }
+            break;
+        case CNAME:
+            {
+                cname_rdata *cname = new cname_rdata(rr);
+                cname->cname = parse_dns_name(start, p);
+                res.emplace_back(dynamic_cast<rr_base*>(cname));
+            }
+            break;
+        case MX:
+            {
+                mx_rdata *mx = new mx_rdata(rr);
+                mx->preference = ntohs(u16(p));
+                mx->exchange_name = parse_dns_name(start, p);
+                res.emplace_back(dynamic_cast<rr_base*>(mx));
+            }
+            break;
+        case TXT:
+            {
+                txt_rdata *txt = new txt_rdata(rr);
+                uint8_t txt_len = *p++;
+                txt->str.assign(p, p + txt_len);
+                p += txt_len;
+                res.emplace_back(dynamic_cast<rr_base*>(txt));
+            }
+            break;
+        case SOA:
+            {
+                soa_rdata *soa = new soa_rdata(rr);
+                soa->mname     = parse_dns_name(start, p);
+                soa->rname     = parse_dns_name(start, p);
+                soa->serial    = ntohl(u32(p));
+                soa->refresh   = ntohl(u32(p));
+                soa->retry     = ntohl(u32(p));
+                soa->expire    = ntohl(u32(p));
+                soa->minimum   = ntohl(u32(p));
+                res.emplace_back(dynamic_cast<rr_base*>(soa));
+            }
+            break;
+        case PTR:
+            {
+                ptr_rdata *ptr = new ptr_rdata(rr);
+                ptr->ptr_name = parse_dns_name(start, p);
+                res.emplace_back(dynamic_cast<rr_base*>(ptr));
+            }
+            break;
+        }
+    }
+}
+
+static bool is_same_name(std::string_view name, const char*& p)
+{
+    for (auto c : name) {
+        if (c != *p++) return false;
+    }
+    return true;
+}
+
 void resolver::unpack(angel::buffer& res_buf)
 {
     const char *p = res_buf.peek();
@@ -188,58 +268,15 @@ void resolver::unpack(angel::buffer& res_buf)
     uint16_t authority  = ntohs(u16(p));
     uint16_t additional = ntohs(u16(p));
 
-    std::string name    = parse_dns_name(res_buf.peek(), p);
-    uint16_t q_type     = ntohs(u16(p));
-    uint16_t q_class    = ntohs(u16(p));
+    (void)(query);
+    (void)(authority);
+    (void)(additional);
 
-    rr_base rr;
-    for (int i = 0; i < answer; i++) {
-        rr.name     = parse_dns_name(res_buf.peek(), p);
-        rr.type     = ntohs(u16(p));
-        rr._class   = ntohs(u16(p));
-        rr.ttl      = ntohl(u32(p));
-        rr.len      = ntohs(u16(p));
-        switch (rr.type) {
-        case A:
-            {
-                a_rdata *item = new a_rdata(rr);
-                item->addr = std::move(to_ip(p));
-                res.emplace_back(dynamic_cast<rr_base*>(item));
-            }
-            break;
-        case NS:
-            {
-                ns_rdata *item = new ns_rdata(rr);
-                item->ns_name = parse_dns_name(res_buf.peek(), p);
-                res.emplace_back(dynamic_cast<rr_base*>(item));
-            }
-            break;
-        case CNAME:
-            {
-                cname_rdata *item = new cname_rdata(rr);
-                item->cname = parse_dns_name(res_buf.peek(), p);
-                res.emplace_back(dynamic_cast<rr_base*>(item));
-            }
-            break;
-        case MX:
-            {
-                mx_rdata *item = new mx_rdata(rr);
-                item->preference = ntohs(u16(p));
-                item->exchange_name = parse_dns_name(res_buf.peek(), p);
-                res.emplace_back(dynamic_cast<rr_base*>(item));
-            }
-            break;
-        case TXT:
-            {
-                txt_rdata *item = new txt_rdata(rr);
-                uint8_t txt_len = *p++;
-                item->str.assign(p, p + txt_len);
-                p += txt_len;
-                res.emplace_back(dynamic_cast<rr_base*>(item));
-            }
-            break;
-        }
-    }
+    if (!is_same_name(it->second->name, p)) return;
+    if (it->second->q_type != u16(p)) return;
+    if (it->second->q_class != u16(p)) return;
+
+    parse_answer_rrs(res, p, res_buf.peek(), answer);
 
     it->second->recv_promise.set_value(std::move(res));
     {
@@ -257,7 +294,10 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
 {
     auto *qc = new query_context();
     qc->id = id++ % 65536;
-    qc->pack(name, q_type, q_class);
+    qc->name = name;
+    qc->q_type = q_type;
+    qc->q_class = q_class;
+    qc->pack();
     auto f = qc->recv_promise.get_future();
     {
         std::lock_guard<std::mutex> mlock(query_map_mutex);
