@@ -1,53 +1,16 @@
 #include <angel/sockops.h>
 #include <angel/util.h>
+#include <angel/logger.h>
 
 #include <netinet/in.h>
+
+#include <fstream>
 
 #include "resolver.h"
 
 namespace angel {
 
 namespace dns {
-
-// RR CLASS
-#define CLASS_IN    1 // the internet
-
-#define DNS_SERVER_IP   "192.168.43.1"
-#define DNS_SERVER_PORT 53
-
-//  Header
-//    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//  |                      ID                       |
-//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//  |QR|   Opcode  |AA|TC|RD|RA| Z|AD|CD|   RCODE   |
-//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//  |                    QDCOUNT                    |
-//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//  |                    ANCOUNT                    |
-//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//  |                    NSCOUNT                    |
-//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//  |                    ARCOUNT                    |
-//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//  QR       0   query
-//           1   response
-//  OPCODE   0   standard query
-//  (4)      1   inverse query
-//           2   server status request
-//           3-15 reserved
-//  AA       authoritative answer
-//  TC       truncate
-//  RD       recursion desired
-//  RA       recursion available
-//  Z,AD,CD  0
-//  RCODE    0   no error
-//  (4)      1   format error
-//           2   server failure
-//           3   name error
-//           4   not implemented
-//           5   refused
-//           6-15 reserved
 
 template <typename Ptr>
 static inline const char *charptr(Ptr p)
@@ -116,18 +79,51 @@ static std::string to_ip(const char*& p)
     return angel::sockops::to_host_ip(&addr);
 }
 
-struct dns_header {
-    uint16_t id;
-    uint16_t flags;
-    uint16_t query;
-    uint16_t answer;
-    uint16_t authority;
-    uint16_t additional;
-};
+//  Header
+//    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                      ID                       |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |QR|   Opcode  |AA|TC|RD|RA| Z|AD|CD|   RCODE   |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    QDCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    ANCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    NSCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  |                    ARCOUNT                    |
+//  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//  QR       0   query
+//           1   response
+//  OPCODE   0   standard query
+//  (4)      1   inverse query
+//           2   server status request
+//           3-15 reserved
+//  AA       authoritative answer
+//  TC       truncate
+//  RD       recursion desired
+//  RA       recursion available
+//  Z,AD,CD  0
+//  RCODE    0   no error
+//  (4)      1   format error
+//           2   server failure
+//           3   name error
+//           4   not implemented
+//           5   refused
+//           6-15 reserved
 
 void query_context::pack()
 {
-    dns_header hdr;
+    struct dns_header {
+        uint16_t id;
+        uint16_t flags;
+        uint16_t query;
+        uint16_t answer;
+        uint16_t authority;
+        uint16_t additional;
+    } hdr;
+
     hdr.id          = htons(id);
     hdr.flags       = 0x0100;
     hdr.query       = htons(1);
@@ -135,24 +131,59 @@ void query_context::pack()
     hdr.authority   = 0;
     hdr.additional  = 0;
 
+    buf.resize(sizeof(hdr));
+    memcpy(&buf[0], &hdr, sizeof(hdr));
+
     q_type  = htons(q_type);
     q_class = htons(q_class);
 
-    buf.resize(sizeof(hdr));
-    memcpy(&buf[0], &hdr, sizeof(hdr));
     buf.append(name);
     buf.append(charptr(&q_type), sizeof(q_type));
     buf.append(charptr(&q_class), sizeof(q_class));
 }
 
+static const char *resolv_conf = "/etc/resolv.conf";
+static const int name_server_port = 53;
+
+// Pick a name server for an ipv4 address
+static std::string parse_resolv_conf()
+{
+    char buf[BUFSIZ];
+    std::ifstream ifs(resolv_conf);
+    if (!ifs.is_open()) {
+        log_fatal("can't open %s", resolv_conf);
+    }
+    while (ifs.getline(buf, sizeof(buf))) {
+        const char *p = buf;
+        const char *end = buf + strlen(buf);
+        while (p < end && isspace(*p)) p++;
+        if (p == end || *p == '#') continue;
+        if (strncmp(p, "nameserver", 10) == 0) {
+            p += 10;
+            while (p < end && isspace(*p)) p++;
+            std::string addr;
+            while (p < end && !isspace(*p))
+                addr.push_back(*p++);
+            if (addr.find(".") != std::string::npos)
+                return addr;
+        }
+    }
+    return "";
+}
+
 resolver::resolver()
 {
+    auto name_server_addr = parse_resolv_conf();
+    if (name_server_addr == "") {
+        log_fatal("can't find a name server address");
+    }
+
     angel::client_options ops;
     ops.protocol = "udp";
     ops.is_reconnect = true;
     ops.is_quit_loop = false;
     loop = loop_thread.wait_loop();
-    cli.reset(new angel::client(loop, angel::inet_addr(DNS_SERVER_IP, DNS_SERVER_PORT), ops));
+    cli.reset(new angel::client(loop, angel::inet_addr(name_server_addr, name_server_port), ops));
     cli->set_connection_handler([this](const angel::connection_ptr& conn){
             lock_t lk(delay_task_queue_mutex);
             while (!delay_task_queue.empty()) {
@@ -364,6 +395,8 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
     }
     return f;
 }
+
+#define CLASS_IN 1 // the internet
 
 result_future resolver::query(std::string_view name, int type)
 {
