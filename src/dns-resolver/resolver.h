@@ -15,43 +15,90 @@ namespace angel {
 
 namespace dns {
 
-// <ip1, ip2, ...>
-typedef std::vector<std::string> a_res_t;
-typedef std::vector<std::string> ns_res_t;
-// A domain name can usually only point to one authoritative domain name
-typedef std::string cname_res_t;
-// <<preference1, exchange_name1>, <preference2, exchange_name2>, ...>
-typedef std::vector<std::pair<uint16_t, std::string>> mx_res_t;
-typedef std::vector<std::string> txt_res_t;
+enum type {
+    A       =  1, // a host address
+    NS      =  2, // an authoritative name server
+    CNAME   =  5, // the canonical name for an alias
+    SOA     =  6, // marks the start of a zone of authority
+    WKS     = 11, // a well known service description
+    PTR     = 12, // a domain name pointer
+    HINFO   = 13, // host information
+    MINFO   = 14, // mailbox or mail list information
+    MX      = 15, // mail exchange
+    TXT     = 16, // text strings
+    //============================
+    ERROR   = 17, // query error
+};
 
-typedef std::variant<std::string,
-                     std::vector<std::string>,
-                     std::vector<std::pair<uint16_t, std::string>> > result;
+struct rr_base {
+    rr_base() = default;
+    rr_base(const rr_base&) = default;
+    std::string name;
+    uint16_t type;
+    uint16_t _class;
+    uint32_t ttl;
+    uint16_t len;
+};
+
+struct a_rdata : rr_base {
+    a_rdata(const rr_base& rr) : rr_base(rr) {  }
+    std::string addr;
+};
+
+struct ns_rdata : rr_base {
+    ns_rdata(const rr_base& rr) : rr_base(rr) {  }
+    std::string ns_name;
+};
+
+// A domain name can usually only point to one authoritative domain name
+struct cname_rdata : rr_base {
+    cname_rdata(const rr_base& rr) : rr_base(rr) {  }
+    std::string cname;
+};
+
+struct mx_rdata : rr_base {
+    mx_rdata(const rr_base& rr) : rr_base(rr) {  }
+    uint16_t preference; // lower values are preferred
+    std::string exchange_name;
+};
+
+struct txt_rdata : rr_base {
+    txt_rdata(const rr_base& rr) : rr_base(rr) {  }
+    std::string str;
+};
+
+typedef std::unique_ptr<rr_base> rr_base_ptr;
+typedef std::vector<rr_base_ptr> result;
 typedef std::shared_future<result> result_future;
 
-static inline const a_res_t& get_a(const result& res)
+static inline const a_rdata *get_a(const rr_base_ptr& rr)
 {
-    return std::get<a_res_t>(res);
+    return static_cast<const a_rdata*>(rr.get());
 }
 
-static inline const ns_res_t& get_ns(const result& res)
+static inline const ns_rdata *get_ns(const rr_base_ptr& rr)
 {
-    return std::get<ns_res_t>(res);
+    return static_cast<const ns_rdata*>(rr.get());
 }
 
-static inline const cname_res_t& get_cname(const result& res)
+static inline const cname_rdata *get_cname(const rr_base_ptr& rr)
 {
-    return std::get<cname_res_t>(res);
+    return static_cast<const cname_rdata*>(rr.get());
 }
 
-static inline const mx_res_t& get_mx(const result& res)
+static inline const mx_rdata *get_mx(const rr_base_ptr& rr)
 {
-    return std::get<mx_res_t>(res);
+    return static_cast<const mx_rdata*>(rr.get());
 }
 
-static inline const txt_res_t& get_txt(const result& res)
+static inline const txt_rdata *get_txt(const rr_base_ptr& rr)
 {
-    return std::get<txt_res_t>(res);
+    return static_cast<const txt_rdata*>(rr.get());
+}
+
+static inline const char *get_err(const rr_base_ptr& rr)
+{
+    return rr->name.c_str();
 }
 
 struct query_context {
@@ -66,10 +113,13 @@ typedef std::lock_guard<std::mutex> lock_t;
 class resolver {
 public:
     resolver();
-    result_future query(std::string_view name, std::string_view type);
+    // auto f = query()
+    // if f.valid() == false, argument error
+    // if f.get().front()->type == ERROR, resolver error
+    result_future query(std::string_view name, int type);
 private:
     static void delay_send(resolver *r, query_context *qc);
-    int unpack(angel::buffer& res_buf);
+    void unpack(angel::buffer& res_buf);
     result_future query(std::string_view name, uint16_t q_type, uint16_t q_class);
 
     // The background thread runs an `evloop` to receive the response

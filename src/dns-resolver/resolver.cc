@@ -9,31 +9,6 @@ namespace angel {
 
 namespace dns {
 
-// RR TYPE
-#define TYPE_A          1 // a host address
-#define TYPE_NS         2 // an authoritative name server
-#define TYPE_CNAME      5 // the canonical name for an alias
-#define TYPE_SOA        6 // marks the start of a zone of authority
-#define TYPE_WKS       11 // a well known service description
-#define TYPE_PTR       12 // a domain name pointer
-#define TYPE_HINFO     13 // host information
-#define TYPE_MINFO     14 // mailbox or mail list information
-#define TYPE_MX        15 // mail exchange
-#define TYPE_TXT       16 // text strings
-
-static std::unordered_map<std::string_view, uint16_t> type_map = {
-    { "A",      1 },
-    { "NS",     2 },
-    { "CNAME",  5 },
-    { "SOA",    6 },
-    { "WKS",   11 },
-    { "PTR",   12 },
-    { "HINFO", 13 },
-    { "MINFO", 14 },
-    { "MX",    15 },
-    { "TXT",   16 },
-};
-
 // RR CLASS
 #define CLASS_IN    1 // the internet
 
@@ -136,16 +111,6 @@ void query_context::pack(std::string_view name, uint16_t q_type, uint16_t q_clas
     buf.append(charptr(&q_class), sizeof(q_class));
 }
 
-enum {
-    NoError,
-    FormatError,
-    ServerFailure,
-    NameError,
-    NotImplemented,
-    Refused,
-    Unmatch = 16,
-};
-
 resolver::resolver()
 {
     angel::client_options ops;
@@ -162,13 +127,30 @@ resolver::resolver()
             }
             });
     cli->set_message_handler([this](const angel::connection_ptr& conn, angel::buffer& buf){
-            int rcode = this->unpack(buf);
-            (void)(rcode);
+            this->unpack(buf);
+            buf.retrieve_all();
             });
     cli->start();
 }
 
-int resolver::unpack(angel::buffer& res_buf)
+enum {
+    NoError,
+    FormatError,
+    ServerFailure,
+    NameError,
+    NotImplemented,
+    Refused,
+};
+
+static const std::unordered_map<int, std::string_view> rcode_map = {
+    { FormatError,      "FormatError" },
+    { ServerFailure,    "ServerFailure" },
+    { NameError,        "NameError" },
+    { NotImplemented,   "NotImplemented" },
+    { Refused,          "Refused" },
+};
+
+void resolver::unpack(angel::buffer& res_buf)
 {
     const char *p = res_buf.peek();
 
@@ -178,15 +160,27 @@ int resolver::unpack(angel::buffer& res_buf)
     uint8_t rcode = p[1] & 0x0f;
     p += 2;
 
-    if (rcode != NoError) return rcode;
-    assert(qr);
-    assert(ra);
+    if (!qr) return;
 
     QueryMap::iterator it;
     {
         std::lock_guard<std::mutex> mlock(query_map_mutex);
         it = query_map.find(id);
-        if (it == query_map.end()) return Unmatch;
+        if (it == query_map.end()) return;
+    }
+
+    result res;
+    if (rcode != NoError) {
+        rr_base *rr = new rr_base();
+        rr->type = ERROR;
+        rr->name = rcode_map.at(rcode);
+        res.emplace_back(rr);
+        it->second->recv_promise.set_value(std::move(res));
+        {
+            std::lock_guard<std::mutex> mlock(query_map_mutex);
+            query_map.erase(it);
+        }
+        return;
     }
 
     uint16_t query      = ntohs(u16(p));
@@ -194,55 +188,54 @@ int resolver::unpack(angel::buffer& res_buf)
     uint16_t authority  = ntohs(u16(p));
     uint16_t additional = ntohs(u16(p));
 
-    auto name           = parse_dns_name(res_buf.peek(), p);
+    std::string name    = parse_dns_name(res_buf.peek(), p);
     uint16_t q_type     = ntohs(u16(p));
     uint16_t q_class    = ntohs(u16(p));
 
-    result res;
-    switch (q_type) {
-    case TYPE_A: res = a_res_t(); break;
-    case TYPE_NS: res = ns_res_t(); break;
-    case TYPE_CNAME: res = cname_res_t(); break;
-    case TYPE_MX: res = mx_res_t(); break;
-    case TYPE_TXT: res = txt_res_t(); break;
-    }
-
+    rr_base rr;
     for (int i = 0; i < answer; i++) {
-        auto rr_name        = parse_dns_name(res_buf.peek(), p);
-        uint16_t rr_type    = ntohs(u16(p));
-        uint16_t rr_class   = ntohs(u16(p));
-        uint32_t rr_ttl     = ntohl(u32(p));
-        uint16_t rd_len     = ntohs(u16(p));
-        switch (q_type) {
-        case TYPE_A:
+        rr.name     = parse_dns_name(res_buf.peek(), p);
+        rr.type     = ntohs(u16(p));
+        rr._class   = ntohs(u16(p));
+        rr.ttl      = ntohl(u32(p));
+        rr.len      = ntohs(u16(p));
+        switch (rr.type) {
+        case A:
             {
-                std::get<a_res_t>(res).emplace_back(to_ip(p));
+                a_rdata *item = new a_rdata(rr);
+                item->addr = std::move(to_ip(p));
+                res.emplace_back(dynamic_cast<rr_base*>(item));
             }
             break;
-        case TYPE_NS:
+        case NS:
             {
-                auto ns_name = parse_dns_name(res_buf.peek(), p);
-                std::get<ns_res_t>(res).emplace_back(std::move(ns_name));
+                ns_rdata *item = new ns_rdata(rr);
+                item->ns_name = parse_dns_name(res_buf.peek(), p);
+                res.emplace_back(dynamic_cast<rr_base*>(item));
             }
             break;
-        case TYPE_CNAME:
+        case CNAME:
             {
-                auto cname = parse_dns_name(res_buf.peek(), p);
-                std::get<cname_res_t>(res) = std::move(cname);
+                cname_rdata *item = new cname_rdata(rr);
+                item->cname = parse_dns_name(res_buf.peek(), p);
+                res.emplace_back(dynamic_cast<rr_base*>(item));
             }
             break;
-        case TYPE_MX:
+        case MX:
             {
-                uint16_t preference = ntohs(u16(p)); // lower values are preferred
-                auto exchange_name = parse_dns_name(res_buf.peek(), p);
-                std::get<mx_res_t>(res).emplace_back(preference, std::move(exchange_name));
+                mx_rdata *item = new mx_rdata(rr);
+                item->preference = ntohs(u16(p));
+                item->exchange_name = parse_dns_name(res_buf.peek(), p);
+                res.emplace_back(dynamic_cast<rr_base*>(item));
             }
             break;
-        case TYPE_TXT:
+        case TXT:
             {
+                txt_rdata *item = new txt_rdata(rr);
                 uint8_t txt_len = *p++;
-                std::get<txt_res_t>(res).emplace_back(p, p + txt_len);
+                item->str.assign(p, p + txt_len);
                 p += txt_len;
+                res.emplace_back(dynamic_cast<rr_base*>(item));
             }
             break;
         }
@@ -253,9 +246,6 @@ int resolver::unpack(angel::buffer& res_buf)
         std::lock_guard<std::mutex> mlock(query_map_mutex);
         query_map.erase(it);
     }
-
-    res_buf.retrieve(p - res_buf.peek());
-    return NoError;
 }
 
 void resolver::delay_send(resolver *r, query_context *qc)
@@ -285,13 +275,13 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
     return f;
 }
 
-result_future resolver::query(std::string_view name, std::string_view type)
+result_future resolver::query(std::string_view name, int type)
 {
     if (name == "") return result_future();
     auto dns_name = to_dns_name(name);
     if (dns_name == "") return result_future();
-    if (!type_map.count(type)) return result_future();
-    return query(dns_name, type_map[type], CLASS_IN);
+    // check type
+    return query(dns_name, type, CLASS_IN);
 }
 
 }
