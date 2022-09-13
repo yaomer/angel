@@ -1,8 +1,8 @@
 #ifndef __ANGEL_RESOLVER_H
 #define __ANGEL_RESOLVER_H
 
-#include <angel/evloop_thread.h>
-#include <angel/client.h>
+#include "evloop_thread.h"
+#include "client.h"
 
 #include <vector>
 #include <queue>
