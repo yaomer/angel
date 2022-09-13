@@ -1,5 +1,8 @@
 #include <string>
 
+namespace angel {
+namespace util {
+
 #define APPEND(i) res.push_back(indexs[i])
 
 static const char *indexs = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -68,4 +71,7 @@ std::string base64_encode(const char *data, size_t len)
         break;
     }
     return res;
+}
+
+}
 }

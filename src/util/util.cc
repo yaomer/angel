@@ -1,19 +1,13 @@
-#include <angel/util.h>
-
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <time.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 #include <sstream>
 
 #include <angel/logger.h>
 
 namespace angel {
-
 namespace util {
 
 static thread_local char errno_buf[256];
@@ -89,40 +83,6 @@ void set_thread_affinity(pthread_t tid, int cpu_number)
     if (pthread_setaffinity_np(tid, sizeof(mask), &mask) < 0)
         log_error("pthread_setaffinity_np error: %s", strerrno());
 #endif
-}
-
-void daemon()
-{
-    pid_t pid;
-
-    if ((pid = fork()) < 0) {
-        log_fatal("fork error: %s", strerrno());
-    }
-    if (pid > 0)
-        exit(0);
-
-    if (setsid() < 0) {
-        log_fatal("setsid error: %s", strerrno());
-    }
-    umask(0);
-
-    int fd = open("/dev/null", O_RDWR);
-    if (fd < 0) {
-        log_fatal("open /dev/null error: %s", strerrno());
-    }
-
-    if (dup2(fd, STDIN_FILENO) < 0) {
-        log_fatal("dup2 stdin error: %s", strerrno());
-    }
-    if (dup2(fd, STDOUT_FILENO) < 0) {
-        log_fatal("dup2 stdout error: %s", strerrno());
-    }
-    if (dup2(fd, STDERR_FILENO) < 0) {
-        log_fatal("dup2 stderr error: %s", strerrno());
-    }
-
-    if (fd > STDERR_FILENO)
-        close(fd);
 }
 
 }

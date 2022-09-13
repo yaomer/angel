@@ -3,6 +3,9 @@
 
 #include <angel/sockops.h>
 
+namespace angel {
+namespace util {
+
 static inline void assert_little_endian()
 {
     int a = 1;
@@ -134,4 +137,7 @@ std::string sha1(const std::string& data, bool normal)
         p += ChunkBytes;
     }
     return normal ? to_digest(h) : to_hex_digest(h);
+}
+
+}
 }

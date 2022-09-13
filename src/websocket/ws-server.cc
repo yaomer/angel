@@ -3,17 +3,20 @@
 // See https://www.rfc-editor.org/rfc/rfc6455.html
 //
 
+#include <angel/ws-server.h>
+
 #include <iostream>
 #include <numeric>
 
 #include <angel/sockops.h>
+#include <angel/util.h>
 
-#include "ws-server.h"
+namespace angel {
 
-WebSocketServer::WebSocketServer(angel::evloop *loop, angel::inet_addr listen_addr)
+WebSocketServer::WebSocketServer(evloop *loop, inet_addr listen_addr)
     : server(loop, listen_addr)
 {
-    server.set_connection_handler([this](const angel::connection_ptr& conn){
+    server.set_connection_handler([this](const connection_ptr& conn){
             conn->set_context(WebSocketContext(this, conn.get()));
             });
     server.set_message_handler(WebSocketContext::message_handler);
@@ -22,20 +25,20 @@ WebSocketServer::WebSocketServer(angel::evloop *loop, angel::inet_addr listen_ad
 void WebSocketServer::for_each(const WebSocketHandler handler)
 {
     if (!handler) return;
-    server.for_each([handler = std::move(handler)](const angel::connection_ptr& conn){
+    server.for_each([handler = std::move(handler)](const connection_ptr& conn){
             WebSocketContext& context = std::any_cast<WebSocketContext&>(conn->get_context());
             handler(context);
             });
 }
 
-WebSocketContext::WebSocketContext(WebSocketServer *ws, angel::connection *conn)
+WebSocketContext::WebSocketContext(WebSocketServer *ws, connection *conn)
     : state(Handshake), ws(ws), conn(conn), read_request_line(true),
     required_request_headers(6), fragment(false)
 {
 }
 
 // 主要程序逻辑
-void WebSocketContext::message_handler(const angel::connection_ptr& conn, angel::buffer& buf)
+void WebSocketContext::message_handler(const connection_ptr& conn, buffer& buf)
 {
     uint16_t frame;
     WebSocketContext& context = std::any_cast<WebSocketContext&>(conn->get_context());
@@ -139,8 +142,8 @@ int WebSocketContext::handshake(const char *line, const char *end)
 void WebSocketContext::sec_websocket_accept(std::string key)
 {
     static const char *guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    key = sha1(key + guid, true);
-    SecWebSocketAccept = base64_encode(key.data(), key.size());
+    key = util::sha1(key + guid, true);
+    SecWebSocketAccept = util::base64_encode(key.data(), key.size());
 }
 
 // Server:
@@ -148,7 +151,7 @@ void WebSocketContext::sec_websocket_accept(std::string key)
 // Connection: Upgrade
 // Upgrade: websocket
 // Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
-void WebSocketContext::handshake_ok(const angel::connection_ptr& conn)
+void WebSocketContext::handshake_ok(const connection_ptr& conn)
 {
     std::string buf;
     buf += "HTTP/1.1 101 Switching Protocols\r\n";
@@ -158,12 +161,12 @@ void WebSocketContext::handshake_ok(const angel::connection_ptr& conn)
     conn->send(buf);
 }
 
-void WebSocketContext::handshake_error(const angel::connection_ptr& conn)
+void WebSocketContext::handshake_error(const connection_ptr& conn)
 {
     conn->send("HTTP/1.1 400 Bad Request\r\n\r\n");
 }
 
-int WebSocketContext::handshake(const angel::connection_ptr& conn, angel::buffer& buf)
+int WebSocketContext::handshake(const connection_ptr& conn, buffer& buf)
 {
     auto& context = std::any_cast<WebSocketContext&>(conn->get_context());
     while (buf.readable() >= 2) {
@@ -220,7 +223,7 @@ static bool decode_payload_len(uint64_t& payload_len, const char*& masking_key,
         i = 10;
         if (readable < i) return false;
         raw_len = *reinterpret_cast<const uint64_t*>(&b[2]);
-        payload_len = angel::sockops::ntoh64(raw_len);
+        payload_len = sockops::ntoh64(raw_len);
         break;
     case 126:
         i = 4;
@@ -240,7 +243,7 @@ static bool decode_payload_len(uint64_t& payload_len, const char*& masking_key,
     return true;
 }
 
-int WebSocketContext::decode(angel::buffer& raw_buf)
+int WebSocketContext::decode(buffer& raw_buf)
 {
     const char *b = raw_buf.peek();
     uint64_t readable = raw_buf.readable();
@@ -333,7 +336,7 @@ void WebSocketContext::encode(const std::string& raw_buf)
         encoded_buffer.append(reinterpret_cast<const char*>(&encoded_size), 2);
     } else {
         encoded_buffer.push_back(127);
-        uint64_t encoded_size = angel::sockops::hton64(raw_size);
+        uint64_t encoded_size = sockops::hton64(raw_size);
         encoded_buffer.append(reinterpret_cast<const char*>(&encoded_size), 8);
     }
     encoded_buffer.append(raw_buf);
@@ -345,23 +348,4 @@ void WebSocketContext::send(const std::string& data)
     conn->send(encoded_buffer);
 }
 
-int main()
-{
-    angel::evloop loop;
-    WebSocketServer ws(&loop, angel::inet_addr(8000));
-    ws.onopen = [](WebSocketContext& c){
-        printf("new client (%s) to host (%s)\n", c.origin.c_str(), c.host.c_str());
-    };
-    ws.onmessage = [](WebSocketContext& c){
-        printf("%s: %s\n", c.origin.c_str(), c.decoded_buffer.c_str());
-        c.send(c.decoded_buffer);
-    };
-    ws.onclose = [](WebSocketContext& c){
-        printf("disconnect with client (%s)\n", c.origin.c_str());
-    };
-    ws.onerror = [](WebSocketContext& c){
-        printf("%s: %s\n", c.origin.c_str(), c.decoded_buffer.c_str());
-    };
-    ws.start();
-    loop.run();
 }

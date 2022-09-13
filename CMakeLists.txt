@@ -38,7 +38,10 @@ set (SRC_FILES
     ${SRC_DIR}/signaler.cc
     ${SRC_DIR}/buffer.cc
     ${SRC_DIR}/logger.cc
-    ${SRC_DIR}/util.cc
+    ${SRC_DIR}/util/util.cc
+    ${SRC_DIR}/util/daemon.cc
+    ${SRC_DIR}/util/sha1.cc
+    ${SRC_DIR}/util/base64.cc
 )
 
 if (ANGEL_HAVE_POLL)
@@ -58,6 +61,8 @@ if (ANGEL_HAVE_SELECT)
 endif()
 
 list(APPEND SRC_FILES ${SRC_DIR}/dns-resolver/resolver.cc)
+
+list(APPEND SRC_FILES ${SRC_DIR}/websocket/ws-server.cc)
 
 add_library (angel STATIC ${SRC_FILES})
 
