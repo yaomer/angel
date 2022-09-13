@@ -29,7 +29,7 @@ gcc >= 7.0 / clang >= 4.0
 #include <angel/evloop_thread.h>
 #include <iostream>
 ```
-##### 定时器的使用
+#### 定时器的使用
 ```cpp
 int main(void)
 {
@@ -42,7 +42,7 @@ int main(void)
     loop.run();
 }
 ```
-##### 信号处理
+#### 信号处理
 ```cpp
 int main(void)
 {
@@ -57,7 +57,7 @@ int main(void)
     loop.run();
 }
 ```
-##### 一个简单的Echo服务器与客户端
+#### 一个简单的Echo服务器与客户端
 ```cpp
 int main(void)
 {
@@ -97,7 +97,7 @@ int main(void)
     }
 }
 ```
-##### 将服务器多线程化
+#### 将服务器多线程化
 ```cpp
 int main(void)
 {
@@ -113,7 +113,7 @@ int main(void)
     loop.run();
 }
 ```
-##### 使用一个线程池处理任务
+#### 使用一个线程池处理任务
 ```cpp
 int main(void)
 {
@@ -132,7 +132,7 @@ int main(void)
     loop.run();
 }
 ```
-##### 踢掉空闲连接
+#### 踢掉空闲连接
 ```cpp
 int main(void)
 {
@@ -151,7 +151,7 @@ int main(void)
     loop.run();
 }
 ```
-##### 日志记录与控制
+#### 日志记录与控制
 ```cpp
 int main(void)
 {
@@ -165,7 +165,9 @@ int main(void)
     log_error("hello");
 }
 ```
-##### 更多示例
+### 更多示例
+- 内置的[dns resolver](https://github.com/yaomer/angel/tree/master/src/dns-resolver)
+- 内置的[websocket server](https://github.com/yaomer/angel/tree/master/src/websocket)
 - 一些简单的[例子](https://github.com/yaomer/angel/tree/master/examples)
 - 一个更有意义的例子[alice](https://github.com/yaomer/Alice)
 
