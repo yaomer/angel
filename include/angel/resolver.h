@@ -29,11 +29,28 @@ enum type {
     ERROR   = 17, // query error
 };
 
+struct a_rdata;
+struct ns_rdata;
+struct cname_rdata;
+struct mx_rdata;
+struct txt_rdata;
+struct soa_rdata;
+struct ptr_rdata;
+
 // RR(Resource record) Common
 // for (Answer, Authority and Additional)
 struct rr_base {
     rr_base() = default;
     rr_base(const rr_base&) = default;
+    // When used, it must be guaranteed to point to one of its derived classes
+    const a_rdata *as_a() const;
+    const ns_rdata *as_ns() const;
+    const cname_rdata *as_cname() const;
+    const mx_rdata *as_mx() const;
+    const txt_rdata *as_txt() const;
+    const soa_rdata *as_soa() const;
+    const ptr_rdata *as_ptr() const;
+    const char *as_err() const;
     std::string name;
     uint16_t type;
     uint16_t _class;
@@ -88,46 +105,6 @@ struct ptr_rdata : rr_base {
 typedef std::unique_ptr<rr_base> rr_base_ptr;
 typedef std::vector<rr_base_ptr> result;
 typedef std::shared_future<result> result_future;
-
-static inline const a_rdata *get_a(const rr_base_ptr& rr)
-{
-    return static_cast<const a_rdata*>(rr.get());
-}
-
-static inline const ns_rdata *get_ns(const rr_base_ptr& rr)
-{
-    return static_cast<const ns_rdata*>(rr.get());
-}
-
-static inline const cname_rdata *get_cname(const rr_base_ptr& rr)
-{
-    return static_cast<const cname_rdata*>(rr.get());
-}
-
-static inline const mx_rdata *get_mx(const rr_base_ptr& rr)
-{
-    return static_cast<const mx_rdata*>(rr.get());
-}
-
-static inline const txt_rdata *get_txt(const rr_base_ptr& rr)
-{
-    return static_cast<const txt_rdata*>(rr.get());
-}
-
-static inline const soa_rdata *get_soa(const rr_base_ptr& rr)
-{
-    return static_cast<const soa_rdata*>(rr.get());
-}
-
-static inline const ptr_rdata *get_ptr(const rr_base_ptr& rr)
-{
-    return static_cast<const ptr_rdata*>(rr.get());
-}
-
-static inline const char *get_err(const rr_base_ptr& rr)
-{
-    return rr->name.c_str();
-}
 
 class resolver;
 

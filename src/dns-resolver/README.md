@@ -52,8 +52,7 @@ int main()
             auto f = r.query("baidu.com", angel::dns::A);
             auto& ans = f.get();
             for (auto& item : ans) {
-                auto *x = angel::dns::get_a(item);
-                log_info("%s", x->addr.c_str());
+                log_info("%s", item->as_a()->addr.c_str());
             }
         }
     };

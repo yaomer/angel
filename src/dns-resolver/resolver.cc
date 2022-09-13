@@ -409,6 +409,15 @@ result_future resolver::query(std::string_view name, int type)
     return query(dns_name, type, CLASS_IN);
 }
 
+const a_rdata *rr_base::as_a() const { return static_cast<const a_rdata*>(this); }
+const ns_rdata *rr_base::as_ns() const { return static_cast<const ns_rdata*>(this); }
+const cname_rdata *rr_base::as_cname() const { return static_cast<const cname_rdata*>(this); }
+const mx_rdata *rr_base::as_mx() const { return static_cast<const mx_rdata*>(this); }
+const txt_rdata *rr_base::as_txt() const { return static_cast<const txt_rdata*>(this); }
+const soa_rdata *rr_base::as_soa() const { return static_cast<const soa_rdata*>(this); }
+const ptr_rdata *rr_base::as_ptr() const { return static_cast<const ptr_rdata*>(this); }
+const char *rr_base::as_err() const { return name.c_str(); }
+
 void resolver::show(const result_future& f)
 {
     using std::cout;
@@ -419,25 +428,25 @@ void resolver::show(const result_future& f)
     auto& ans = f.get();
     for (auto& item : ans) {
         if (item->type == A) {
-            auto *x = get_a(item);
+            auto *x = item->as_a();
             cout << x->name << " has address " << x->addr << "\n";
         } else if (item->type == NS) {
-            auto *x = get_ns(item);
+            auto *x = item->as_ns();
             cout << x->name << " name server " << x->ns_name << "\n";
         } else if (item->type == CNAME) {
-            auto *x = get_cname(item);
+            auto *x = item->as_cname();
             cout << x->name << " is an alias for " << x->cname << "\n";
         } else if (item->type == MX) {
-            auto *x = get_mx(item);
+            auto *x = item->as_mx();
             cout << x->name << " mail is handled by " << x->preference << " " << x->exchange_name << "\n";
         } else if (item->type == TXT) {
-            auto *x = get_txt(item);
+            auto *x = item->as_txt();
             cout << x->name << " descriptive text \"" << x->str << "\"\n";
         } else if (item->type == PTR) {
-            auto *x = get_ptr(item);
+            auto *x = item->as_ptr();
             cout << x->name << " is the address of " << x->ptr_name << "\n";
         } else if (item->type == SOA) {
-            auto *x = angel::dns::get_soa(item);
+            auto *x = item->as_soa();
             cout << x->name << " has SOA record " << x->mname << " " << x->rname << " "
                  << x->serial << " " << x->refresh << " " << x->retry << " " << x->expire
                  << " " << x->minimum << "\n";
