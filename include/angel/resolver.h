@@ -12,7 +12,6 @@
 #include <angel/client.h>
 
 namespace angel {
-
 namespace dns {
 
 enum type {
@@ -144,16 +143,17 @@ struct query_context : public std::enable_shared_from_this<query_context> {
     void set_retransmit_timer(resolver *);
 };
 
-// show result info
-void show(const result_future&);
-
 class resolver {
 public:
     resolver();
+    resolver(const resolver&) = delete;
+    resolver& operator=(const resolver&) = delete;
     // auto f = query()
     // if f.valid() == false, argument error
     // if f.get().front()->type == ERROR, resolver error
     result_future query(std::string_view name, int type);
+    // show result info
+    static void show(const result_future&);
 private:
     static void delay_send(resolver *r, query_context *qc);
     void unpack(angel::buffer& res_buf);

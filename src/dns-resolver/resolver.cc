@@ -8,7 +8,6 @@
 #include <angel/logger.h>
 
 namespace angel {
-
 namespace dns {
 
 template <typename Ptr>
@@ -410,7 +409,7 @@ result_future resolver::query(std::string_view name, int type)
     return query(dns_name, type, CLASS_IN);
 }
 
-void show(const angel::dns::result_future& f)
+void resolver::show(const result_future& f)
 {
     using std::cout;
     if (!f.valid()) {
