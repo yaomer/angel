@@ -144,7 +144,8 @@ struct query_context : public std::enable_shared_from_this<query_context> {
     void set_retransmit_timer(resolver *);
 };
 
-typedef std::lock_guard<std::mutex> lock_t;
+// show result info
+void show(const result_future&);
 
 class resolver {
 public:

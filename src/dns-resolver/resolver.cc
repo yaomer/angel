@@ -4,6 +4,7 @@
 
 #include <netinet/in.h>
 
+#include <iostream>
 #include <fstream>
 
 #include "resolver.h"
@@ -170,6 +171,8 @@ static std::string parse_resolv_conf()
     }
     return "";
 }
+
+typedef std::lock_guard<std::mutex> lock_t;
 
 resolver::resolver()
 {
@@ -405,6 +408,42 @@ result_future resolver::query(std::string_view name, int type)
     if (dns_name == "") return result_future();
     // check type
     return query(dns_name, type, CLASS_IN);
+}
+
+void show(const angel::dns::result_future& f)
+{
+    using std::cout;
+    if (!f.valid()) {
+        cout << "argument error\n";
+        return;
+    }
+    auto& ans = f.get();
+    for (auto& item : ans) {
+        if (item->type == A) {
+            auto *x = get_a(item);
+            cout << x->name << " has address " << x->addr << "\n";
+        } else if (item->type == NS) {
+            auto *x = get_ns(item);
+            cout << x->name << " name server " << x->ns_name << "\n";
+        } else if (item->type == CNAME) {
+            auto *x = get_cname(item);
+            cout << x->name << " is an alias for " << x->cname << "\n";
+        } else if (item->type == MX) {
+            auto *x = get_mx(item);
+            cout << x->name << " mail is handled by " << x->preference << " " << x->exchange_name << "\n";
+        } else if (item->type == TXT) {
+            auto *x = get_txt(item);
+            cout << x->name << " descriptive text \"" << x->str << "\"\n";
+        } else if (item->type == PTR) {
+            auto *x = get_ptr(item);
+            cout << x->name << " is the address of " << x->ptr_name << "\n";
+        } else if (item->type == SOA) {
+            auto *x = angel::dns::get_soa(item);
+            cout << x->name << " has SOA record " << x->mname << " " << x->rname << " "
+                 << x->serial << " " << x->refresh << " " << x->retry << " " << x->expire
+                 << " " << x->minimum << "\n";
+        }
+    }
 }
 
 }
