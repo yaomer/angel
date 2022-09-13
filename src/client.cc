@@ -1,6 +1,8 @@
+#include <angel/client.h>
+
+#include <angel/logger.h>
+
 #include "connector.h"
-#include "client.h"
-#include "logger.h"
 
 namespace angel {
 

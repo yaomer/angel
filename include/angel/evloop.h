@@ -8,7 +8,7 @@
 #include <vector>
 #include <map>
 
-#include "channel.h"
+#include <angel/channel.h>
 
 namespace angel {
 

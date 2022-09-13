@@ -17,25 +17,11 @@ CHECK_SYMBOL_EXISTS (SO_KEEPALIVE netinet/tcp.h ANGEL_HAVE_SO_KEEPALIVE)
 
 set (SRC_DIR "${PROJECT_SOURCE_DIR}/src")
 
+include_directories (${PROJECT_SOURCE_DIR}/include)
+
 configure_file (
     "${SRC_DIR}/config.h.in"
     "${SRC_DIR}/config.h"
-)
-
-set (PUBLIC_HEADERS
-    ${SRC_DIR}/buffer.h
-    ${SRC_DIR}/channel.h
-    ${SRC_DIR}/evloop.h
-    ${SRC_DIR}/evloop_thread.h
-    ${SRC_DIR}/connection.h
-    ${SRC_DIR}/inet_addr.h
-    ${SRC_DIR}/socket.h
-    ${SRC_DIR}/sockops.h
-    ${SRC_DIR}/server.h
-    ${SRC_DIR}/client.h
-    ${SRC_DIR}/thread_pool.h
-    ${SRC_DIR}/logger.h
-    ${SRC_DIR}/util.h
 )
 
 set (SRC_FILES 
@@ -71,10 +57,12 @@ if (ANGEL_HAVE_SELECT)
     list(APPEND SRC_FILES ${SRC_DIR}/select.cc)
 endif()
 
+list(APPEND SRC_FILES ${SRC_DIR}/dns-resolver/resolver.cc)
+
 add_library (angel STATIC ${SRC_FILES})
 
 install(TARGETS angel
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib)
 
-install(FILES ${PUBLIC_HEADERS} DESTINATION include/angel)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/angel DESTINATION include)

@@ -3,9 +3,9 @@
 
 #include <string>
 
-#include "evloop.h"
-#include "connection.h"
-#include "thread_pool.h"
+#include <angel/evloop.h>
+#include <angel/connection.h>
+#include <angel/thread_pool.h>
 
 namespace angel {
 

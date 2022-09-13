@@ -4,8 +4,8 @@
 #include <vector>
 #include <memory>
 
-#include "evloop_thread.h"
-#include "util.h"
+#include <angel/evloop_thread.h>
+#include <angel/util.h>
 
 namespace angel {
 

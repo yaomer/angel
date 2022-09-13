@@ -6,7 +6,7 @@
 #include <memory>
 #include <mutex>
 
-#include "channel.h"
+#include <angel/channel.h>
 
 namespace angel {
 

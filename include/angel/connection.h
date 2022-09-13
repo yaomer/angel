@@ -6,10 +6,10 @@
 #include <atomic>
 #include <any> // only c++17
 
-#include "channel.h"
-#include "buffer.h"
-#include "inet_addr.h"
-#include "socket.h"
+#include <angel/channel.h>
+#include <angel/buffer.h>
+#include <angel/inet_addr.h>
+#include <angel/socket.h>
 
 namespace angel {
 

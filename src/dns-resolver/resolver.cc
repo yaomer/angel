@@ -1,13 +1,11 @@
-#include <angel/sockops.h>
-#include <angel/util.h>
-#include <angel/logger.h>
-
-#include <netinet/in.h>
+#include <angel/resolver.h>
 
 #include <iostream>
 #include <fstream>
 
-#include "resolver.h"
+#include <angel/sockops.h>
+#include <angel/util.h>
+#include <angel/logger.h>
 
 namespace angel {
 
@@ -141,6 +139,7 @@ void query_context::pack()
     buf.append(name);
     buf.append(charptr(&q_type), sizeof(q_type));
     buf.append(charptr(&q_class), sizeof(q_class));
+    assert(buf.size() <= max_udp_size);
 }
 
 static const char *resolv_conf = "/etc/resolv.conf";
@@ -231,7 +230,7 @@ static void parse_answer_rrs(result& res, const char*& p, const char *start, int
         case A:
             {
                 a_rdata *a = new a_rdata(rr);
-                a->addr = std::move(to_ip(p));
+                a->addr = to_ip(p);
                 res.emplace_back(dynamic_cast<rr_base*>(a));
             }
             break;
@@ -309,6 +308,7 @@ void resolver::unpack(angel::buffer& res_buf)
     p += 2;
 
     if (!qr) return;
+    (void)(ra);
 
     QueryMap::iterator it;
     {

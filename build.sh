@@ -8,11 +8,9 @@ if [ -d "./build" ]; then
     rm -fr ./build;
 fi
 mkdir ./build && cd ./build || return
-if ! cmake .. || ! make install ; then
+if ! cmake .. || ! make -j4 install ; then
     echo -e "$LSHOWCOLOR Build failed $RSHOWCOLOR"
     exit 1;
 fi
-echo -e "$LSHOWCOLOR angel is built
- libangel.a -> /usr/local/lib
- header files -> /usr/local/include/angel
- now you can delete directory ./build $RSHOWCOLOR"
+echo -e "$LSHOWCOLOR #################### $RSHOWCOLOR"
+echo -e "$LSHOWCOLOR angel is built, now you can delete directory ./build $RSHOWCOLOR"

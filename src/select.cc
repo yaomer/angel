@@ -2,10 +2,11 @@
 
 #ifdef ANGEL_HAVE_SELECT
 
-#include "evloop.h"
 #include "select.h"
-#include "logger.h"
-#include "util.h"
+
+#include <angel/evloop.h>
+#include <angel/logger.h>
+#include <angel/util.h>
 
 namespace angel {
 

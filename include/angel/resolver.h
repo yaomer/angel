@@ -1,15 +1,15 @@
 #ifndef __ANGEL_RESOLVER_H
 #define __ANGEL_RESOLVER_H
 
-#include "evloop_thread.h"
-#include "client.h"
-
 #include <vector>
 #include <queue>
 #include <unordered_map>
 #include <future>
 #include <memory>
 #include <variant>
+
+#include <angel/evloop_thread.h>
+#include <angel/client.h>
 
 namespace angel {
 

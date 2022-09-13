@@ -7,7 +7,7 @@
 #include <atomic>
 #include <string>
 
-#include "buffer.h"
+#include <angel/buffer.h>
 
 namespace angel {
 
