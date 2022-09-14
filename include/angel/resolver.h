@@ -1,5 +1,5 @@
-#ifndef __ANGEL_RESOLVER_H
-#define __ANGEL_RESOLVER_H
+#ifndef __ANGEL_DNS_RESOLVER_H
+#define __ANGEL_DNS_RESOLVER_H
 
 #include <vector>
 #include <queue>
@@ -154,4 +154,4 @@ private:
 }
 }
 
-#endif // __ANGEL_RESOLVER_H
+#endif // __ANGEL_DNS_RESOLVER_H

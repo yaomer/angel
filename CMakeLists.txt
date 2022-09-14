@@ -60,7 +60,7 @@ if (ANGEL_HAVE_SELECT)
     list(APPEND SRC_FILES ${SRC_DIR}/select.cc)
 endif()
 
-list(APPEND SRC_FILES ${SRC_DIR}/dns-resolver/resolver.cc)
+list(APPEND SRC_FILES ${SRC_DIR}/dns/resolver.cc)
 
 list(APPEND SRC_FILES ${SRC_DIR}/websocket/ws-server.cc)
 
