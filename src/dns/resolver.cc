@@ -148,6 +148,7 @@ static const int name_server_port = 53;
 static std::string parse_resolv_conf()
 {
     char buf[BUFSIZ];
+    std::string addr;
     std::ifstream ifs(resolv_conf);
     if (!ifs.is_open()) {
         log_fatal("can't open %s", resolv_conf);
@@ -158,16 +159,16 @@ static std::string parse_resolv_conf()
         while (p < end && isspace(*p)) p++;
         if (p == end || *p == '#') continue;
         if (strncmp(p, "nameserver", 10) == 0) {
-            p += 10;
-            while (p < end && isspace(*p)) p++;
-            std::string addr;
+            for (p += 10; p < end && isspace(*p); p++) ;
             while (p < end && !isspace(*p))
                 addr.push_back(*p++);
             if (addr.find(".") != std::string::npos)
-                return addr;
+                break;
+            addr.clear();
         }
     }
-    return "";
+    ifs.close();
+    return addr;
 }
 
 typedef std::lock_guard<std::mutex> lock_t;
@@ -178,13 +179,13 @@ resolver::resolver()
     if (name_server_addr == "") {
         log_fatal("can't find a name server address");
     }
+    log_info("found a name server (%s)", name_server_addr.c_str());
 
     angel::client_options ops;
     ops.protocol = "udp";
     ops.is_reconnect = true;
     ops.is_quit_loop = false;
-    loop = loop_thread.wait_loop();
-    cli.reset(new angel::client(loop, angel::inet_addr(name_server_addr, name_server_port), ops));
+    cli.reset(new angel::client(receiver.wait_loop(), angel::inet_addr(name_server_addr, name_server_port), ops));
     cli->set_connection_handler([this](const angel::connection_ptr& conn){
             lock_t lk(delay_task_queue_mutex);
             while (!delay_task_queue.empty()) {
@@ -197,6 +198,7 @@ resolver::resolver()
             buf.retrieve_all();
             });
     cli->start();
+    log_info("resolver is running");
 }
 
 enum {
@@ -311,7 +313,7 @@ void resolver::unpack(angel::buffer& res_buf)
 
     QueryMap::iterator it;
     {
-        std::lock_guard<std::mutex> mlock(query_map_mutex);
+        lock_t lk(query_map_mutex);
         it = query_map.find(id);
         if (it == query_map.end()) return;
     }
@@ -324,7 +326,7 @@ void resolver::unpack(angel::buffer& res_buf)
         res.emplace_back(rr);
         it->second->recv_promise.set_value(std::move(res));
         {
-            std::lock_guard<std::mutex> mlock(query_map_mutex);
+            lock_t lk(query_map_mutex);
             query_map.erase(it);
         }
         return;
@@ -347,7 +349,7 @@ void resolver::unpack(angel::buffer& res_buf)
 
     it->second->recv_promise.set_value(std::move(res));
     {
-        std::lock_guard<std::mutex> mlock(query_map_mutex);
+        lock_t lk(query_map_mutex);
         query_map.erase(it);
     }
 }
@@ -355,18 +357,18 @@ void resolver::unpack(angel::buffer& res_buf)
 void query_context::set_retransmit_timer(resolver *r)
 {
     // TODO: 指数退避
-    retransmit_timer_id = r->loop->run_after(3000, [r, qc = shared_from_this()](){
+    retransmit_timer_id = r->receiver.get_loop()->run_after(3000, [r, qc = shared_from_this()](){
             lock_t lk(r->query_map_mutex);
             if (r->query_map.count(qc->id)) {
                 r->cli->conn()->send(qc->buf);
                 qc->set_retransmit_timer(r);
             } else {
-                r->loop->cancel_timer(qc->retransmit_timer_id);
+                r->receiver.get_loop()->cancel_timer(qc->retransmit_timer_id);
             }
             });
 }
 
-void resolver::delay_send(resolver *r, query_context *qc)
+void query_context::send(resolver *r, query_context *qc)
 {
     r->cli->conn()->send(qc->buf);
     qc->set_retransmit_timer(r);
@@ -382,30 +384,33 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
     qc->pack();
     auto f = qc->recv_promise.get_future();
     {
-        std::lock_guard<std::mutex> mlock(query_map_mutex);
+        lock_t lk(query_map_mutex);
         query_map.emplace(qc->id, qc);
     }
     if (!cli->is_connected()) {
-        std::packaged_task<void()> t(std::bind(&delay_send, this, qc));
+        std::packaged_task<void()> t(std::bind(&query_context::send, this, qc));
         {
             lock_t lk(delay_task_queue_mutex);
             delay_task_queue.emplace(std::move(t));
         }
     } else {
-        cli->conn()->send(qc->buf);
-        qc->set_retransmit_timer(this);
+        query_context::send(this, qc);
     }
     return f;
 }
 
 #define CLASS_IN 1 // the internet
 
+static const std::unordered_set<int> type_map = {
+    A, NS, CNAME, SOA, PTR, MX, TXT
+};
+
 result_future resolver::query(std::string_view name, int type)
 {
     if (name == "") return result_future();
     auto dns_name = to_dns_name(name);
     if (dns_name == "") return result_future();
-    // check type
+    if (!type_map.count(type)) return result_future();
     return query(dns_name, type, CLASS_IN);
 }
 

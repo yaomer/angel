@@ -4,6 +4,7 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <future>
 #include <memory>
 #include <variant>
@@ -118,6 +119,7 @@ struct query_context : public std::enable_shared_from_this<query_context> {
     size_t retransmit_timer_id;
     void pack();
     void set_retransmit_timer(resolver *);
+    static void send(resolver *r, query_context *qc);
 };
 
 class resolver {
@@ -132,13 +134,11 @@ public:
     // show result info
     static void show(const result_future&);
 private:
-    static void delay_send(resolver *r, query_context *qc);
     void unpack(angel::buffer& res_buf);
     result_future query(std::string_view name, uint16_t q_type, uint16_t q_class);
 
     // The background thread runs an `evloop` to receive the response
-    angel::evloop_thread loop_thread;
-    angel::evloop *loop; // -> loop_thread.get_loop()
+    angel::evloop_thread receiver;
     std::unique_ptr<angel::client> cli;
     std::atomic_size_t id = 1;
     typedef std::unordered_map<uint16_t, std::shared_ptr<query_context>> QueryMap;
