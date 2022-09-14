@@ -8,6 +8,9 @@
 #include <mutex>
 #include <condition_variable>
 
+//
+// A simple thread pool implementation
+//
 namespace angel {
 
 typedef std::function<void()> task_callback_t;
@@ -34,13 +37,15 @@ public:
     {
         assert(state == state::running);
         assert(!workers.empty());
-        std::lock_guard<std::mutex> mlock(mutex);
-        if (policy == policy::cached) {
-            if (qtask.size() == workers.size()) {
-                add_new_worker();
+        {
+            std::lock_guard<std::mutex> mlock(mtx);
+            if (policy == policy::cached) {
+                if (task_queue.size() == workers.size()) {
+                    add_new_worker();
+                }
             }
+            task_queue.emplace(std::move(task));
         }
-        qtask.emplace(std::move(task));
         condvar.notify_one();
     }
     void shutdown()
@@ -59,19 +64,19 @@ private:
         while (true) {
             task_callback_t task;
             {
-                std::unique_lock<std::mutex> ulock(mutex);
-                while (state == state::running && qtask.empty())
+                std::unique_lock<std::mutex> ulock(mtx);
+                while (state == state::running && task_queue.empty())
                     condvar.wait(ulock);
                 if (state == state::stop)
                     break;
-                if (!qtask.empty()) {
-                    task = std::move(qtask.front());
-                    qtask.pop();
+                if (!task_queue.empty()) {
+                    task = std::move(task_queue.front());
+                    task_queue.pop();
                 }
             }
             if (task) task();
-            std::lock_guard<std::mutex> mlock(mutex);
-            if (state == state::shutdown && qtask.empty())
+            std::lock_guard<std::mutex> mlock(mtx);
+            if (state == state::shutdown && task_queue.empty())
                 break;
         }
     }
@@ -82,8 +87,10 @@ private:
     }
     void notify(state s)
     {
-        std::lock_guard<std::mutex> mlock(mutex);
-        state = s;
+        {
+            std::lock_guard<std::mutex> mlock(mtx);
+            state = s;
+        }
         condvar.notify_all();
     }
     void join()
@@ -94,9 +101,9 @@ private:
         }
     }
 
-    std::mutex mutex;
+    std::mutex mtx;
     std::condition_variable condvar;
-    std::queue<task_callback_t> qtask;
+    std::queue<task_callback_t> task_queue;
     std::vector<std::thread> workers;
     policy policy;
     state state;
