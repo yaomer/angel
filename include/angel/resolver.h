@@ -119,7 +119,7 @@ struct query_context : public std::enable_shared_from_this<query_context> {
     size_t retransmit_timer_id;
     void pack();
     void set_retransmit_timer(resolver *);
-    static void send(resolver *r, query_context *qc);
+    void send_query(resolver *r);
 };
 
 class resolver {

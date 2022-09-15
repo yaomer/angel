@@ -368,10 +368,10 @@ void query_context::set_retransmit_timer(resolver *r)
             });
 }
 
-void query_context::send(resolver *r, query_context *qc)
+void query_context::send_query(resolver *r)
 {
-    r->cli->conn()->send(qc->buf);
-    qc->set_retransmit_timer(r);
+    r->cli->conn()->send(buf);
+    set_retransmit_timer(r);
 }
 
 result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q_class)
@@ -388,13 +388,13 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
         query_map.emplace(qc->id, qc);
     }
     if (!cli->is_connected()) {
-        std::packaged_task<void()> t(std::bind(&query_context::send, this, qc));
+        std::packaged_task<void()> task(std::bind(&query_context::send_query, qc, this));
         {
             lock_t lk(delay_task_queue_mutex);
-            delay_task_queue.emplace(std::move(t));
+            delay_task_queue.emplace(std::move(task));
         }
     } else {
-        query_context::send(this, qc);
+        qc->send_query(this);
     }
     return f;
 }
@@ -455,6 +455,8 @@ void resolver::show(const result_future& f)
             cout << x->name << " has SOA record " << x->mname << " " << x->rname << " "
                  << x->serial << " " << x->refresh << " " << x->retry << " " << x->expire
                  << " " << x->minimum << "\n";
+        } else if (item->type == ERROR) {
+            cout << item->as_err() << "\n";
         }
     }
 }
