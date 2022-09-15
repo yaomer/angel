@@ -151,7 +151,7 @@ static std::string parse_resolv_conf()
     std::string addr;
     std::ifstream ifs(resolv_conf);
     if (!ifs.is_open()) {
-        log_fatal("can't open %s", resolv_conf);
+        log_fatal("resolver can't open %s", resolv_conf);
     }
     while (ifs.getline(buf, sizeof(buf))) {
         const char *p = buf;
@@ -162,7 +162,7 @@ static std::string parse_resolv_conf()
             for (p += 10; p < end && isspace(*p); p++) ;
             while (p < end && !isspace(*p))
                 addr.push_back(*p++);
-            if (addr.find(".") != std::string::npos)
+            if (util::check_ip(addr))
                 break;
             addr.clear();
         }
@@ -177,9 +177,9 @@ resolver::resolver()
 {
     auto name_server_addr = parse_resolv_conf();
     if (name_server_addr == "") {
-        log_fatal("can't find a name server address");
+        log_fatal("resolver can't find a name server address");
     }
-    log_info("found a name server (%s)", name_server_addr.c_str());
+    log_info("resolver found a name server (%s)", name_server_addr.c_str());
 
     angel::client_options ops;
     ops.protocol = "udp";

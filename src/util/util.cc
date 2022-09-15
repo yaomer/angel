@@ -85,5 +85,19 @@ void set_thread_affinity(pthread_t tid, int cpu_number)
 #endif
 }
 
+bool check_ip(std::string_view ipv4_addr)
+{
+    auto fields = split(ipv4_addr.data(), ipv4_addr.data() + ipv4_addr.size(), '.');
+    if (fields.size() != 4) return false;
+    for (auto& field : fields) {
+        if (field.empty()) return false;
+        bool all_digit = std::all_of(field.begin(), field.end(), isdigit);
+        if (!all_digit) return false;
+        if (field.size() > 1 && field[0] == '0') return false;
+        if (atoi(field.c_str()) > 255) return false;
+    }
+    return true;
+}
+
 }
 }

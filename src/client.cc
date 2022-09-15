@@ -24,6 +24,7 @@ bool client::is_connected()
 
 void client::new_connection(int fd)
 {
+    log_info("client connected to host (%s)", peer_addr.to_host());
     cli_conn = connection_ptr(new connection(1, loop, fd));
     cli_conn->set_state(connection::state::connected);
     cli_conn->set_connection_handler(connection_handler);

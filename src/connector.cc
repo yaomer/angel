@@ -46,7 +46,7 @@ void connector_t::connect()
     int ret = sockops::connect(sockfd, &peer_addr.addr());
     connect_channel->set_fd(sockfd);
     loop->add_channel(connect_channel);
-    log_info("connect(fd=%d) -> host %s", sockfd, peer_addr.to_host());
+    log_info("connect(fd=%d) -> host (%s)", sockfd, peer_addr.to_host());
     if (ret == 0) {
         // 通常如果服务端和客户端在同一台主机，连接会立即建立
         connected();
@@ -60,7 +60,7 @@ void connector_t::connect()
 
 void connector_t::connecting()
 {
-    log_debug("fd=%d is connecting", sockfd);
+    log_debug("connector(fd=%d) is connecting", sockfd);
     auto check_handler = [this]{ this->check(); };
     connect_channel->set_read_handler(check_handler);
     connect_channel->set_write_handler(check_handler);
@@ -70,7 +70,7 @@ void connector_t::connecting()
 void connector_t::connected()
 {
     if (has_connected) return;
-    log_debug("fd=%d is connected", sockfd);
+    log_debug("connector(fd=%d) is connected", sockfd);
     loop->remove_channel(connect_channel);
     connect_channel.reset();
     new_connection_handler(sockfd);
