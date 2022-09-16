@@ -16,13 +16,6 @@ buffer::buffer(size_t size) : buf(size)
 
 buffer::~buffer() = default;
 
-int buffer::find(char *s, std::string_view pattern)
-{
-    const char *p = std::search(
-            s, begin() + write_index, pattern.begin(), pattern.end());
-    return p == begin() + write_index ? -1 : p - s;
-}
-
 void buffer::make_space(size_t len)
 {
     if (len > writeable()) {
@@ -50,10 +43,11 @@ void buffer::append(const char *data, size_t len)
 
 void buffer::retrieve(size_t len)
 {
-    if (len < readable())
+    if (len < readable()) {
         read_index += len;
-    else
+    } else {
         read_index = write_index = 0;
+    }
 }
 
 const char *buffer::c_str()
@@ -84,9 +78,9 @@ int buffer::read_fd(int fd)
     iov[1].iov_len = sizeof(extrabuf);
 
     if ((n = readv(fd, iov, 2)) > 0) {
-        if (n <= writen)
+        if (n <= writen) {
             write_index += n;
-        else {
+        } else {
             write_index += writen;
             append(extrabuf, n - writen);
         }

@@ -39,14 +39,23 @@ public:
     {
         return readable() >= s.size() && memcmp(peek(), s.data(), s.size()) == 0;
     }
+    // ignore case
+    bool starts_with_case(std::string_view s)
+    {
+        return readable() >= s.size() && strncasecmp(peek(), s.data(), s.size()) == 0;
+    }
+
+    int find(char *start, std::string_view pattern)
+    {
+        const char *p = std::search(start, end(), pattern.begin(), pattern.end());
+        return p == end() ? -1 : p - start;
+    }
     int find(std::string_view pattern)
     {
         return find(peek(), pattern);
     }
     int find_crlf() { return find("\r\n"); }
     int find_lf() { return find("\n"); }
-    // return index-pos if found else -1
-    int find(char *pos, std::string_view pattern);
 
     void swap(buffer& other);
     char& operator[](size_t idx)
