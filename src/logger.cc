@@ -62,7 +62,10 @@ void logger::set_dir(std::string dir)
 void logger::set_name(std::string name)
 {
     this->name = name;
-    if (filename != "") create_new_file();
+    if (filename != "") {
+        unlink(filename.c_str());
+        create_new_file();
+    }
 }
 
 void logger::set_level(level level)
