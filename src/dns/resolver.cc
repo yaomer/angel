@@ -423,6 +423,48 @@ const soa_rdata *rr_base::as_soa() const { return static_cast<const soa_rdata*>(
 const ptr_rdata *rr_base::as_ptr() const { return static_cast<const ptr_rdata*>(this); }
 const char *rr_base::as_err() const { return name.c_str(); }
 
+std::vector<std::string> resolver::get_addr_list(std::string_view name)
+{
+    std::vector<std::string> res;
+    auto f = query(name, A);
+    if (f.valid()) {
+        for (auto& item : f.get()) {
+            if (item->type == A) {
+                res.emplace_back(std::move(item->as_a()->addr));
+            }
+        }
+    }
+    return res;
+}
+
+std::vector<std::string> resolver::get_mx_name_list(std::string_view name)
+{
+    std::vector<std::string> res;
+
+    typedef std::pair<uint16_t, std::string_view> mx_pair;
+    std::vector<mx_pair> mx_list;
+
+    auto f = query(name, MX);
+    if (!f.valid()) return res;
+
+    for (auto& item : f.get()) {
+        if (item->type == MX) {
+            auto mx = item->as_mx();
+            mx_list.emplace_back(mx->preference, mx->exchange_name);
+        }
+    }
+    // sort by preference
+    if (!mx_list.empty()) {
+        std::sort(mx_list.begin(), mx_list.end(), [](mx_pair& l, mx_pair& r){
+                return l.first < r.first;
+                });
+        for (auto& [preference, name] : mx_list) {
+            res.emplace_back(name);
+        }
+    }
+    return res;
+}
+
 void resolver::show(const result_future& f)
 {
     using std::cout;

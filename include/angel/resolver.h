@@ -130,7 +130,11 @@ public:
     // auto f = query()
     // if f.valid() == false, argument error
     // if f.get().front()->type == ERROR, resolver error
-    result_future query(std::string_view name, int type);
+    result_future query(std::string_view dname, int type);
+    // get A record result
+    std::vector<std::string> get_addr_list(std::string_view dname);
+    // get MX record result, sort by preference
+    std::vector<std::string> get_mx_name_list(std::string_view dname);
     // show result info
     static void show(const result_future&);
 private:
