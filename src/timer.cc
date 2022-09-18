@@ -5,6 +5,8 @@
 
 namespace angel {
 
+// timer_id从1开始，0保留用作他用
+// 比如当timer_id为0时，我们就认为它不是一个有效的timer
 timer_t::timer_t(evloop *loop) : loop(loop), timer_id(1)
 {
 }

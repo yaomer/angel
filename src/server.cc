@@ -55,10 +55,6 @@ void server::new_connection(int fd)
 
 void server::remove_connection(const connection_ptr& conn)
 {
-    // 这里禁用conn的TTL，因为如果用户开启了TTL，并且在close_handler()中发送了数据，
-    // 而conn->send()中会更新连接的ttl timer，从而会导致conn的生命期被延长，
-    // 即再经过ttl时间后才会被关闭
-    conn->set_ttl(0, 0);
     conn->set_state(connection::state::closed);
     conn->get_loop()->remove_channel(conn->get_channel());
     if (close_handler) close_handler(conn);

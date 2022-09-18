@@ -63,8 +63,7 @@ public:
     bool is_closed() { return conn_state == state::closed; }
     std::any& get_context() { return context; }
     void set_context(std::any ctx) { context = std::move(ctx); }
-    void set_ttl(size_t timer_id, int64_t ms)
-    { ttl_timer_id = timer_id; ttl_ms = ms; }
+    void set_ttl(size_t timer_id, int64_t ms);
     void establish();
     void close() { handle_close(false); }
     void set_connection_handler(const connection_handler_t handler)

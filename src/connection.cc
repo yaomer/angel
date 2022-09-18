@@ -37,9 +37,6 @@ connection::connection(size_t id, evloop *loop, int sockfd)
 
 connection::~connection()
 {
-    if (ttl_timer_id > 0) {
-        loop->cancel_timer(ttl_timer_id);
-    }
     log_info("connection(id=%d, fd=%d) is %s", conn_id, conn_socket->fd(), get_state_str());
 }
 
@@ -107,6 +104,12 @@ void connection::handle_close(bool is_forced)
 {
     log_info("connection(id=%d, fd=%d) is %s", conn_id, conn_channel->fd(), get_state_str());
     if (conn_state == state::closed) return;
+    // 我们必须在这里就取消ttl timer，而不是在connection析构时；
+    // 因为如果ttl timer存在，那么connection的生存期就会被延长。
+    if (ttl_timer_id > 0) {
+        loop->cancel_timer(ttl_timer_id);
+        ttl_timer_id = 0;
+    }
     if (!is_forced && output_buf.readable() > 0) {
         set_state(state::closing);
         return;
@@ -222,9 +225,15 @@ int connection::send_file(int fd)
     return sockops::send_file(fd, conn_channel->fd());
 }
 
+void connection::set_ttl(size_t timer_id, int64_t ms)
+{
+    ttl_timer_id = timer_id;
+    ttl_ms = ms;
+}
+
 void connection::update_ttl_timer_if_needed()
 {
-    if (ttl_ms <= 0) return;
+    if (ttl_timer_id == 0) return;
     loop->cancel_timer(ttl_timer_id);
     ttl_timer_id = loop->run_after(ttl_ms, [conn = shared_from_this()]{
             conn->close();
