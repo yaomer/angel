@@ -107,20 +107,7 @@ typedef std::unique_ptr<rr_base> rr_base_ptr;
 typedef std::vector<rr_base_ptr> result;
 typedef std::shared_future<result> result_future;
 
-class resolver;
-
-struct query_context : public std::enable_shared_from_this<query_context> {
-    uint16_t id;
-    std::string name;
-    uint16_t q_type;
-    uint16_t q_class;
-    std::string buf;
-    std::promise<result> recv_promise;
-    size_t retransmit_timer_id;
-    void pack();
-    void set_retransmit_timer(resolver *);
-    void send_query(resolver *r);
-};
+struct query_context;
 
 class resolver {
 public:

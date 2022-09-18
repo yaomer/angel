@@ -77,6 +77,19 @@ static std::string to_ip(const char*& p)
     return angel::sockops::to_host_ip(&addr);
 }
 
+struct query_context : public std::enable_shared_from_this<query_context> {
+    uint16_t id;
+    std::string name;
+    uint16_t q_type;
+    uint16_t q_class;
+    std::string buf;
+    std::promise<result> recv_promise;
+    size_t retransmit_timer_id;
+    void pack();
+    void set_retransmit_timer(resolver *);
+    void send_query(resolver *r);
+};
+
 //  Header
 //    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
 //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
