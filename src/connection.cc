@@ -102,7 +102,6 @@ void connection::handle_write()
 
 void connection::handle_close(bool is_forced)
 {
-    log_info("connection(id=%d, fd=%d) is %s", conn_id, conn_channel->fd(), get_state_str());
     if (conn_state == state::closed) return;
     // 我们必须在这里就取消ttl timer，而不是在connection析构时；
     // 因为如果ttl timer存在，那么connection的生存期就会被延长。
@@ -114,10 +113,14 @@ void connection::handle_close(bool is_forced)
         set_state(state::closing);
         return;
     }
-    if (close_handler)
+    if (close_handler) {
         loop->run_in_loop([conn = shared_from_this()]{
-                conn->close_handler(conn);
+                // 避免在close_handler()内部再次调用handle_close()
+                auto close_handler = conn->close_handler;
+                conn->close_handler = nullptr;
+                close_handler(conn);
                 });
+    }
 }
 
 void connection::handle_error()
