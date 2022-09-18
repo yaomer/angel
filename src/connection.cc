@@ -116,7 +116,7 @@ void connection::handle_close(bool is_forced)
     if (close_handler) {
         loop->run_in_loop([conn = shared_from_this()]{
                 // 避免在close_handler()内部再次调用handle_close()
-                auto close_handler = conn->close_handler;
+                auto close_handler = std::move(conn->close_handler);
                 conn->close_handler = nullptr;
                 close_handler(conn);
                 });
