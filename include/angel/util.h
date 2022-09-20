@@ -26,6 +26,8 @@ int get_ncpus();
 void set_thread_affinity(pthread_t tid, int cpu_number);
 
 std::string base64_encode(const char *data, size_t len);
+std::string base64_decode(const char *data, size_t len);
+
 std::string sha1(const std::string& data, bool normal);
 
 // check ipv4 addr format
