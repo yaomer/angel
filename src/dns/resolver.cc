@@ -1,3 +1,8 @@
+//
+// Async DNS Resolver
+// See https://www.rfc-editor.org/rfc/rfc1035.html
+//
+
 #include <angel/resolver.h>
 
 #include <iostream>
@@ -211,7 +216,6 @@ resolver::resolver()
             buf.retrieve_all();
             });
     cli->start();
-    log_info("resolver is running");
 }
 
 enum {

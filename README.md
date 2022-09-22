@@ -166,7 +166,7 @@ int main(void)
 }
 ```
 ### 更多示例
-- 内置的[dns resolver](https://github.com/yaomer/angel/tree/master/src/dns-resolver)
+- 内置的[async dns resolver](https://github.com/yaomer/angel/tree/master/src/dns-resolver)
 - 内置的[websocket server](https://github.com/yaomer/angel/tree/master/src/websocket)
 - 一些简单的[例子](https://github.com/yaomer/angel/tree/master/examples)
 - 一个更有意义的例子[alice](https://github.com/yaomer/Alice)

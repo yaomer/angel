@@ -143,7 +143,7 @@ void WebSocketContext::sec_websocket_accept(std::string key)
 {
     static const char *guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     key = util::sha1(key + guid, true);
-    SecWebSocketAccept = util::base64_encode(key.data(), key.size());
+    SecWebSocketAccept = util::base64_encode(key);
 }
 
 // Server:

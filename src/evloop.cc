@@ -184,7 +184,7 @@ size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
     int64_t expire = get_cur_time_ms() + timeout;
     timer_task_t *task = new timer_task_t(expire, 0, std::move(cb));
     size_t id = timer->add_timer(task);
-    log_info("add a timer(id=%zu) after %lld ms", id, timeout);
+    log_debug("add a timer(id=%zu) after %lld ms", id, timeout);
     return id;
 }
 
@@ -194,14 +194,14 @@ size_t evloop::run_every(int64_t interval, const timer_callback_t cb)
     int64_t expire = get_cur_time_ms() + interval;
     timer_task_t *task = new timer_task_t(expire, interval, std::move(cb));
     size_t id = timer->add_timer(task);
-    log_info("add a timer(id=%zu) every %lld ms", id, interval);
+    log_debug("add a timer(id=%zu) every %lld ms", id, interval);
     return id;
 }
 
 void evloop::cancel_timer(size_t id)
 {
     timer->cancel_timer(id);
-    log_info("cancel a timer(id=%zu)", id);
+    log_debug("cancel a timer(id=%zu)", id);
 }
 
 void evloop::quit()

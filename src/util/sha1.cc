@@ -123,9 +123,9 @@ static std::string to_hex_digest(uint32_t h[5])
     return buf;
 }
 
-std::string sha1(const std::string& data, bool normal)
+std::string sha1(std::string_view data, bool normal)
 {
-    auto buf = data;
+    std::string buf{ data };
 
     assert_little_endian();
     padding(buf, data.size() * 8);

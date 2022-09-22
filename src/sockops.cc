@@ -157,7 +157,7 @@ void set_keepalive(int fd, bool on)
 #endif
     if (::setsockopt(fd, SOL_SOCKET, optval, &opt, sizeof(opt)) < 0)
         log_fatal("[setsockopt -> TCP_KEEPALIVE]: %s", strerrno());
-    log_info("%s TCP_KEEPALIVE", (on ? "enable" : "disable"));
+    log_debug("%s TCP_KEEPALIVE", (on ? "enable" : "disable"));
 }
 
 void set_nodelay(int fd, bool on)
@@ -165,7 +165,7 @@ void set_nodelay(int fd, bool on)
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, TCP_NODELAY, &opt, sizeof(opt)) < 0)
         log_fatal("[setsockopt -> TCP_NODELAY]: %s", strerrno());
-    log_info("%s TCP_NODELAY", (on ? "enable" : "disable"));
+    log_debug("%s TCP_NODELAY", (on ? "enable" : "disable"));
 }
 
 void set_reuseaddr(int fd, bool on)
@@ -173,7 +173,7 @@ void set_reuseaddr(int fd, bool on)
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
         log_fatal("[setsockopt -> SO_REUSEADDR]: %s", strerrno());
-    log_info("%s SO_REUSEADDR", (on ? "enable" : "disable"));
+    log_debug("%s SO_REUSEADDR", (on ? "enable" : "disable"));
 }
 
 void set_reuseport(int fd, bool on)
@@ -181,7 +181,7 @@ void set_reuseport(int fd, bool on)
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
         log_fatal("[setsockopt -> SO_REUSEPORT]: %s", strerrno());
-    log_info("%s SO_REUSEPORT", (on ? "enable" : "disable"));
+    log_debug("%s SO_REUSEPORT", (on ? "enable" : "disable"));
 }
 
 }

@@ -27,12 +27,15 @@ static const char *indexs = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 
 #define APPEND(i) res.push_back(indexs[i])
 
-std::string base64_encode(const char *data, size_t len)
+std::string base64_encode(std::string_view data)
 {
     std::string res;
-    res.reserve(len);
     unsigned char a, b, c;
     unsigned char i1, i2, i3, i4;
+
+    size_t len = data.size();
+    res.reserve(len);
+
     size_t i = 0;
     while (true) {
         if (i + 3 > len) break;
@@ -102,9 +105,10 @@ static constexpr unsigned char mapchars[128] = {
 
 #define APPEND(c) res.push_back(c)
 
-std::string base64_decode(const char *data, size_t len)
+std::string base64_decode(std::string_view data)
 {
     std::string res;
+    size_t len = data.size();
     assert(len > 0 && len % 4 == 0);
     res.reserve(len * 0.75);
     unsigned char a, b, c, d;
