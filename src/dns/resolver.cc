@@ -202,7 +202,6 @@ resolver::resolver()
     angel::client_options ops;
     ops.protocol = "udp";
     ops.is_reconnect = true;
-    ops.is_quit_loop = false;
     cli.reset(new angel::client(receiver.wait_loop(), angel::inet_addr(name_server_addr, name_server_port), ops));
     cli->set_connection_handler([this](const angel::connection_ptr& conn){
             lock_t lk(delay_task_queue_mutex);

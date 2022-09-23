@@ -13,10 +13,6 @@
 namespace angel {
 
 class poller;
-class select_base_t;
-class poll_base_t;
-class kqueue_base_t;
-class epoll_base_t;
 
 class timer_t;
 typedef std::function<void()> timer_callback_t;

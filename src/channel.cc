@@ -6,10 +6,7 @@
 namespace angel {
 
 channel::channel(evloop *loop)
-    : loop(loop),
-    evfd(-1),
-    filter(0),
-    trigger(0)
+    : loop(loop), evfd(-1), filter(0), trigger(0)
 {
 }
 
@@ -35,19 +32,19 @@ void channel::disable_write()
 static const char *ev2str(int events)
 {
     switch (events) {
-    case Read: return "Read";
-    case Write: return "Write";
-    case Error: return "Error";
-    case Read | Write: return "Read|Write";
-    case Read | Error: return "Read|Error";
-    case Write | Error: return "Write|Error";
-    default: return "None";
+    case Read: return "<Read>";
+    case Write: return "<Write>";
+    case Error: return "<Error>";
+    case Read | Write: return "<Read|Write>";
+    case Read | Error: return "<Read|Error>";
+    case Write | Error: return "<Write|Error>";
+    default: return "<None>";
     }
 }
 
 void channel::handle_event()
 {
-    log_debug("fd=%d revents is %s", fd(), ev2str(trigger));
+    log_debug("channel(fd=%d) triggered event is %s", fd(), ev2str(trigger));
     if (trigger & Error)
         if (error_handler) error_handler();
     if (trigger & Read)
