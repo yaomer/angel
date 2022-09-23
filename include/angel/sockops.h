@@ -6,7 +6,6 @@
 #include <string_view>
 
 namespace angel {
-
 namespace sockops {
 
 static inline uint64_t hton64(uint64_t host)
@@ -43,6 +42,8 @@ int get_socket_error(int sockfd);
 int to_host_port(in_port_t port);
 const char *to_host_ip(const struct in_addr *addr);
 const char *to_host(const struct sockaddr_in *addr);
+
+const char *get_host_name();
 
 int send_file(int fd, int sockfd);
 

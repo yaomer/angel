@@ -1,5 +1,6 @@
 #include <angel/sockops.h>
 
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <fcntl.h>
@@ -108,22 +109,33 @@ int to_host_port(in_port_t port)
     return ntohs(port);
 }
 
-static thread_local char sockops_ipaddr[32];
-static thread_local char sockops_host[48];
-
 const char *to_host_ip(const struct in_addr *addr)
 {
-    if (inet_ntop(AF_INET, addr, sockops_ipaddr, sizeof(sockops_ipaddr)) == nullptr)
+    static thread_local char host_ip[32];
+    if (inet_ntop(AF_INET, addr, host_ip, sizeof(host_ip)) == nullptr) {
         log_error("inet_ntop: %s", strerrno());
-    return sockops_ipaddr;
+        return nullptr;
+    }
+    return host_ip;
 }
 
 const char *to_host(const struct sockaddr_in *addr)
 {
+    static thread_local char host[48];
     int port = to_host_port(addr->sin_port);
     const char *ip = to_host_ip(&addr->sin_addr);
-    snprintf(sockops_host, sizeof(sockops_host), "%s:%d", ip, port);
-    return sockops_host;
+    snprintf(host, sizeof(host), "%s:%d", ip, port);
+    return host;
+}
+
+const char *get_host_name()
+{
+    static thread_local char hostname[256];
+    if (::gethostname(hostname, sizeof(hostname)) < 0) {
+        log_error("gethostname: %s", strerrno());
+        return nullptr;
+    }
+    return hostname;
 }
 
 #if defined (__linux__)
