@@ -64,6 +64,8 @@ list(APPEND SRC_FILES ${SRC_DIR}/dns/resolver.cc)
 
 list(APPEND SRC_FILES ${SRC_DIR}/websocket/ws-server.cc)
 
+list(APPEND SRC_FILES ${SRC_DIR}/smtplib/smtplib.cc)
+
 add_library (angel STATIC ${SRC_FILES})
 
 install(TARGETS angel
