@@ -28,6 +28,7 @@ enum type {
     TXT     = 16, // text strings
     //============================
     ERROR   = 17, // query error
+    TIMEOUT = 18, // query timeout
 };
 
 struct a_rdata;

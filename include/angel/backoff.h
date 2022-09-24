@@ -19,8 +19,8 @@ public:
     }
 private:
     int interval = 200;
+    double multiplier = 2.0;
     int max_retries = 6;
-    const double multiplier = 2.0;
     // default: 200 400 800 1600 3200 6400
 };
 

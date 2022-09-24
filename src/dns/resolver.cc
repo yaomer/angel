@@ -11,6 +11,7 @@
 #include <angel/sockops.h>
 #include <angel/util.h>
 #include <angel/logger.h>
+#include <angel/backoff.h>
 
 namespace angel {
 namespace dns {
@@ -90,9 +91,19 @@ struct query_context : public std::enable_shared_from_this<query_context> {
     std::string buf;
     std::promise<result> recv_promise;
     size_t retransmit_timer_id;
+    ExponentialBackoff backoff;
+    resolver *resolver;
+
+    ~query_context()
+    {
+        cancel_retransmit_timer();
+    }
+
     void pack();
-    void set_retransmit_timer(resolver *);
-    void send_query(resolver *r);
+    void set_retransmit_timer();
+    void cancel_retransmit_timer();
+    void send_query();
+    void notify(result&& res);
 };
 
 //  Header
@@ -333,6 +344,7 @@ void resolver::unpack(angel::buffer& res_buf)
         it = query_map.find(id);
         if (it == query_map.end()) return;
     }
+    log_info("recv query(id=%zu)", it->second->id);
 
     result res;
     if (rcode != NoError) {
@@ -340,11 +352,7 @@ void resolver::unpack(angel::buffer& res_buf)
         rr->type = ERROR;
         rr->name = rcode_map.at(rcode);
         res.emplace_back(rr);
-        it->second->recv_promise.set_value(std::move(res));
-        {
-            lock_t lk(query_map_mutex);
-            query_map.erase(it);
-        }
+        it->second->notify(std::move(res));
         return;
     }
 
@@ -363,31 +371,58 @@ void resolver::unpack(angel::buffer& res_buf)
 
     parse_answer_rrs(res, p, res_buf.peek(), answer);
 
-    it->second->recv_promise.set_value(std::move(res));
+    it->second->notify(std::move(res));
+}
+
+void query_context::notify(result&& res)
+{
+    cancel_retransmit_timer();
+    recv_promise.set_value(std::move(res));
     {
-        lock_t lk(query_map_mutex);
-        query_map.erase(it);
+        lock_t lk(resolver->query_map_mutex);
+        resolver->query_map.erase(id);
     }
 }
 
-void query_context::set_retransmit_timer(resolver *r)
+void query_context::set_retransmit_timer()
 {
-    // TODO: 指数退避
-    retransmit_timer_id = r->receiver.get_loop()->run_after(3000, [r, qc = shared_from_this()](){
-            lock_t lk(r->query_map_mutex);
-            if (r->query_map.count(qc->id)) {
+    int after = backoff.next_back_off();
+    if (after == 0) {
+        result res;
+        rr_base *rr = new rr_base();
+        rr->type = TIMEOUT;
+        res.emplace_back(rr);
+        notify(std::move(res));
+        return;
+    }
+    retransmit_timer_id = resolver->receiver.get_loop()->run_after(after, [qc = shared_from_this()](){
+            auto r = qc->resolver;
+            bool need_retransmit;
+            {
+                lock_t lk(r->query_map_mutex);
+                need_retransmit = r->query_map.count(qc->id);
+            }
+            if (need_retransmit) {
                 r->cli->conn()->send(qc->buf);
-                qc->set_retransmit_timer(r);
-            } else {
-                r->receiver.get_loop()->cancel_timer(qc->retransmit_timer_id);
+                log_info("retransmit dns query(id=%zu)", qc->id);
+                qc->set_retransmit_timer();
             }
             });
 }
 
-void query_context::send_query(resolver *r)
+void query_context::cancel_retransmit_timer()
 {
-    r->cli->conn()->send(buf);
-    set_retransmit_timer(r);
+    if (retransmit_timer_id > 0) {
+        resolver->receiver.get_loop()->cancel_timer(retransmit_timer_id);
+        retransmit_timer_id = 0;
+    }
+}
+
+void query_context::send_query()
+{
+    resolver->cli->conn()->send(buf);
+    log_info("send dns query(id=%zu)", id);
+    set_retransmit_timer();
 }
 
 result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q_class)
@@ -397,6 +432,9 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
     qc->name = name;
     qc->q_type = q_type;
     qc->q_class = q_class;
+    // 1 + 2 + 4 + 8 + 16 == 31(s)
+    qc->backoff = ExponentialBackoff(1000, 2, 5);
+    qc->resolver = this;
     qc->pack();
     auto f = qc->recv_promise.get_future();
     {
@@ -404,13 +442,15 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
         query_map.emplace(qc->id, qc);
     }
     if (!cli->is_connected()) {
-        std::packaged_task<void()> task(std::bind(&query_context::send_query, qc, this));
+        std::shared_ptr<query_context> sptr(qc);
+        std::weak_ptr<query_context> wptr = sptr;
+        std::packaged_task<void()> task([wptr]() { if (!wptr.expired()) wptr.lock()->send_query(); });
         {
             lock_t lk(delay_task_queue_mutex);
             delay_task_queue.emplace(std::move(task));
         }
     } else {
-        qc->send_query(this);
+        qc->send_query();
     }
     return f;
 }
@@ -488,8 +528,7 @@ void resolver::show(const result_future& f)
         cout << "argument error\n";
         return;
     }
-    auto& ans = f.get();
-    for (auto& item : ans) {
+    for (auto& item : f.get()) {
         if (item->type == A) {
             auto *x = item->as_a();
             cout << x->name << " has address " << x->addr << "\n";
