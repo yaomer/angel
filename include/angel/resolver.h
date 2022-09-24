@@ -119,10 +119,12 @@ public:
     // if f.valid() == false, argument error
     // if f.get().front()->type == ERROR, resolver error
     result_future query(std::string_view dname, int type);
+    // wait_for_ms = 0: block and wait until the result is returned
+    // wait_for_ms > 0: return after `wait_for_ms` (ms)
     // get A record result
-    std::vector<std::string> get_addr_list(std::string_view dname);
+    std::vector<std::string> get_addr_list(std::string_view dname, int wait_for_ms = 0);
     // get MX record result, sort by preference
-    std::vector<std::string> get_mx_name_list(std::string_view dname);
+    std::vector<std::string> get_mx_name_list(std::string_view dname, int wait_for_ms = 0);
     // show result info
     static void show(const result_future&);
 private:

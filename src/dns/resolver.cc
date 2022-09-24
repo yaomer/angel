@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <chrono>
 
 #include <angel/sockops.h>
 #include <angel/util.h>
@@ -94,14 +95,8 @@ struct query_context : public std::enable_shared_from_this<query_context> {
     ExponentialBackoff backoff;
     resolver *resolver;
 
-    ~query_context()
-    {
-        cancel_retransmit_timer();
-    }
-
     void pack();
     void set_retransmit_timer();
-    void cancel_retransmit_timer();
     void send_query();
     void notify(result&& res);
 };
@@ -376,7 +371,9 @@ void resolver::unpack(angel::buffer& res_buf)
 
 void query_context::notify(result&& res)
 {
-    cancel_retransmit_timer();
+    if (retransmit_timer_id > 0) {
+        resolver->receiver.get_loop()->cancel_timer(retransmit_timer_id);
+    }
     recv_promise.set_value(std::move(res));
     {
         lock_t lk(resolver->query_map_mutex);
@@ -408,14 +405,6 @@ void query_context::set_retransmit_timer()
                 qc->set_retransmit_timer();
             }
             });
-}
-
-void query_context::cancel_retransmit_timer()
-{
-    if (retransmit_timer_id > 0) {
-        resolver->receiver.get_loop()->cancel_timer(retransmit_timer_id);
-        retransmit_timer_id = 0;
-    }
 }
 
 void query_context::send_query()
@@ -479,21 +468,27 @@ const soa_rdata *rr_base::as_soa() const { return static_cast<const soa_rdata*>(
 const ptr_rdata *rr_base::as_ptr() const { return static_cast<const ptr_rdata*>(this); }
 const char *rr_base::as_err() const { return name.c_str(); }
 
-std::vector<std::string> resolver::get_addr_list(std::string_view name)
+std::vector<std::string> resolver::get_addr_list(std::string_view name, int wait_for_ms)
 {
     std::vector<std::string> res;
+
     auto f = query(name, A);
-    if (f.valid()) {
-        for (auto& item : f.get()) {
-            if (item->type == A) {
-                res.emplace_back(std::move(item->as_a()->addr));
-            }
+    if (!f.valid()) return res;
+
+    if (wait_for_ms > 0) {
+        auto status = f.wait_for(std::chrono::milliseconds(wait_for_ms));
+        if (status != std::future_status::ready) return res;
+    }
+
+    for (auto& item : f.get()) {
+        if (item->type == A) {
+            res.emplace_back(std::move(item->as_a()->addr));
         }
     }
     return res;
 }
 
-std::vector<std::string> resolver::get_mx_name_list(std::string_view name)
+std::vector<std::string> resolver::get_mx_name_list(std::string_view name, int wait_for_ms)
 {
     std::vector<std::string> res;
 
@@ -502,6 +497,11 @@ std::vector<std::string> resolver::get_mx_name_list(std::string_view name)
 
     auto f = query(name, MX);
     if (!f.valid()) return res;
+
+    if (wait_for_ms > 0) {
+        auto status = f.wait_for(std::chrono::milliseconds(wait_for_ms));
+        if (status != std::future_status::ready) return res;
+    }
 
     for (auto& item : f.get()) {
         if (item->type == MX) {
