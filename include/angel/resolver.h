@@ -110,14 +110,20 @@ typedef std::shared_future<result> result_future;
 
 struct query_context;
 
+class cache;
+
 class resolver {
 public:
     resolver();
+    ~resolver();
     resolver(const resolver&) = delete;
     resolver& operator=(const resolver&) = delete;
+    // valid for get_addr_list()
+    void enable_cache();
     // auto f = query()
     // if f.valid() == false, argument error
     // if f.get().front()->type == ERROR, resolver error
+    // (Do not use cache)
     result_future query(std::string_view dname, int type);
     // wait_for_ms = 0: block and wait until the result is returned
     // wait_for_ms > 0: return after `wait_for_ms` (ms)
@@ -141,6 +147,8 @@ private:
     std::mutex query_map_mutex;
     DelayTaskQueue delay_task_queue;
     std::mutex delay_task_queue_mutex;
+    // Only Cache A record
+    std::unique_ptr<cache> cache;
 
     friend struct query_context;
 };

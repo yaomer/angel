@@ -14,6 +14,8 @@
 #include <angel/logger.h>
 #include <angel/backoff.h>
 
+#include "cache.h"
+
 namespace angel {
 namespace dns {
 
@@ -221,6 +223,16 @@ resolver::resolver()
             buf.retrieve_all();
             });
     cli->start();
+}
+
+resolver::~resolver()
+{
+}
+
+void resolver::enable_cache()
+{
+    cache.reset(new class cache());
+    receiver.get_loop()->run_every(1000, [this]{ this->cache->evict(); });
 }
 
 enum {
@@ -468,22 +480,39 @@ const soa_rdata *rr_base::as_soa() const { return static_cast<const soa_rdata*>(
 const ptr_rdata *rr_base::as_ptr() const { return static_cast<const ptr_rdata*>(this); }
 const char *rr_base::as_err() const { return name.c_str(); }
 
+static bool is_ready(result_future& f, int wait_for_ms)
+{
+    if (wait_for_ms <= 0) return true;
+    return f.wait_for(std::chrono::milliseconds(wait_for_ms)) == std::future_status::ready;
+}
+
 std::vector<std::string> resolver::get_addr_list(std::string_view name, int wait_for_ms)
 {
     std::vector<std::string> res;
 
-    auto f = query(name, A);
-    if (!f.valid()) return res;
-
-    if (wait_for_ms > 0) {
-        auto status = f.wait_for(std::chrono::milliseconds(wait_for_ms));
-        if (status != std::future_status::ready) return res;
+    if (cache) {
+        auto *p = cache->get(name);
+        if (p) return p->addr_list;
     }
 
+    auto f = query(name, A);
+
+    if (!f.valid()) return res;
+
+    if (!is_ready(f, wait_for_ms)) return res;
+
+    uint32_t min_ttl = 0;
     for (auto& item : f.get()) {
         if (item->type == A) {
             res.emplace_back(std::move(item->as_a()->addr));
+            if (cache) {
+                min_ttl = min_ttl == 0 ? item->ttl : std::min(min_ttl, item->ttl);
+            }
         }
+    }
+
+    if (cache && min_ttl > 0) {
+        cache->put(name, res, min_ttl);
     }
     return res;
 }
@@ -496,12 +525,10 @@ std::vector<std::string> resolver::get_mx_name_list(std::string_view name, int w
     std::vector<mx_pair> mx_list;
 
     auto f = query(name, MX);
+
     if (!f.valid()) return res;
 
-    if (wait_for_ms > 0) {
-        auto status = f.wait_for(std::chrono::milliseconds(wait_for_ms));
-        if (status != std::future_status::ready) return res;
-    }
+    if (!is_ready(f, wait_for_ms)) return res;
 
     for (auto& item : f.get()) {
         if (item->type == MX) {
