@@ -12,9 +12,9 @@ namespace angel {
 class connector_t;
 
 struct client_options {
-    bool is_reconnect = false; // 与对端断开连接后是否尝试重连
-    int64_t retry_interval_ms = 3000; // connect()调用失败后的重试间隔时间
-    bool is_quit_loop = false; // 连接断开后是否loop->quit()
+    bool is_reconnect = false; // Whether to try to reconnect after disconnecting from the peer
+    int64_t retry_interval_ms = 3000; // Retry interval after connect() fails
+    bool is_quit_loop = false; // Whether to quit loop after the connection is closed
     std::string protocol = "tcp"; // "tcp" or "udp"
 };
 

@@ -57,7 +57,7 @@ void connection::handle_read()
         if (message_handler) {
             message_handler(shared_from_this(), input_buf);
         } else {
-            // 如果用户未设置消息回调，就丢掉所有读到的数据
+            // If the user does not set a message handler, discard all read data
             input_buf.retrieve_all();
         }
     } else if (n == 0) {
@@ -68,7 +68,8 @@ void connection::handle_read()
     update_ttl_timer_if_needed();
 }
 
-// 每当关注的sockfd可写时，由handle_write()负责将未发送完的数据发送过去
+// Whenever the registered sockfd is writable,
+// handle_write() is responsible for sending the unsent data to the peer.
 void connection::handle_write()
 {
     if (conn_state == state::closed) {
@@ -91,7 +92,7 @@ void connection::handle_write()
             }
         } else {
             log_warn("write to connection(id=%d, fd=%d): %s", conn_id, conn_channel->fd(), strerrno());
-            // 对端尚未与我们建立连接或者对端已关闭连接
+            // The peer has not established a connection with us, or has closed the connection
             if (errno == ECONNRESET || errno == EPIPE) {
                 force_close_connection();
                 return;
@@ -103,8 +104,8 @@ void connection::handle_write()
 void connection::handle_close(bool is_forced)
 {
     if (conn_state == state::closed) return;
-    // 我们必须在这里就取消ttl timer，而不是在connection析构时；
-    // 因为如果ttl timer存在，那么connection的生存期就会被延长。
+    // We must cancel the ttl timer here, not when the connection is destructed;
+    // otherwise, if the ttl timer exists, the lifetime of the connection will be extended.
     if (ttl_timer_id > 0) {
         loop->cancel_timer(ttl_timer_id);
         ttl_timer_id = 0;
@@ -115,7 +116,7 @@ void connection::handle_close(bool is_forced)
     }
     if (close_handler) {
         loop->run_in_loop([conn = shared_from_this()]{
-                // 避免在close_handler()内部再次调用handle_close()
+                // Avoid calling close_handler() again in close_handler().
                 auto close_handler = std::move(conn->close_handler);
                 conn->close_handler = nullptr;
                 close_handler(conn);
@@ -126,7 +127,7 @@ void connection::handle_close(bool is_forced)
 void connection::handle_error()
 {
     log_error("connection(id=%d, fd=%d): %s", conn_id, conn_channel->fd(), strerrno());
-    // 对端已关闭连接
+    // The peer has closed the connection
     if (errno == ECONNRESET)
         force_close_connection();
 }
@@ -179,10 +180,10 @@ void connection::send_in_loop(const char *data, size_t len)
 void connection::send(const char *s, size_t len)
 {
     if (loop->is_io_loop_thread()) {
-        // 在本线程直接发送即可
+        // You can send it directly on this thread.
         send_in_loop(s, len);
     } else {
-        // 跨线程必须将数据拷贝一份，防止数据失效
+        // Delayed sending across threads must copy the data to prevent data failure.
         loop->run_in_loop([this, message = std::string(s, len)]{
                 this->send_in_loop(message.data(), message.size());
                 });

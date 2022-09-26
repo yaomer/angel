@@ -56,7 +56,8 @@ void kqueue_base_t::change(int fd, int events)
 void kqueue_base_t::remove(int fd, int events)
 {
     struct kevent kev;
-    // 删除fd上注册的所有事件，kqueue即会从内核事件列表中移除fd
+    // Delete all events registered on the fd,
+    // and kqueue will remove the fd from the kernel event list.
     if (events & Read) {
         EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)

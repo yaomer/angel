@@ -15,11 +15,11 @@ namespace angel {
 class listener_t;
 class evloop_thread_pool;
 
-// server支持以下几种运行方式：
-// 1. [单线程reactor]
-// 2. [单线程reactor + thread pool](start_task_threads())
-// 3. [多线程reactor](start_io_threads())
-// 4. [多线程reactor + thread pool](start_io_threads(), start_task_threads())
+// Server supports several operating modes:
+// 1) [single-threaded reactor]
+// 2) [single-threaded reactor + thread pool] (start_task_threads())
+// 3) [multi-threaded reactor] (start_io_threads())
+// 4) [multi-threaded reactor + thread pool] (start_io_threads(), start_task_threads())
 class server {
 public:
     typedef std::function<void(const connection_ptr&)> for_each_functor_t;
@@ -43,6 +43,7 @@ public:
     void start_io_threads(size_t thread_nums = 0);
     void start_task_threads(size_t thread_nums = 0,
                             enum thread_pool::policy policy = thread_pool::policy::fixed);
+    // execute a task in the task thread pool
     void executor(const task_callback_t task);
     void set_exit_handler(const signaler_handler_t handler)
     {

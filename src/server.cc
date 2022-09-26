@@ -58,12 +58,8 @@ void server::remove_connection(const connection_ptr& conn)
     if (close_handler) close_handler(conn);
     conn->set_state(connection::state::closed);
     conn->get_loop()->remove_channel(conn->get_channel());
-    // 必须在主线程的evloop中移除一个连接，否则多个线程就有可能并发
-    // 修改connection_map
-    // 例如，主线程接收到一个新连接，之后调用new_connection将它添加到
-    // connection_map中，如果此时恰好有某个io子线程要移除一个连接，并且
-    // 正在调用remove_connection，这时两个线程就会同时修改connection_map，
-    // 这会导致难以预料的后果
+    // We have to remove a connection in the io loop thread
+    // to prevent multiple threads from concurrently modifying the connection_map.
     loop->run_in_loop([this, id = conn->id()]{
             this->connection_map.erase(id);
             });
@@ -146,7 +142,8 @@ void server::clean_up()
 void server::start()
 {
     log_info("server %s is running", listener->addr().to_host());
-    // 必须忽略SIGPIPE信号，不然当向一个已关闭的连接发送消息时，会导致服务端意外退出
+    // The SIGPIPE signal must be ignored,
+    // otherwise sending a message to a closed connection will cause the server to exit unexpectedly.
     add_signal(SIGPIPE, nullptr);
     add_signal(SIGINT, [this]{ this->clean_up(); });
     add_signal(SIGTERM, [this]{ this->clean_up(); });

@@ -18,29 +18,32 @@ class connection;
 
 typedef std::shared_ptr<connection> connection_ptr;
 
-// 连接成功建立后调用一次
+// Called after the connection is successfully established.
 typedef std::function<void(const connection_ptr&)> connection_handler_t;
-// 每次接收到对端的消息后调用
+// Called after receiving the peer message.
 typedef std::function<void(const connection_ptr&, buffer&)> message_handler_t;
-// 连接关闭时调用一次
+// Called after the connection is closed.
 typedef std::function<void(const connection_ptr&)> close_handler_t;
-// 低水位回调，数据发送完后调用，可用于一方持续不断的发送数据
+// Low water mark callback
+// Called after data is sent, can be used to continuously send data.
 typedef std::function<void(const connection_ptr&)> write_complete_handler_t;
-// 高水位回调，待发送的数据累积到某个阈值时调用
+// High water mark callback
+// Called when the data to be sent accumulates to a certain threshold.
 typedef std::function<void(const connection_ptr&)> high_water_mark_handler_t;
-// 连接出错时调用，暂时未使用
+// Called when there is a connection error. (not used yet)
 typedef std::function<void()> error_handler_t;
 
 //
-// 相比于channel更上层的封装，专门用于管理TCP连接
+// A higher-level encapsulation than channel,
+// and manage TCP (or UDP) connections exclusively.
 //
 class connection : public std::enable_shared_from_this<connection> {
 public:
     enum class state {
-        connecting, // 连接正在建立
-        connected,  // 连接建立完成
-        closing,    // 连接将要关闭
-        closed,     // 连接已经关闭
+        connecting,
+        connected,
+        closing,
+        closed,
     };
 
     connection(size_t id, evloop *loop, int sockfd);
@@ -97,11 +100,14 @@ private:
     buffer output_buf;
     inet_addr local_addr;
     inet_addr peer_addr;
-    // 保存连接所需的上下文
-    // context不应包含一个connection_ptr，否则将会造成循环引用
-    // 若有需要，<connection*>即可
+    // Save the context needed for the connection
+    //
+    // There should not be a connection_ptr in the context,
+    // otherwise it will cause a circular reference.
+    //
+    // If necessary, <connection*> or <weak_ptr<connection>> can be.
+    //
     std::any context;
-    // 标识一个连接的状态
     std::atomic<state> conn_state;
     size_t ttl_timer_id;
     int64_t ttl_ms;

@@ -20,7 +20,7 @@ typedef std::function<void()> timer_callback_t;
 class signaler_t;
 typedef std::function<void()> signaler_handler_t;
 
-// reactor模式的核心，事件循环的驱动
+// The event loop, the core of the recator mode.
 class evloop {
 public:
     typedef std::function<void()> functor;
@@ -31,11 +31,11 @@ public:
     evloop(const evloop&) = delete;
     evloop& operator=(const evloop&) = delete;
 
-    // 向loop中注册一个事件
+    // Register an event with the loop
     void add_channel(const channel_ptr& chl);
-    // 从loop中删除一个事件
+    // Remove an event from the loop (you may need close(fd))
     void remove_channel(const channel_ptr& chl);
-    // 修改fd上关联的事件
+    // Modify events associated with fd
     void change_event(int fd, int events);
 
     channel_ptr search_channel(int fd)
@@ -43,9 +43,14 @@ public:
 
     void run();
     bool is_io_loop_thread();
+    // Execute user callback on io loop thread.
+    // Execute immediately if the current thread is io thread, else queue_in_loop(cb).
     void run_in_loop(const functor cb);
+    // Put the callback into the task queue of the io thread.
     void queue_in_loop(const functor cb);
+    // Execute a callback after timeout (ms)
     size_t run_after(int64_t timeout_ms, const timer_callback_t cb);
+    // Execute a callback every interval (ms)
     size_t run_every(int64_t interval_ms, const timer_callback_t cb);
     void cancel_timer(size_t id);
     void quit();
@@ -64,7 +69,8 @@ private:
     std::vector<std::shared_ptr<channel>> active_channels;
     std::atomic_bool is_quit;
     std::thread::id cur_tid;
-    // 一个任务队列，用于将非io线程的任务转到io线程执行
+    // A task queue for transferring tasks
+    // from non-io threads to io threads for execution.
     std::vector<functor> functors;
     std::mutex mutex;
     int wake_fd[2];

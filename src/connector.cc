@@ -48,11 +48,11 @@ void connector_t::connect()
     loop->add_channel(connect_channel);
     log_info("connect(fd=%d) -> host (%s)", sockfd, peer_addr.to_host());
     if (ret == 0) {
-        // 通常如果服务端和客户端在同一台主机，连接会立即建立
+        // Usually if the server and client are on the same host,
+        // the connection will be established immediately.
         connected();
     } else if (ret < 0) {
         if (errno == EINPROGRESS) {
-            // 连接正在建立
             connecting();
         }
     }
@@ -77,11 +77,14 @@ void connector_t::connected()
     has_connected = true;
 }
 
-// 在Mac OS上使用poll判断sockfd的状态，好像有时会可读，有时会可写
-// 所以我们在可读可写情况下都使用getsockopt来获取sockfd的状态
+// Using poll to judge the status of sockfd on Mac OS
+// seems to be sometimes readable and sometimes writable,
+// so we use getsockopt() to get the status of sockfd
+// in both readable and writable situations.
 
-// 如果一个socket fd上出现了错误，那么在close(fd)之前，只能通过
-// getsockopt()获取一次错误，之后便不会再触发
+// If there is an error on a socket fd, before close(fd),
+// the error can only be gotten once through getsockopt(),
+// and then it will not be triggered again.
 
 void connector_t::check()
 {

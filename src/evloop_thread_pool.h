@@ -28,7 +28,7 @@ public:
                         evthr->get_thread().native_handle(), cpu_number++);
             }
         }
-        // 等待所有IO线程完成初始化
+        // Wait for all io threads to complete initialization
         for (size_t i = 0; i < thread_nums; i++) {
             while (!thread_pool[i]->wait_loop())
                 ;
@@ -38,7 +38,7 @@ public:
     evloop_thread_pool(const evloop_thread_pool&) = delete;
     evloop_thread_pool& operator=(const evloop_thread_pool&) = delete;
     size_t threads() const { return thread_nums; }
-    // 使用[round-robin]挑选出下一个[io thread]
+    // Select an io loop by using [round-robin]
     evloop *get_next_loop()
     {
         if (next_index >= thread_nums) next_index = 0;

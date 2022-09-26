@@ -133,7 +133,7 @@ void evloop::wakeup_init()
     add_channel(chl);
 }
 
-// 唤醒io线程
+// Wakeup current io loop thread
 void evloop::wakeup()
 {
     uint64_t one = 1;
@@ -144,7 +144,6 @@ void evloop::wakeup()
         log_debug("wake up the io-loop by fd=%d", wake_fd[1]);
 }
 
-// 接受被唤醒
 void evloop::handle_read()
 {
     uint64_t one;
@@ -153,22 +152,20 @@ void evloop::handle_read()
         log_error("read %zd bytes instead of %zu", n, sizeof(one));
 }
 
-// 判断当前线程是否是io线程
 bool evloop::is_io_loop_thread()
 {
     return std::this_thread::get_id() == cur_tid;
 }
 
-// 在io线程执行用户回调
 void evloop::run_in_loop(const functor cb)
 {
     if (!is_io_loop_thread()) {
         queue_in_loop(cb);
-    } else
+    } else {
         cb();
+    }
 }
 
-// 向任务队列中添加一个任务
 void evloop::queue_in_loop(const functor cb)
 {
     {
@@ -178,7 +175,6 @@ void evloop::queue_in_loop(const functor cb)
     wakeup();
 }
 
-// [timeout ms]后执行一次cb
 size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
 {
     int64_t expire = get_cur_time_ms() + timeout;
@@ -188,7 +184,6 @@ size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
     return id;
 }
 
-// 每隔[interval ms]执行一次cb
 size_t evloop::run_every(int64_t interval, const timer_callback_t cb)
 {
     int64_t expire = get_cur_time_ms() + interval;

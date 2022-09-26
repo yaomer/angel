@@ -5,13 +5,13 @@
 
 namespace angel {
 
-// timer_id从1开始，0保留用作他用
-// 比如当timer_id为0时，我们就认为它不是一个有效的timer
 timer_t::timer_t(evloop *loop) : loop(loop), timer_id(1)
 {
 }
 
-timer_t::~timer_t() = default;
+timer_t::~timer_t()
+{
+}
 
 int64_t timer_t::timeout()
 {
@@ -38,7 +38,7 @@ void timer_t::cancel_timer(size_t id)
             [this, id]{ this->cancel_timer_in_loop(id); });
 }
 
-// Add a TimerTask is O(log n)
+// Add a timer task is O(log n)
 void timer_t::add_timer_in_loop(timer_task_t *task, size_t id)
 {
     task->id = id;
@@ -48,27 +48,19 @@ void timer_t::add_timer_in_loop(timer_task_t *task, size_t id)
     log_debug("timer(id=%zu) has been added to the Timer", id);
 }
 
-// Cancel a TimerTask is O(logn)
+// Cancel a timer task is O(log n)
 void timer_t::cancel_timer_in_loop(size_t id)
 {
     auto it = timer_map.find(id);
-    if (it != timer_map.end()) {
-        // 对于multiset来说，由于它存储的值可重复，所以它不能简单的
-        // 用find()来查找，因为如果存在多个相同的元素，这无法确定
-        // 到底返回哪个，而我们则需要返回所有相同的元素，有两种方法
-        // 可以做到：
-        // 1. 使用equal_range()，它返回一个pair，[first, second)区间
-        // 表示所有匹配的元素
-        // 2. [lower_bound(), upper_bound()) <==> [first, second)
-        // 这两种方法实际上是大同小异的，看个人喜好了
-        auto range = timer_set.equal_range(it->second);
-        for (auto it = range.first; it != range.second; ++it) {
-            if ((*it)->id == id) {
-                log_debug("timer(id=%d) has been canceled", id);
-                (*it)->canceled = true;
-                del_timer(it);
-                break;
-            }
+    if (it == timer_map.end()) return;
+    auto range = timer_set.equal_range(it->second);
+    timer_map.erase(it);
+    for (auto it = range.first; it != range.second; ++it) {
+        if ((*it)->id == id) {
+            log_debug("timer(id=%d) has been canceled", id);
+            (*it)->canceled = true;
+            timer_set.erase(it);
+            break;
         }
     }
 }
@@ -80,11 +72,13 @@ void timer_t::update_timer(int64_t now)
         timer_task_t *new_task = new timer_task_t(now + task->interval,
                 task->interval, task->timer_cb);
         new_task->id = task->id;
-        // 必须先删除旧的task，再添加更新后的task，以保证正确的执行顺序
-        del_timer();
+        // Remove old task first, then add new task to ensure correct execution order.
+        timer_set.erase(timer_set.begin());
+        timer_map.erase(task->id);
         add_timer_in_loop(new_task, new_task->id);
     } else {
-        del_timer();
+        timer_set.erase(timer_set.begin());
+        timer_map.erase(task->id);
     }
 }
 

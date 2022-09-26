@@ -10,11 +10,9 @@
 namespace angel {
 namespace util {
 
-static thread_local char errno_buf[256];
-
-// 线程安全的strerror
 const char *strerr(int err)
 {
+    static thread_local char errno_buf[256];
     strerror_r(err, errno_buf, sizeof(errno_buf));
     return errno_buf;
 }

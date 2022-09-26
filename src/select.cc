@@ -33,11 +33,11 @@ void select_base_t::add(int fd, int events)
     maxfd = std::max(maxfd, fd, std::greater<int>());
 }
 
+// To modify the event associated with the fd,
+// you must first clear the originally registered fd from rdset and wrset,
+// and then re-register, otherwise the same fd may be registered repeatedly.
 void select_base_t::change(int fd, int events)
 {
-    // 要修改关联到fd上的事件，必须先从rdset和wrset中
-    // 清除掉原先注册的fd，然后再重新注册，不然就可能会
-    // 出现重复注册同一个fd
     FD_CLR(fd, &rdset);
     FD_CLR(fd, &wrset);
     if (events & Read)
@@ -62,8 +62,9 @@ void select_base_t::remove(int fd, int events)
 int select_base_t::wait(evloop *loop, int64_t timeout)
 {
     struct timeval tv;
-    // 我们不能直接将rdset和wrset传递给select()，因为select()会改写它们
-    // 以存放活跃的fd，我们需要传递给它一个副本
+    // We cannot pass rdset and wrset directly to select(),
+    // because select() modifies them to hold the active fds
+    // and we need to pass it a copy.
     fd_set rdset1, wrset1, errset;
     FD_ZERO(&rdset1);
     FD_ZERO(&wrset1);

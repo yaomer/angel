@@ -8,8 +8,10 @@ namespace angel {
 
 namespace util {
 
-const char *strerrno();
+// thread-safe strerror()
 const char *strerr(int err);
+// strerr(errno)
+const char *strerrno();
 
 // if c == ','
 // for [a,b,c,d] return [a][b][c][d]

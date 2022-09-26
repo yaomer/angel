@@ -15,30 +15,21 @@ class evloop_thread {
 public:
     evloop_thread()
         : loop(nullptr),
-        thread([this]{ this->thread_func(); })
-    {
-    }
-    ~evloop_thread()
-    {
-        quit();
-    }
+        thread([this]{ this->thread_func(); }) {  }
+    ~evloop_thread() { quit(); }
+
     evloop_thread(const evloop_thread&) = delete;
     evloop_thread& operator=(const evloop_thread&) = delete;
-    std::thread& get_thread()
-    {
-        return thread;
-    }
+
+    // Wait for loop to complete initialization
     evloop *wait_loop()
     {
         std::unique_lock<std::mutex> ulock(mutex);
-        // 等待loop初始化完成
         condvar.wait(ulock, [this]{ return this->loop; });
         return loop;
     }
-    evloop *get_loop()
-    {
-        return loop;
-    }
+    std::thread& get_thread() { return thread; }
+    evloop *get_loop() { return loop; }
     void quit()
     {
         if (loop) loop->quit();
@@ -55,8 +46,11 @@ private:
             condvar.notify_one();
         }
         loop->run();
-        // loop不置空，当从thread_func()退出后就会成为悬挂指针
-        // 之后如果再调用quit()就会导致段错误
+        // If not set loop to nullptr, it will become a dangling pointer
+        // after exiting from thread_func().
+        //
+        // If you call quit() later, it will cause a segmentation fault.
+        //
         loop = nullptr;
     }
 

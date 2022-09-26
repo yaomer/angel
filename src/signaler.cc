@@ -16,9 +16,11 @@ namespace angel {
 
 using namespace util;
 
-// 保护__signaler_ptr，使之正确初始化
-// 由于信号的特殊性，所以每个进程只能存在一个signaler实例，
-// 即它只能绑定在一个evloop上
+// Protect __signaler_ptr to initialize properly.
+//
+// Due to the particularity of signals, there can only be one signaler instance per process,
+// that is, it can only be bound to one evloop.
+//
 std::mutex _SYNC_SIG_INIT_LOCK;
 angel::signaler_t *__signaler_ptr = nullptr;
 
@@ -61,7 +63,6 @@ void signaler_t::start()
     loop->add_channel(sig_channel);
 }
 
-// 每当有信号发生时被调用，用于将异步信号事件转换为同步的I/O事件
 void signaler_t::sig_handler(int signo)
 {
     ssize_t n = write(signal_fd,
@@ -83,7 +84,6 @@ void signaler_t::cancel_signal(int signo)
             [this, signo]{ this->cancel_signal_in_loop(signo); });
 }
 
-// if handler == nullptr, ignore signo
 void signaler_t::add_signal_in_loop(int signo, const signaler_handler_t handler)
 {
     struct sigaction sa;
@@ -96,15 +96,14 @@ void signaler_t::add_signal_in_loop(int signo, const signaler_handler_t handler)
         sa.sa_handler = SIG_IGN;
         log_debug("ignore %s", signal_str(signo));
     }
-    // 重启被信号中断的syscall
+    // Restart syscall interrupted by signal
     sa.sa_flags |= SA_RESTART;
-    // 建立sig handler之前屏蔽所有信号
+    // Mask all signals before building sig handler
     sigfillset(&sa.sa_mask);
     if (sigaction(signo, &sa, nullptr) < 0)
         log_error("sigaction: %s", strerrno());
 }
 
-// 恢复信号signo的默认语义
 void signaler_t::cancel_signal_in_loop(int signo)
 {
     struct sigaction sa;
@@ -120,14 +119,13 @@ void signaler_t::cancel_signal_in_loop(int signo)
     }
 }
 
-// 信号捕获函数，根据读到的信号值调用对应的信号处理函数
+// Call the corresponding processing function according to the read signal value.
 void signaler_t::sig_catch()
 {
     static unsigned char buf[1024];
     bzero(buf, sizeof(buf));
     ssize_t n = read(sig_channel->fd(), buf, sizeof(buf));
-    if (n < 0)
-        log_error("read: %s", strerrno());
+    if (n < 0) log_error("read: %s", strerrno());
     for (int i = 0; i < n; i++) {
         auto it = sig_callback_map.find(buf[i]);
         if (it != sig_callback_map.end())

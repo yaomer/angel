@@ -142,7 +142,8 @@ void logger::thread_func()
     while (true) {
         {
             std::unique_lock<std::mutex> ulock(mlock);
-            // 这里就算出现虚假唤醒也无关紧要，即睡眠时间小于log_flush_interval也是可以的
+            // It doesn't matter if there is a spurious wakeup here,
+            // that is, the sleep time is less than log_flush_interval.
             condvar.wait_for(ulock, std::chrono::seconds(log_flush_interval));
             if (write_buf.readable() > 0)
                 write_buf.swap(flush_buf);
@@ -218,7 +219,7 @@ const char *logger::format_time()
                 tm.tm_hour, tm.tm_min, tm.tm_sec, ms % 1000);
         log_last_second = seconds;
     } else {
-        // 在1s内只需要格式化ms部分
+        // In 1s just reformat the `ms` part
         snprintf(log_time_buf + 20, sizeof(log_time_buf) - 20,
                 "%03lld", ms % 1000);
     }

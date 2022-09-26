@@ -14,13 +14,18 @@ class evloop;
 
 typedef std::function<void()> signaler_handler_t;
 
-// signaler用来处理信号事件，但我们实际上是用socketpair将其转化为
-// I/O事件来处理的，这就将信号的异步转化为了同步，从而简化了处理
 //
-// 我们将管道的一端(fd[0])注册到evloop中，然后每当有信号被捕获时，
-// 我们就向fd[1]中写入1 byte，这1 byte实际上就是该信号的信号值，
-// 然后当我们在loop中监听到有sig_channel的可读事件发生时，我们就会
-// 根据读到的信号值去调用用户注册的不同的信号处理函数
+// We use socketpair() to convert fully asynchronous signals
+// into synchronous I/O events for processing.
+//
+// We register fd[0](the read end of the pipe) in evloop，
+// and then whenever a signal is captured, we write one byte to fd[1](the write end of the pipe),
+// which is actually the signal value of the signal.
+//
+// Then when we listen to the occurrence of a readable event with sig_channel in loop,
+// we call the different signal processing functions registered by the user
+// according to the read signal value.
+//
 class signaler_t {
 public:
     explicit signaler_t(evloop *);
@@ -28,7 +33,9 @@ public:
     signaler_t(const signaler_t&) = delete;
     signaler_t& operator=(const signaler_t&) = delete;
 
+    // if handler == nullptr, ignore signo
     void add_signal(int signo, const signaler_handler_t handler);
+    // Restore the default semantics of signo
     void cancel_signal(int signo);
     void start();
 private:
