@@ -41,7 +41,7 @@ public:
                        std::string_view username, std::string_view password,
                        const email& mail);
 private:
-    dns::resolver resolver;
+    dns::resolver *resolver;
     evloop_thread send_thread;
     std::unordered_map<size_t, std::shared_ptr<send_task>> task_map;
     std::mutex task_map_mutex;

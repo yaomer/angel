@@ -16,6 +16,7 @@ namespace smtplib {
 sender::sender() : id(1)
 {
     send_thread.wait_loop();
+    resolver = dns::resolver::get_resolver();
 }
 
 sender::~sender()
@@ -87,7 +88,7 @@ result_future sender::send(std::string_view host, int port,
 
 void send_task::set_try_addrs()
 {
-    auto addr_list = sender->resolver.get_addr_list(host);
+    auto addr_list = sender->resolver->get_addr_list(host);
     for (auto& addr : addr_list) {
         try_addrs.emplace(std::move(addr));
     }

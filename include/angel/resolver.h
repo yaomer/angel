@@ -114,12 +114,8 @@ class cache;
 
 class resolver {
 public:
-    resolver();
-    ~resolver();
     resolver(const resolver&) = delete;
     resolver& operator=(const resolver&) = delete;
-    // valid for get_addr_list()
-    void enable_cache();
     // auto f = query()
     // if f.valid() == false, argument error
     // if f.get().front()->type == ERROR, resolver error
@@ -133,7 +129,19 @@ public:
     std::vector<std::string> get_mx_name_list(std::string_view dname, int wait_for_ms = 0);
     // show result info
     static void show(const result_future&);
+    ////////////////////////////////
+    // Singleton
+    ////////////////////////////////
+    // Cache is only valid for get_addr_list()
+    static resolver *get_resolver()
+    {
+        static resolver ins;
+        return &ins;
+    }
 private:
+    resolver();
+    ~resolver();
+
     void unpack(angel::buffer& res_buf);
     result_future query(std::string_view name, uint16_t q_type, uint16_t q_class);
 

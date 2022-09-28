@@ -222,17 +222,15 @@ resolver::resolver()
             this->unpack(buf);
             buf.retrieve_all();
             });
+
+    cache.reset(new class cache());
+    receiver.get_loop()->run_every(1000, [this]{ this->cache->evict(); });
+
     cli->start();
 }
 
 resolver::~resolver()
 {
-}
-
-void resolver::enable_cache()
-{
-    cache.reset(new class cache());
-    receiver.get_loop()->run_every(1000, [this]{ this->cache->evict(); });
 }
 
 enum {
