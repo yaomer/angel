@@ -1,3 +1,5 @@
+#include <angel/util.h>
+
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
@@ -95,6 +97,33 @@ bool check_ip(std::string_view ipv4_addr)
         if (atoi(field.c_str()) > 255) return false;
     }
     return true;
+}
+
+ConfigParamlist parse_conf(const char *pathname)
+{
+    char buf[1024];
+    FILE *fp = fopen(pathname, "r");
+    if (!fp) {
+        log_fatal("can't open %s: %s", pathname, util::strerrno());
+    }
+    ConfigParamlist paramlist;
+    while (fgets(buf, sizeof(buf), fp)) {
+        const char *s = buf;
+        const char *es = buf + strlen(buf);
+        ConfigParam param;
+        do {
+            s = std::find_if_not(s, es, isspace);
+            if (s == es || s[0] == '#') break;
+            const char *p = std::find_if(s, es, isspace);
+            assert(p != es);
+            param.emplace_back(s, p);
+            s = p + 1;
+        } while (true);
+        if (!param.empty())
+            paramlist.emplace_back(param);
+    }
+    fclose(fp);
+    return paramlist;
 }
 
 }

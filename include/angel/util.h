@@ -35,6 +35,13 @@ std::string sha1(std::string_view data, bool normal);
 // check ipv4 addr format
 bool check_ip(std::string_view ipv4_addr);
 
+// configuration file syntax:
+// 1) field and value are separated by spaces
+// 2) lines beginning with # as comments
+typedef std::vector<std::string> ConfigParam;
+typedef std::vector<ConfigParam> ConfigParamlist;
+ConfigParamlist parse_conf(const char *pathname);
+
 void daemon();
 
 #define UNUSED(x) ((void)(x))
