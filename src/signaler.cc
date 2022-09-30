@@ -59,7 +59,6 @@ signaler_t::~signaler_t() = default;
 
 void signaler_t::start()
 {
-    log_debug("signaler is running");
     loop->add_channel(sig_channel);
 }
 

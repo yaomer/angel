@@ -98,7 +98,7 @@ void send_task::start()
 {
     if (try_addrs.empty()) {
         std::string err = "No " + host + " address available";
-        log_error(err.c_str());
+        log_error("(smtplib) %s", err.c_str());
         set_result(false, err);
         return;
     }
@@ -116,7 +116,7 @@ void send_task::start()
     // If can't connect to the addr after 30s, try another addr
     timer_id = sender->send_thread.get_loop()->run_after(1000 * 30, [task = shared_from_this()]{
             if (task->cli->is_connected()) return;
-            log_warn("can't connect to (%s), try another...", task->cli->get_peer_addr().to_host());
+            log_warn("(smtplib) can't connect to (%s), try another...", task->cli->get_peer_addr().to_host());
             task->start();
             });
 }
@@ -142,14 +142,14 @@ void send_task::set_result(bool is_ok, std::string_view err)
 void send_task::ehlo()
 {
     cli->conn()->format_send("EHLO %s\r\n", sockops::get_host_name());
-    log_info("C: EHLO %s", sockops::get_host_name());
+    log_debug("(smtplib) C: EHLO %s", sockops::get_host_name());
     state = EHLO;
 }
 
 void send_task::auth()
 {
     cli->conn()->send("AUTH LOGIN\r\n");
-    log_info("C: AUTH LOGIN");
+    log_debug("(smtplib) C: AUTH LOGIN");
     state = AUTH;
 }
 
@@ -160,25 +160,25 @@ void send_task::do_auth(std::string_view arg)
     if (strcasecmp(res.c_str(), "username:") == 0) {
         auto s = util::base64_encode(username);
         cli->conn()->send(s.append("\r\n"));
-        log_info("C: %s", s.c_str());
+        log_debug("(smtplib) C: %s", s.c_str());
     } else if (strcasecmp(res.c_str(), "password:") == 0) {
         auto s = util::base64_encode(password);
         cli->conn()->send(s.append("\r\n"));
-        log_info("C: %s", s.c_str());
+        log_debug("(smtplib) C: %s", s.c_str());
     }
 }
 
 void send_task::mail()
 {
     cli->conn()->format_send("MAIL FROM:<%s>\r\n", email.from.c_str());
-    log_info("C: MAIL FROM:<%s>", email.from.c_str());
+    log_debug("(smtplib) C: MAIL FROM:<%s>", email.from.c_str());
     state = MAIL;
 }
 
 void send_task::rcpt()
 {
     cli->conn()->format_send("RCPT TO:<%s>\r\n", email.to[rcpt_index++].c_str());
-    log_info("C: RCPT TO:<%s>", email.to[rcpt_index-1].c_str());
+    log_debug("(smtplib) C: RCPT TO:<%s>", email.to[rcpt_index-1].c_str());
     if (rcpt_index >= email.to.size()) {
         rcpt_index = 0;
         state = RCPT;
@@ -188,7 +188,7 @@ void send_task::rcpt()
 void send_task::data()
 {
     cli->conn()->send("DATA\r\n");
-    log_info("C: DATA");
+    log_debug("(smtplib) C: DATA");
     state = DATA;
 }
 
@@ -209,20 +209,20 @@ void send_task::do_data()
     if (buf != "") buf.append("\r\n");
     cli->conn()->send(buf);
     cli->conn()->send(email.data.append("\r\n.\r\n"));
-    log_info("C: %s %s", buf.c_str(), email.data.c_str());
+    log_debug("(smtplib) C: %s %s", buf.c_str(), email.data.c_str());
     state = QUIT;
 }
 
 void send_task::quit()
 {
     cli->conn()->send("QUIT\r\n");
-    log_info("C: QUIT");
+    log_debug("(smtplib) C: QUIT");
     state = CLOSE;
 }
 
 void send_task::send_mail(const connection_ptr& conn, buffer& buf)
 {
-    log_info("S(%s): %s", conn->get_peer_addr().to_host(), buf.c_str());
+    log_debug("(smtplib) S(%s): %s", conn->get_peer_addr().to_host(), buf.c_str());
     while (buf.readable() > 0) {
         int crlf = buf.find_crlf();
         if (crlf < 0) break;
@@ -296,7 +296,7 @@ void send_task::send_mail(const connection_ptr& conn, buffer& buf)
     }
     return;
 error:
-    log_error("S(%s): %s", conn->get_peer_addr().to_host(), buf.c_str());
+    log_error("(smtplib) S(%s): %s", conn->get_peer_addr().to_host(), buf.c_str());
     set_result(false, buf.c_str());
 }
 

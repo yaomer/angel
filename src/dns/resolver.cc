@@ -177,7 +177,7 @@ static std::string parse_resolv_conf()
     std::string addr;
     std::ifstream ifs(resolv_conf);
     if (!ifs.is_open()) {
-        log_fatal("resolver can't open %s", resolv_conf);
+        log_fatal("(resolver) can't open %s: %s", resolv_conf, util::strerrno());
     }
     while (ifs.getline(buf, sizeof(buf))) {
         const char *p = buf;
@@ -203,9 +203,9 @@ resolver::resolver()
 {
     auto name_server_addr = parse_resolv_conf();
     if (name_server_addr == "") {
-        log_fatal("resolver can't find a name server address");
+        log_fatal("(resolver) can't find a name server address");
     }
-    log_info("resolver found a name server (%s)", name_server_addr.c_str());
+    log_info("(resolver) found a name server (%s)", name_server_addr.c_str());
 
     angel::client_options ops;
     ops.protocol = "udp";
@@ -349,7 +349,7 @@ void resolver::unpack(angel::buffer& res_buf)
         it = query_map.find(id);
         if (it == query_map.end()) return;
     }
-    log_info("recv query(id=%zu)", it->second->id);
+    log_debug("(resolver) recv query(id=%zu)", it->second->id);
 
     result res;
     if (rcode != NoError) {
@@ -411,7 +411,7 @@ void query_context::set_retransmit_timer()
             }
             if (need_retransmit) {
                 r->cli->conn()->send(qc->buf);
-                log_info("retransmit dns query(id=%zu)", qc->id);
+                log_debug("(resolver) retransmit query(id=%zu)", qc->id);
                 qc->set_retransmit_timer();
             }
             });
@@ -420,7 +420,7 @@ void query_context::set_retransmit_timer()
 void query_context::send_query()
 {
     resolver->cli->conn()->send(buf);
-    log_info("send dns query(id=%zu)", id);
+    log_debug("(resolver) send query(id=%zu)", id);
     set_retransmit_timer();
 }
 
@@ -456,8 +456,14 @@ result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q
 
 #define CLASS_IN 1 // the internet
 
-static const std::unordered_set<int> type_map = {
-    A, NS, CNAME, SOA, PTR, MX, TXT
+static const std::unordered_map<int, const char *> type_map = {
+    { A,        "A" },
+    { NS,       "NS" },
+    { CNAME,    "CNAME" },
+    { SOA,      "SOA" },
+    { PTR,      "PTR" },
+    { MX,       "MX" },
+    { TXT,      "TXT" },
 };
 
 result_future resolver::query(std::string_view name, int type)
@@ -465,7 +471,9 @@ result_future resolver::query(std::string_view name, int type)
     if (name == "") return result_future();
     auto dns_name = to_dns_name(name);
     if (dns_name == "") return result_future();
-    if (!type_map.count(type)) return result_future();
+    auto it = type_map.find(type);
+    if (it == type_map.end()) return result_future();
+    log_info("(resolver) query(name=%s, type=%s)", &*name.begin(), it->second);
     return query(dns_name, type, CLASS_IN);
 }
 
