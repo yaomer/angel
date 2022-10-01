@@ -7,3 +7,4 @@ cli
 build/
 a.out
 test.cc
+tests

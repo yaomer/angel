@@ -66,6 +66,12 @@ list(APPEND SRC_FILES ${SRC_DIR}/websocket/ws-server.cc)
 
 list(APPEND SRC_FILES ${SRC_DIR}/smtplib/smtplib.cc)
 
+list(APPEND SRC_FILES
+    ${SRC_DIR}/mime/mime.cc
+    ${SRC_DIR}/mime/charset.cc
+    ${SRC_DIR}/mime/encoder.cc
+)
+
 add_library (angel STATIC ${SRC_FILES})
 
 install(TARGETS angel
