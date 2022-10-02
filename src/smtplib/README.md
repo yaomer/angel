@@ -3,27 +3,29 @@ Async SMTP Client
 
 ```cpp
 #include <angel/smtplib.h>
+#include <angel/mime.h>
+
 #include <iostream>
 
 int main()
 {
-    angel::smtplib::email mail;
-    angel::smtplib::sender sender;
-
-    auto username = "yours@qq.com";
+    auto host = "smtp.qq.com";
+    auto username = "xxx@qq.com";
     auto password = "Authorization code";
+    auto content = "<h1> Hello </h1>";
 
-    mail.from = username;
-    mail.to = {"yours@163.com"};
-    mail.headers["Subject"] = "Test Smtp Client";
-    mail.headers["From"] = "yours<yours@qq.com>";
-    mail.headers["To"] = "yours<yours@163.com>";
-    mail.data = "hello";
+    auto sender = username;
+    std::vector<std::string> receivers = { "who@163.com" };
 
-    auto f = sender.send("smtp.qq.com", 25, username, password, mail);
-    // do something
+    angel::mime::text msg(content, "html", "utf-8");
+    msg.add_header("From", "xxx<xxx@qq.com>");
+    msg.add_header("To", "who<who@163.com>");
+    msg.add_header("Subject", "Test Smtp");
 
-    auto res = f.get();
+    angel::smtplib::smtp smtp;
+    auto f = smtp.send_mail(host, 25, username, password, sender, receivers, msg.str());
+
+    auto& res = f.get();
     if (res.is_ok) {
         std::cout << "send successfully\n";
     } else {

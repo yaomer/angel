@@ -13,13 +13,13 @@
 namespace angel {
 namespace smtplib {
 
-sender::sender() : id(1)
+smtp::smtp() : id(1)
 {
-    send_thread.wait_loop();
+    sender.wait_loop();
     resolver = dns::resolver::get_resolver();
 }
 
-sender::~sender()
+smtp::~smtp()
 {
 }
 
@@ -41,9 +41,11 @@ struct send_task : public std::enable_shared_from_this<send_task> {
     bool need_auth = false;
     std::string username;
     std::string password;
-    email email;
+    std::string sender;
+    std::vector<std::string> receivers;
+    std::string mail_data;
     std::promise<result> res_promise;
-    sender *sender;
+    smtp *smtp;
 
     void start();
     void set_try_addrs();
@@ -60,9 +62,12 @@ struct send_task : public std::enable_shared_from_this<send_task> {
     void quit();
 };
 
-result_future sender::send(std::string_view host, int port,
-                           std::string_view username, std::string_view password,
-                           const email& mail)
+result_future smtp::send_mail(std::string_view host, int port,
+                              std::string_view username, std::string_view password,
+                              std::string_view sender, // sender mailbox
+                              const std::vector<std::string>& receivers, // receiver mailbox list
+                              std::string_view data // mail data
+                              )
 {
     auto *task = new send_task();
 
@@ -71,8 +76,10 @@ result_future sender::send(std::string_view host, int port,
     task->port      = port;
     task->username  = username;
     task->password  = password;
-    task->email     = mail;
-    task->sender    = this;
+    task->sender    = sender;
+    task->receivers = receivers;
+    task->mail_data = data;
+    task->smtp      = this;
 
     task->set_try_addrs();
 
@@ -88,7 +95,7 @@ result_future sender::send(std::string_view host, int port,
 
 void send_task::set_try_addrs()
 {
-    auto addr_list = sender->resolver->get_addr_list(host);
+    auto addr_list = smtp->resolver->get_addr_list(host);
     for (auto& addr : addr_list) {
         try_addrs.emplace(std::move(addr));
     }
@@ -107,14 +114,14 @@ void send_task::start()
     inet_addr conn_addr(try_addrs.front().c_str(), port);
     try_addrs.pop();
 
-    cli.reset(new client(sender->send_thread.get_loop(), conn_addr));
+    cli.reset(new client(smtp->sender.get_loop(), conn_addr));
     cli->set_message_handler([this](const connection_ptr& conn, buffer& buf){
             this->send_mail(conn, buf);
             });
     cli->start();
 
     // If can't connect to the addr after 30s, try another addr
-    timer_id = sender->send_thread.get_loop()->run_after(1000 * 30, [task = shared_from_this()]{
+    timer_id = smtp->sender.get_loop()->run_after(1000 * 30, [task = shared_from_this()]{
             if (task->cli->is_connected()) return;
             log_warn("(smtplib) can't connect to (%s), try another...", task->cli->get_peer_addr().to_host());
             task->start();
@@ -124,7 +131,7 @@ void send_task::start()
 void send_task::set_result(bool is_ok, std::string_view err)
 {
     if (timer_id > 0) {
-        sender->send_thread.get_loop()->cancel_timer(timer_id);
+        smtp->sender.get_loop()->cancel_timer(timer_id);
     }
 
     result res;
@@ -134,8 +141,8 @@ void send_task::set_result(bool is_ok, std::string_view err)
     // Notify the caller
     res_promise.set_value(std::move(res));
     {
-        std::lock_guard<std::mutex> lk(sender->task_map_mutex);
-        sender->task_map.erase(id);
+        std::lock_guard<std::mutex> lk(smtp->task_map_mutex);
+        smtp->task_map.erase(id);
     }
 }
 
@@ -170,16 +177,16 @@ void send_task::do_auth(std::string_view arg)
 
 void send_task::mail()
 {
-    cli->conn()->format_send("MAIL FROM:<%s>\r\n", email.from.c_str());
-    log_debug("(smtplib) C: MAIL FROM:<%s>", email.from.c_str());
+    cli->conn()->format_send("MAIL FROM:<%s>\r\n", sender.c_str());
+    log_debug("(smtplib) C: MAIL FROM:<%s>", sender.c_str());
     state = MAIL;
 }
 
 void send_task::rcpt()
 {
-    cli->conn()->format_send("RCPT TO:<%s>\r\n", email.to[rcpt_index++].c_str());
-    log_debug("(smtplib) C: RCPT TO:<%s>", email.to[rcpt_index-1].c_str());
-    if (rcpt_index >= email.to.size()) {
+    cli->conn()->format_send("RCPT TO:<%s>\r\n", receivers[rcpt_index++].c_str());
+    log_debug("(smtplib) C: RCPT TO:<%s>", receivers[rcpt_index-1].c_str());
+    if (rcpt_index >= receivers.size()) {
         rcpt_index = 0;
         state = RCPT;
     }
@@ -194,22 +201,8 @@ void send_task::data()
 
 void send_task::do_data()
 {
-    std::string buf;
-    // Pack headers, must be in the following order
-    auto& headers = email.headers;
-    if (headers.count("From")) {
-        buf += "From: " + headers["From"] + "\r\n";
-    }
-    if (headers.count("To")) {
-        buf += "To: " + headers["To"] + "\r\n";
-    }
-    if (headers.count("Subject")) {
-        buf += "Subject: " + headers["Subject"] + "\r\n";
-    }
-    if (buf != "") buf.append("\r\n");
-    cli->conn()->send(buf);
-    cli->conn()->send(email.data.append("\r\n.\r\n"));
-    log_debug("(smtplib) C: %s %s", buf.c_str(), email.data.c_str());
+    cli->conn()->send(mail_data.append("\r\n.\r\n"));
+    log_debug("(smtplib) C: %s", mail_data.c_str());
     state = QUIT;
 }
 

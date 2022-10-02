@@ -13,14 +13,6 @@
 namespace angel {
 namespace smtplib {
 
-struct email {
-    std::string from;
-    std::vector<std::string> to;
-    // From, To, Subject
-    std::unordered_map<std::string, std::string> headers;
-    std::string data;
-};
-
 struct send_task;
 
 struct result {
@@ -30,19 +22,22 @@ struct result {
 
 typedef std::shared_future<result> result_future;
 
-class sender {
+class smtp {
 public:
-    sender();
-    ~sender();
-    sender(const sender&) = delete;
-    sender& operator=(const sender&) = delete;
+    smtp();
+    ~smtp();
+    smtp(const smtp&) = delete;
+    smtp& operator=(const smtp&) = delete;
 
-    result_future send(std::string_view host, int port,
-                       std::string_view username, std::string_view password,
-                       const email& mail);
+    result_future send_mail(std::string_view host, int port,
+                            std::string_view username, std::string_view password,
+                            std::string_view sender, // sender mailbox
+                            const std::vector<std::string>& receivers, // receiver mailbox list
+                            std::string_view data // mail data
+                            );
 private:
     dns::resolver *resolver;
-    evloop_thread send_thread;
+    evloop_thread sender;
     std::unordered_map<size_t, std::shared_ptr<send_task>> task_map;
     std::mutex task_map_mutex;
     std::atomic_size_t id;
