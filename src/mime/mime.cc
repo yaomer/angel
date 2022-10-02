@@ -3,6 +3,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <random>
 
 #include <angel/util.h>
 
@@ -53,8 +54,10 @@ void message::encode(int encoding)
 
 std::string& message::str()
 {
-    add_header("Date", format_date());
-    add_header("MIME-Version", "1.0");
+    if (top_level) {
+        add_header("Date", format_date());
+        add_header("MIME-Version", "1.0");
+    }
 
     data.clear();
     for (auto& [field, value] : headers) {
@@ -70,6 +73,7 @@ text::text(std::string_view content,
            const char *_charset)
 {
     this->content = content;
+    this->content.append("\r\n");
 
     std::string cs(str_to_lower(_charset));
 
@@ -92,6 +96,46 @@ image::image(std::string_view img,
     content_type.append("/").append(subtype).append("; ").append("name=").append(name);
     add_header("Content-Type", content_type);
     encode(charset::BASE64);
+}
+
+static std::string generate_boundary()
+{
+    static thread_local size_t part = 1;
+    static thread_local std::mt19937 e(time(nullptr));
+    static thread_local std::uniform_int_distribution<int> u;
+    // --=_Part_{seq}_{rand-str}.{timestamp-str}
+    std::ostringstream oss;
+    oss << "--=_Part_" << part++ << "_" << u(e) << ".";
+    oss << angel::util::get_cur_time_ms();
+    return oss.str();
+}
+
+multipart::multipart(const char *subtype)
+{
+    boundary = generate_boundary();
+    std::string content_type("multipart");
+    content_type.append("/").append(subtype).append("; ")
+                .append("boundary=\"").append(boundary).append("\"");
+    add_header("Content-Type", content_type);
+}
+
+multipart& multipart::attach(message *msg)
+{
+    msg->top_level = false;
+    bodies.emplace_back(msg);
+    return *this;
+}
+
+std::string& multipart::str()
+{
+    data.clear();
+    data.append(message::str());
+    for (auto& body : bodies) {
+        data.append("--").append(boundary).append("\r\n");
+        data.append(body->str());
+    }
+    data.append("--").append(boundary).append("--\r\n\r\n");
+    return data;
 }
 
 }

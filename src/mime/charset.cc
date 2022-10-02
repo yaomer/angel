@@ -17,6 +17,9 @@ static const std::unordered_map<std::string_view, int> charset_map = {
     { "gb2312",      charset::BASE64 },
     { "gbk",         charset::BASE64 },
     { "gb18030",     charset::BASE64 },
+    { "big5",        charset::BASE64 },
+    { "euc-jp",      charset::BASE64 },
+    { "shift_jis",   charset::BASE64 },
     { "utf-8",       charset::BASE64 },
     { "us-ascii",    charset::BIT7 },
 };
@@ -42,6 +45,7 @@ static const std::unordered_map<std::string_view, std::string_view> alias_map = 
     { "latin-9", "iso-8859-15" },
     { "latin_10","iso-8859-16" },
     { "latin-10","iso-8859-16" },
+    { "euc_jp",  "euc-jp" },
     { "ascii",   "us-ascii" },
 };
 

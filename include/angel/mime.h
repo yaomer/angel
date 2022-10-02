@@ -3,7 +3,9 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <algorithm>
+#include <memory>
 
 namespace angel {
 namespace mime {
@@ -54,18 +56,21 @@ struct field_hash {
 
 class message {
 public:
+    virtual ~message() {  }
     std::string& operator[](std::string_view field);
     void add_header(std::string_view field, std::string_view value);
-    std::string& str();
+    virtual std::string& str();
 private:
     void encode(int encoding);
 
+    bool top_level = true;
     std::unordered_map<field_type, std::string, field_hash> headers;
     std::string content;
     std::string data;
 
     friend struct text;
     friend struct image;
+    friend class multipart;
 };
 
 struct text : public message {
@@ -80,9 +85,21 @@ struct image : public message {
           const char *name);
 };
 
+class multipart : public message {
+public:
+    // subtype: mixed, related, or alternative
+    explicit multipart(const char *subtype = "mixed");
+    multipart& attach(message *msg);
+    std::string& str() override;
+private:
+    std::vector<std::unique_ptr<message>> bodies;
+    std::string data;
+    std::string boundary;
+};
+
 class exception {
 public:
-    exception(const char *msg) : msg(msg) {  }
+    explicit exception(const char *msg) : msg(msg) {  }
     const char *what() const { return msg.c_str(); }
 private:
     std::string msg;
