@@ -10,7 +10,7 @@ static const int max_line_limit = 76;
 
 static inline bool is_QPchar(unsigned char c)
 {
-    return (c >= 33 && c <= 60) || (c >= 62 && c <= 126);
+    return (c >= 33 && c <= 60) || (c >= 62 && c <= 126) || c == ' ' || c == '\t';
 }
 
 static inline void to_QP(std::string& res, unsigned char c)
@@ -28,36 +28,34 @@ std::string encoder::encode_QP(std::string_view data)
 
     int count = 0;
     size_t n = data.size();
+    unsigned char c;
     for (size_t i = 0; i < n; i++) {
-        unsigned char c = data[i];
-        if (count + 1 <= max_line_limit && is_QPchar(c)) {
+        c = data[i];
+        // max_line_limit count "=" of "Soft line break"
+        if (count + 1 <= max_line_limit - 1 && is_QPchar(c)) {
             res.push_back(c);
             count++;
-        } else if (count + 3 <= max_line_limit) {
+        } else if (count + 3 <= max_line_limit - 1) {
             to_QP(res, c);
             count += 3;
         } else {
-            // Convert trailing blank and tab.
-            if (res.back() == ' ' || res.back() == '\t') {
-                std::string tmp;
-                while (res.back() == ' ' || res.back() == '\t') {
-                    tmp.push_back(res.back());
-                    res.pop_back();
-                    count--;
-                }
-                while (!tmp.empty()) {
-                    if (count + 3 > max_line_limit) break;
-                    to_QP(res, tmp.back());
-                    count += 3;
-                }
-                i -= tmp.size();
-            }
             // Insert Soft line break
             res.append("=\r\n");
             count = 0;
             i--;
         }
     }
+    // The space or tab at the end of the encoded line
+    // should be represented as =20 or =09.
+    c = res.back();
+    res.pop_back();
+    if (c == ' ' || c == '\t') {
+        if (count - 1 + 3 > max_line_limit) {
+            res.append("=\r\n");
+        }
+        to_QP(res, c);
+    }
+    res.append("\r\n");
     return res;
 }
 

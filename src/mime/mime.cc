@@ -36,17 +36,21 @@ void message::encode(int encoding)
 {
     switch (encoding) {
     case charset::QP:
-        content = encoder.encode_QP(content);
+        encoded_content = encoder.encode_QP(content);
         add_header("Content-Transfer-Encoding", "quoted-printable");
         break;
     case charset::BASE64:
-        content = encoder.encode_base64(content);
+        encoded_content = encoder.encode_base64(content);
         add_header("Content-Transfer-Encoding", "base64");
         break;
     case charset::BIT7:
+        encoded_content = content;
+        encoded_content.append("\r\n");
         add_header("Content-Transfer-Encoding", "7bit");
         break;
     case charset::BIT7or8:
+        encoded_content = content;
+        encoded_content.append("\r\n");
         add_header("Content-Transfer-Encoding", encoder.encode_7or8bit(content));
         break;
     }
@@ -64,7 +68,7 @@ std::string& message::str()
         data.append(field.field).append(": ").append(value).append("\r\n");
     }
     data.append("\r\n");
-    data.append(content);
+    data.append(encoded_content);
     return data;
 }
 
@@ -73,7 +77,6 @@ text::text(std::string_view content,
            const char *_charset)
 {
     this->content = content;
-    this->content.append("\r\n");
 
     std::string cs(str_to_lower(_charset));
 

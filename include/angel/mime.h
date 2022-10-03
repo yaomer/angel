@@ -65,7 +65,8 @@ private:
 
     bool top_level = true;
     std::unordered_map<field_type, std::string, field_hash> headers;
-    std::string content;
+    std::string_view content;
+    std::string encoded_content;
     std::string data;
 
     friend struct text;
