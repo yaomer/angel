@@ -54,57 +54,77 @@ struct field_hash {
     }
 };
 
-class message {
+class base {
 public:
-    virtual ~message() {  }
+    virtual ~base() {  }
     std::string& operator[](std::string_view field);
     void add_header(std::string_view field, std::string_view value);
     virtual std::string& str();
 private:
+    void init(std::string_view data,
+              const char *type,
+              const char *subtype,
+              const char *name,
+              int encoding,
+              const char *charset = nullptr);
     void encode(int encoding);
 
     bool top_level = true;
     std::unordered_map<field_type, std::string, field_hash> headers;
-    std::string_view content;
-    std::string encoded_content;
-    std::string data;
+    std::string_view data;
+    std::string encoded_data;
+    std::string buf;
 
     friend struct text;
     friend struct image;
+    friend struct audio;
+    friend struct application;
+    friend class message;
     friend class multipart;
 };
 
-struct text : public message {
-    text(std::string_view content,
-         const char *subtype = "plain",
-         const char *charset = "us-ascii");
+struct text : public base {
+    // default text/plain; charset=us-ascii
+    text(std::string_view txtdata, const char *name = nullptr);
+    text(std::string_view txtdata, const char *subtype, const char *charset, const char *name = nullptr);
 };
 
-struct image : public message {
-    image(std::string_view img,
-          const char *subtype,
-          const char *name);
+struct image : public base {
+    image(std::string_view imgdata, const char *subtype, const char *name);
 };
 
-class multipart : public message {
+struct audio : public base {
+    audio(std::string_view audata, const char *subtype, const char *name);
+};
+
+struct application : public base {
+    // default application/octet-stream
+    application(std::string_view appdata, const char *name = nullptr);
+    application(std::string_view appdata, const char *subtype, const char *name = nullptr);
+};
+
+class message : public base {
+public:
+    message(base *message, const char *subtype = "rfc822");
+    std::string& str() override;
+private:
+    std::unique_ptr<base> body;
+    std::string data;
+};
+
+class multipart : public base {
 public:
     // subtype: mixed, related, or alternative
     explicit multipart(const char *subtype = "mixed");
-    multipart& attach(message *msg);
+    multipart& attach(base *message);
     std::string& str() override;
 private:
-    std::vector<std::unique_ptr<message>> bodies;
+    std::vector<std::unique_ptr<base>> bodies;
     std::string data;
     std::string boundary;
 };
 
-class exception {
-public:
-    explicit exception(const char *msg) : msg(msg) {  }
-    const char *what() const { return msg.c_str(); }
-private:
-    std::string msg;
-};
+struct unknown_charset_exception {  };
 
 }
 }

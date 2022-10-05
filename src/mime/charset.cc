@@ -53,9 +53,7 @@ int charset::get_encoding(std::string_view charset)
 {
     auto it = charset_map.find(charset);
     if (it != charset_map.end()) return it->second;
-    const char *canonical = get_canonical(charset);
-    if (canonical) return get_encoding(canonical);
-    return NONE;
+    else return NONE;
 }
 
 const char *charset::get_canonical(std::string_view charset)
