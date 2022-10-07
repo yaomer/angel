@@ -16,11 +16,11 @@ static bool equal_case(std::string_view s1, std::string_view s2)
     return s1.size() == s2.size() && strncasecmp(s1.begin(), s2.begin(), s1.size()) == 0;
 }
 
-// [method url version\r\n]
 bool request::parse_line(buffer& buf, int crlf)
 {
     const char *p = buf.peek();
     const char *ep = buf.peek() + crlf;
+
     const char *next = std::find(p, ep, ' ');
     method.assign(p, next);
     std::transform(method.begin(), method.end(), method.begin(), ::toupper);
@@ -28,9 +28,9 @@ bool request::parse_line(buffer& buf, int crlf)
     next = std::find(p, ep, '?');
     if (next == ep) {
         next = std::find(p, ep, ' ');
-        url.assign(p, next);
+        path.assign(p, next);
     } else {
-        url.assign(p, next);
+        path.assign(p, next);
         while (true) {
             p = next + 1;
             next = std::find(p, ep, '&');
@@ -179,15 +179,17 @@ void HttpServer::process_request(const connection_ptr& conn)
     auto& req = ctx.request;
     auto& res = ctx.response;
 
+    req.path = uri::decode(req.path);
+
     res.add_header("Server", "angel");
     if (req.method == "GET") {
         auto& table = router["GET"];
-        auto it = table.find(req.url);
+        auto it = table.find(req.path);
         if (it != table.end()) {
             it->second(req, res);
         } else {
-            std::string path(base_dir + req.url);
-            if (req.url == "/") {
+            std::string path(base_dir + req.path);
+            if (req.path == "/") {
                 path += "index.html";
                 res.add_header("Content-Type", "text/html");
             }

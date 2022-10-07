@@ -64,7 +64,10 @@ list(APPEND SRC_FILES ${SRC_DIR}/dns/resolver.cc)
 
 list(APPEND SRC_FILES ${SRC_DIR}/websocket/ws-server.cc)
 
-list(APPEND SRC_FILES ${SRC_DIR}/httplib/httplib.cc)
+list(APPEND SRC_FILES
+    ${SRC_DIR}/httplib/httplib.cc
+    ${SRC_DIR}/httplib/uri.cc
+)
 
 list(APPEND SRC_FILES ${SRC_DIR}/smtplib/smtplib.cc)
 

@@ -65,7 +65,7 @@ enum ParseState {
 
 struct request {
     std::string method;
-    std::string url;
+    std::string path;
     std::string version;
     std::string host;
     std::string connection;
@@ -97,6 +97,12 @@ private:
     std::string content;
     std::string buf;
     friend class HttpServer;
+};
+
+struct uri {
+    // Encode characters other than "-_.~", letters and numbers.
+    static std::string encode(std::string_view uri);
+    static std::string decode(std::string_view uri);
 };
 
 struct context {
