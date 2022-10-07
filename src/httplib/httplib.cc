@@ -4,8 +4,17 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+
 namespace angel {
 namespace httplib {
+
+static bool equal_case(std::string_view s1, std::string_view s2)
+{
+    return s1.size() == s2.size() && strncasecmp(s1.begin(), s2.begin(), s1.size()) == 0;
+}
 
 // [method url version\r\n]
 bool request::parse_line(buffer& buf, int crlf)
@@ -54,13 +63,24 @@ bool request::parse_header(buffer& buf, int crlf)
     return false;
 }
 
+// Date: Wed, 15 Nov 1995 06:25:24 GMT
+std::string format_date()
+{
+    std::ostringstream oss;
+    auto tm = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    oss << std::put_time(std::gmtime(&tm), "%a, %d %b %Y %T GMT");
+    return oss.str();
+}
+
 std::string& response::str()
 {
-    buf.append("HTTP/1.1 ").append(std::to_string(status_code))
-       .append(" ").append(status_message).append("\r\n");
+    buf.append("HTTP/1.1 ")
+       .append(std::to_string(status_code)).append(" ")
+       .append(status_message).append("\r\n");
 
-    if (!body.empty()) {
-        add_header("Content-Length", std::to_string(body.size()));
+    add_header("Date", format_date());
+    if (!content.empty()) {
+        add_header("Content-Length", std::to_string(content.size()));
     }
 
     for (auto& [field, value] : headers) {
@@ -68,14 +88,14 @@ std::string& response::str()
     }
     buf.append("\r\n");
 
-    if (!body.empty()) buf.append(body);
+    if (!content.empty()) buf.append(content);
 
     return buf;
 }
 
 void response::clear()
 {
-    body.clear();
+    content.clear();
     headers.clear();
     buf.clear();
 }
@@ -100,6 +120,12 @@ void HttpServer::set_base_dir(std::string_view dir)
     base_dir = dir;
 }
 
+void HttpServer::set_parallel(unsigned n)
+{
+    if (n == 0) return;
+    server.start_io_threads(n);
+}
+
 void HttpServer::start()
 {
     set_base_dir(".");
@@ -109,7 +135,6 @@ void HttpServer::start()
 void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
 {
     if (!conn->is_connected()) return;
-    log_info(buf.c_str());
     auto& ctx = std::any_cast<context&>(conn->get_context());
     while (buf.readable() >= 2) {
         int crlf = buf.find_crlf();
@@ -120,8 +145,9 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
             ctx.state = ParseHeader;
             break;
         case ParseHeader:
-            if (ctx.request.parse_header(buf, crlf))
+            if (ctx.request.parse_header(buf, crlf)) {
                 process_request(conn);
+            }
             break;
         }
         buf.retrieve(crlf + 2);
@@ -161,10 +187,14 @@ void HttpServer::process_request(const connection_ptr& conn)
             it->second(req, res);
         } else {
             std::string path(base_dir + req.url);
+            if (req.url == "/") {
+                path += "index.html";
+                res.add_header("Content-Type", "text/html");
+            }
             if (is_file(path)) {
                 res.set_status_code(Ok);
                 res.set_status_message("OK");
-                res.set_body(read_file(path));
+                res.set_content(read_file(path));
             } else {
                 res.set_status_code(NotFound);
                 res.set_status_message("Not Found");
@@ -174,14 +204,16 @@ void HttpServer::process_request(const connection_ptr& conn)
         res.set_status_code(NotImplemented);
         res.set_status_message("Method Not Implemented");
     }
+
+    bool keep_alive = equal_case(req.connection, "keep-alive");
+    res.add_header("Connection", keep_alive ? "keep-alive" : "close");
+
     conn->send(res.str());
     res.clear();
     ctx.state = ParseLine;
 
-    if (strcasecmp(req.connection.c_str(), "Close") == 0) {
+    if (!keep_alive) {
         conn->close();
-    } else if (strcasecmp(req.connection.c_str(), "Keep-Alive") != 0) {
-        // Error
     }
 }
 

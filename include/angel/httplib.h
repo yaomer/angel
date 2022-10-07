@@ -85,17 +85,18 @@ public:
     { status_message.assign(message); }
     void add_header(std::string_view field, std::string_view value)
     { headers.emplace(field, value); }
-    void set_body(std::string_view data)
-    { body.assign(data); }
+    void set_content(std::string_view data)
+    { content.assign(data); }
+private:
     std::string& str();
     void clear();
-private:
 
     int status_code;
     std::string status_message;
     std::unordered_map<std::string, std::string> headers;
-    std::string body;
+    std::string content;
     std::string buf;
+    friend class HttpServer;
 };
 
 struct context {
@@ -112,6 +113,7 @@ public:
     HttpServer& Get(std::string_view path, const ServerHandler handler);
     // For static file
     void set_base_dir(std::string_view dir);
+    void set_parallel(unsigned n);
     void start();
 private:
     void message_handler(const connection_ptr&, buffer&);
