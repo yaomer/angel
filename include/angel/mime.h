@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <memory>
 
+#include <angel/util.h>
+
 namespace angel {
 namespace mime {
 
@@ -24,18 +26,6 @@ struct encoder {
     static std::string encode_7or8bit(std::string_view data);
 };
 
-inline std::string str_to_lower(std::string_view s)
-{
-    std::string r(s);
-    std::transform(r.begin(), r.end(), r.begin(), ::tolower);
-    return r;
-}
-
-inline bool equal_case(std::string_view s1, std::string_view s2)
-{
-    return s1.size() == s2.size() && strcasecmp(s1.data(), s2.data()) == 0;
-}
-
 struct field_type {
     field_type(const char *s) : field(s) {  }
     field_type(std::string_view s) : field(s) {  }
@@ -44,13 +34,13 @@ struct field_type {
 
 inline bool operator==(const field_type& l, const field_type& r)
 {
-    return equal_case(l.field, r.field);
+    return util::equal_case(l.field, r.field);
 }
 
 struct field_hash {
     size_t operator()(const field_type& f) const
     {
-        return std::hash<std::string>()(str_to_lower(f.field));
+        return std::hash<std::string>()(util::to_lower(f.field));
     }
 };
 

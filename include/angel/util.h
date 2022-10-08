@@ -1,8 +1,9 @@
 #ifndef _ANGEL_UTIL_H
 #define _ANGEL_UTIL_H
 
-#include <thread>
 #include <vector>
+#include <algorithm>
+#include <thread>
 
 namespace angel {
 
@@ -41,6 +42,25 @@ bool check_ip(std::string_view ipv4_addr);
 typedef std::vector<std::string> ConfigParam;
 typedef std::vector<ConfigParam> ConfigParamlist;
 ConfigParamlist parse_conf(const char *pathname);
+
+inline std::string to_lower(std::string_view s)
+{
+    std::string r(s);
+    std::transform(r.begin(), r.end(), r.begin(), ::tolower);
+    return r;
+}
+
+inline std::string to_upper(std::string_view s)
+{
+    std::string r(s);
+    std::transform(r.begin(), r.end(), r.begin(), ::toupper);
+    return r;
+}
+
+inline bool equal_case(std::string_view s1, std::string_view s2)
+{
+    return s1.size() == s2.size() && strncasecmp(s1.data(), s2.data(), s1.size()) == 0;
+}
 
 void daemon();
 

@@ -5,8 +5,6 @@
 #include <sstream>
 #include <random>
 
-#include <angel/util.h>
-
 namespace angel {
 namespace mime {
 
@@ -102,7 +100,7 @@ text::text(std::string_view txtdata, const char *name)
 
 text::text(std::string_view txtdata, const char *subtype, const char *_charset, const char *name)
 {
-    std::string cs(str_to_lower(_charset));
+    std::string cs(util::to_lower(_charset));
 
     _charset = charset.get_canonical(cs);
     _charset = _charset ? _charset : cs.data();
