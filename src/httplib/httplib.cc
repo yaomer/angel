@@ -11,60 +11,10 @@
 namespace angel {
 namespace httplib {
 
-static bool equal_case(std::string_view s1, std::string_view s2)
-{
-    return s1.size() == s2.size() && strncasecmp(s1.begin(), s2.begin(), s1.size()) == 0;
-}
-
-bool request::parse_line(buffer& buf, int crlf)
-{
-    const char *p = buf.peek();
-    const char *ep = buf.peek() + crlf;
-
-    const char *next = std::find(p, ep, ' ');
-    method.assign(p, next);
-    std::transform(method.begin(), method.end(), method.begin(), ::toupper);
-    p = next + 1;
-    next = std::find(p, ep, '?');
-    if (next == ep) {
-        next = std::find(p, ep, ' ');
-        path.assign(p, next);
-    } else {
-        path.assign(p, next);
-        while (true) {
-            p = next + 1;
-            next = std::find(p, ep, '&');
-            if (next != ep) {
-                args.emplace_back(p, next);
-            } else {
-                next = std::find(p, ep, ' ');
-                args.emplace_back(p, next);
-                break;
-            }
-        }
-    }
-    version.assign(next + 1, ep);
-    return true;
-}
-
-bool request::parse_header(buffer& buf, int crlf)
-{
-    const char *p = buf.peek();
-    if (buf.starts_with("\r\n")) {
-        return true;
-    }
-    if (buf.starts_with_case("Host: ")) {
-        host.assign(p + 6, p + crlf);
-    } else if (buf.starts_with_case("Connection: ")) {
-        connection.assign(p + 12, p + crlf);
-    } else {
-        ; // TODO: Other Options
-    }
-    return false;
-}
+static const int uri_max_len = 1024 * 1024;
 
 // Date: Wed, 15 Nov 1995 06:25:24 GMT
-std::string format_date()
+static std::string format_date()
 {
     std::ostringstream oss;
     auto tm = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -72,6 +22,128 @@ std::string format_date()
     return oss.str();
 }
 
+static const std::unordered_map<std::string_view, Method> methods = {
+    { "OPTIONS",    OPTIONS },
+    { "GET",        GET },
+    { "HEAD",       HEAD },
+    { "POST",       POST },
+    { "PUT",        PUT },
+    { "DELETE",     DELETE },
+    { "TRACE",      TRACE },
+    { "CONNECT",    CONNECT },
+};
+
+// Request-Line = Method <SP> Request-URI <SP> HTTP-Version <CRLF>
+StatusCode request::parse_line(buffer& buf, int crlf)
+{
+    const char *p = buf.peek();
+    const char *linep = buf.peek() + crlf;
+
+    // Parse Method
+    const char *next = std::find(p, linep, ' ');
+    if (next == linep) return BadRequest;
+
+    std::string_view method(p, next - p);
+    auto it = methods.find(method);
+    if (it == methods.end()) return BadRequest;
+    req_method = it->second;
+    p = next + 1;
+
+    // Parse Request-URI
+    next = std::find(p, linep, ' ');
+    if (next == linep) return BadRequest;
+    const char *version = next + 1;
+
+    auto decoded_uri = uri::decode(std::string_view(p, next - p));
+    p = decoded_uri.data();
+    const char *end = p + decoded_uri.size();
+
+    // Have Parameters ?
+    next = std::find(p, end, '?');
+    req_path.assign(p, next);
+    if (next != end) {
+        p = next + 1;
+        while (true) {
+            const char *eq = std::find(p, end, '=');
+            if (eq == end) return BadRequest;
+            std::string_view key(p, eq - p);
+            const char *sep = std::find(++eq, end, '&');
+            std::string_view value(eq, sep - eq);
+            req_params.emplace(key, value);
+            if (sep == end) break;
+            p = sep + 1;
+        }
+    }
+
+    // Parse HTTP-Version
+    req_version = util::to_upper(std::string_view(version, linep - version));
+    if (req_version == "HTTP/1.0" || req_version == "HTTP/1.1") {
+        // Nothing to do.
+    } else if (req_version == "HTTP/2.0") {
+        return HttpVersionNotSupported;
+    } else {
+        return BadRequest;
+    }
+
+    buf.retrieve(crlf + 2);
+    return Ok;
+}
+
+// message-header = field-name ":" [ field-value ]
+StatusCode request::parse_header(buffer& buf, int crlf)
+{
+    if (buf.starts_with("\r\n")) {
+        buf.retrieve(crlf + 2);
+        return Ok;
+    }
+
+    const char *p = buf.peek();
+    const char *end = buf.peek() + crlf;
+
+    int pos = buf.find(":");
+    if (pos < 0) return BadRequest;
+
+    std::string_view field(p, pos);
+    p += pos + 1;
+    while (p < end && isspace(*p)) p++;
+    if (p == end) return BadRequest;
+    std::string_view value(p, end - p);
+    req_headers.emplace(field, value);
+
+    buf.retrieve(crlf + 2);
+    return Continue;
+}
+
+void request::parse_body(buffer& buf)
+{
+    long content_length = atol(req_headers["Content-Length"].c_str());
+    req_body.assign(buf.peek(), content_length);
+    buf.retrieve(content_length);
+}
+
+void response::set_status_code(StatusCode code)
+{
+    status_code = code;
+    status_message = to_str(code);
+}
+
+void response::add_header(std::string_view field, std::string_view value)
+{
+    headers.emplace(field, value);
+}
+
+void response::set_content(std::string_view data)
+{
+    set_content(data, "text/plain");
+}
+
+void response::set_content(std::string_view data, std::string_view type)
+{
+    add_header("Content-Type", type);
+    content.assign(data);
+}
+
+// Status-Line = HTTP-Version <SP> Status-Code <SP> Reason-Phrase <CRLF>
 std::string& response::str()
 {
     buf.append("HTTP/1.1 ")
@@ -84,7 +156,7 @@ std::string& response::str()
     }
 
     for (auto& [field, value] : headers) {
-        buf.append(field).append(": ").append(value).append("\r\n");
+        buf.append(field.val).append(": ").append(value).append("\r\n");
     }
     buf.append("\r\n");
 
@@ -136,21 +208,56 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
 {
     if (!conn->is_connected()) return;
     auto& ctx = std::any_cast<context&>(conn->get_context());
+    printf("%s\n", buf.c_str());
     while (buf.readable() >= 2) {
         int crlf = buf.find_crlf();
         if (crlf < 0) break;
         switch (ctx.state) {
         case ParseLine:
-            ctx.request.parse_line(buf, crlf);
+        {
+            if (crlf > uri_max_len) {
+                ctx.response.set_status_code(RequestUriTooLong);
+                conn->send(ctx.response.str());
+                conn->close();
+                return;
+            }
+            StatusCode code = ctx.request.parse_line(buf, crlf);
+            if (code != Ok) {
+                ctx.response.set_status_code(code);
+                conn->send(ctx.response.str());
+                conn->close();
+                return;
+            }
             ctx.state = ParseHeader;
             break;
+        }
         case ParseHeader:
-            if (ctx.request.parse_header(buf, crlf)) {
+        {
+            StatusCode code = ctx.request.parse_header(buf, crlf);
+            switch (code) {
+            case Ok:
+                if (ctx.request.method() == POST) {
+                    if (!ctx.request.req_headers.count("Content-Length")) {
+                        ctx.response.set_status_code(LengthRequired);
+                        conn->send(ctx.response.str());
+                        conn->close();
+                        return;
+                    }
+                    ctx.request.parse_body(buf);
+                }
                 process_request(conn);
+                break;
+            case Continue:
+                break;
+            default:
+                ctx.response.set_status_code(code);
+                conn->send(ctx.response.str());
+                conn->close();
+                return;
             }
             break;
         }
-        buf.retrieve(crlf + 2);
+        }
     }
 }
 
@@ -179,35 +286,47 @@ void HttpServer::process_request(const connection_ptr& conn)
     auto& req = ctx.request;
     auto& res = ctx.response;
 
-    req.path = uri::decode(req.path);
-
     res.add_header("Server", "angel");
-    if (req.method == "GET") {
-        auto& table = router["GET"];
-        auto it = table.find(req.path);
+
+    switch (req.method()) {
+    case GET:
+    {
+        auto& table = router[GET];
+        auto it = table.find(req.path());
         if (it != table.end()) {
             it->second(req, res);
         } else {
-            std::string path(base_dir + req.path);
-            if (req.path == "/") {
+            std::string path(base_dir + req.path());
+            if (req.path() == "/") {
                 path += "index.html";
                 res.add_header("Content-Type", "text/html");
             }
             if (is_file(path)) {
                 res.set_status_code(Ok);
-                res.set_status_message("OK");
                 res.set_content(read_file(path));
             } else {
                 res.set_status_code(NotFound);
-                res.set_status_message("Not Found");
             }
         }
-    } else {
+        break;
+    }
+    case POST:
+    {
+        auto& table = router[POST];
+        auto it = table.find(req.path());
+        if (it != table.end()) {
+            it->second(req, res);
+        } else {
+            res.set_status_code(NotFound);
+        }
+        break;
+    }
+    default:
         res.set_status_code(NotImplemented);
-        res.set_status_message("Method Not Implemented");
+        break;
     }
 
-    bool keep_alive = equal_case(req.connection, "keep-alive");
+    bool keep_alive = util::equal_case(req.req_headers["Connection"], "keep-alive");
     res.add_header("Connection", keep_alive ? "keep-alive" : "close");
 
     conn->send(res.str());
@@ -221,8 +340,62 @@ void HttpServer::process_request(const connection_ptr& conn)
 
 HttpServer& HttpServer::Get(std::string_view path, const ServerHandler handler)
 {
-    router["GET"].emplace(path, std::move(handler));
+    router[GET].emplace(path, std::move(handler));
     return *this;
+}
+
+HttpServer& HttpServer::Post(std::string_view path, const ServerHandler handler)
+{
+    router[POST].emplace(path, std::move(handler));
+    return *this;
+}
+
+static const std::unordered_map<StatusCode, const char*> code_map = {
+    { Continue,                     "Continue" },
+    { SwitchingProtocols,           "Switching Protocols" },
+    { Ok,                           "OK" },
+    { Created,                      "Created" },
+    { Accepted,                     "Accepted" },
+    { NonAuthoritativeInformation,  "Non Authoritative Information" },
+    { NoContent,                    "No Content" },
+    { ResetContent,                 "Reset Content" },
+    { PartialContent,               "Partial Content" },
+    { MultipleChoices,              "Multiple Choices" },
+    { MovedPermanently,             "Moved Permanently" },
+    { Found,                        "Found" },
+    { SeeOther,                     "See Other" },
+    { NotModified,                  "Not Modified" },
+    { UseProxy,                     "Use Proxy" },
+    { TemporaryRedirect,            "Temporary Redirect" },
+    { BadRequest,                   "Bad Request" },
+    { Unauthorized,                 "Unauthorized" },
+    { Forbidden,                    "Forbidden" },
+    { NotFound,                     "Not Found" },
+    { MethodNotAllowed,             "Method Not Allowed" },
+    { NotAcceptable,                "Not Acceptable" },
+    { ProxyAuthenticationRequired,  "Proxy Authentication Required" },
+    { RequestTimeout,               "Request Timeout" },
+    { Conflict,                     "Conflict" },
+    { Gone,                         "Gone" },
+    { LengthRequired,               "Length Required" },
+    { PreconditionFailed,           "Precondition Failed" },
+    { RequestEntityTooLarge,        "Request Entity Too Large" },
+    { RequestUriTooLong,            "Request-URI Too Long" },
+    { UnsupportedMediaType,         "Unsupported Media Type" },
+    { RequestedRangeNotSatisfiable, "Requested Range Not Satisfiable" },
+    { ExpectationFailed,            "Expectation Failed" },
+    { InternalServerError,          "Internal Server Error" },
+    { NotImplemented,               "Not Implemented" },
+    { BadGateway,                   "Bad Gateway" },
+    { ServiceUnavailable,           "Service Unavailable" },
+    { GatewayTimeout,               "Gateway Timeout" },
+    { HttpVersionNotSupported,      "Http Version Not Supported" },
+};
+
+const char *to_str(StatusCode code)
+{
+    auto it = code_map.find(code);
+    return it != code_map.end() ? it->second : nullptr;
 }
 
 }

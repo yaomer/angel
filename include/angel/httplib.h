@@ -1,14 +1,26 @@
 #ifndef __ANGEL_HTTPLIB_H
 #define __ANGEL_HTTPLIB_H
 
-#include <angel/server.h>
-
 #include <vector>
 #include <string>
 #include <unordered_map>
 
+#include <angel/server.h>
+#include <angel/util.h>
+
 namespace angel {
 namespace httplib {
+
+enum Method {
+    OPTIONS,
+    GET,
+    HEAD,
+    POST,
+    PUT,
+    DELETE,
+    TRACE,
+    CONNECT,
+};
 
 enum StatusCode {
     // Informational 1xx
@@ -57,43 +69,72 @@ enum StatusCode {
     HttpVersionNotSupported = 505,
 };
 
+const char *to_str(StatusCode code);
+
 enum ParseState {
     ParseLine,
     ParseHeader,
-    ParseBody,
 };
 
-struct request {
-    std::string method;
-    std::string path;
-    std::string version;
-    std::string host;
-    std::string connection;
-    std::vector<std::string> args;
+struct field {
+    field(const char *s) : val(s) {  }
+    field(std::string_view s) : val(s) {  }
+    std::string val;
+};
+
+inline bool operator==(const field& f1, const field& f2)
+{
+    return util::equal_case(f1.val, f2.val);
+}
+
+struct field_hash {
+    bool operator()(const field& f) const
+    {
+        return std::hash<std::string>()(util::to_lower(f.val));
+    }
+};
+
+typedef std::unordered_map<std::string, std::string> Params;
+typedef std::unordered_map<field, std::string, field_hash> Headers;
+
+class request {
+public:
+    Method method() const { return req_method; }
+    const std::string& path() const { return req_path; }
+    const std::string& version() const { return req_version; }
+    const std::string& body() const { return req_body; }
+    const Params& params() const { return req_params; }
+    const Headers& headers() const { return req_headers; }
 private:
-    bool parse_line(buffer& buf, int crlf);
-    bool parse_header(buffer& buf, int crlf);
+    StatusCode parse_line(buffer& buf, int crlf);
+    StatusCode parse_header(buffer& buf, int crlf);
+    void parse_body(buffer& buf);
+
+    Method req_method;
+    std::string req_path;
+    std::string req_version;
+    std::string req_body;
+
+    Params req_params;
+    Headers req_headers;
     friend class HttpServer;
 };
 
 class response {
 public:
     response() = default;
-    void set_status_code(int code)
-    { status_code = code; }
-    void set_status_message(std::string_view message)
-    { status_message.assign(message); }
-    void add_header(std::string_view field, std::string_view value)
-    { headers.emplace(field, value); }
-    void set_content(std::string_view data)
-    { content.assign(data); }
+    void set_status_code(StatusCode code);
+    void add_header(std::string_view field, std::string_view value);
+    // default type = "text/plain"
+    void set_content(std::string_view data);
+    void set_content(std::string_view data, std::string_view type);
 private:
     std::string& str();
     void clear();
 
     int status_code;
     std::string status_message;
-    std::unordered_map<std::string, std::string> headers;
+    Headers headers;
     std::string content;
     std::string buf;
     friend class HttpServer;
@@ -117,6 +158,7 @@ class HttpServer {
 public:
     HttpServer(evloop *, inet_addr);
     HttpServer& Get(std::string_view path, const ServerHandler handler);
+    HttpServer& Post(std::string_view path, const ServerHandler handler);
     // For static file
     void set_base_dir(std::string_view dir);
     void set_parallel(unsigned n);
@@ -127,7 +169,7 @@ private:
 
     angel::server server;
     typedef std::unordered_map<std::string, ServerHandler> Table;
-    std::unordered_map<std::string, Table> router;
+    std::unordered_map<Method, Table> router;
     std::string base_dir;
 };
 
