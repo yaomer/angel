@@ -51,15 +51,15 @@ bool write_file(int fd, const char *buf, size_t len)
     return true;
 }
 
-bool copy_file(const char *from, const char *to)
+bool copy_file(const std::string& from, const std::string& to)
 {
     char buf[4096];
     bool rc = true;
 
-    if (strcmp(from, to) == 0) return rc;
+    if (from == to) return rc;
 
-    int fd1 = open(from, O_RDONLY);
-    int fd2 = open(to, O_RDWR | O_CREAT | O_APPEND, 0644);
+    int fd1 = open(from.c_str(), O_RDONLY);
+    int fd2 = open(to.c_str(), O_RDWR | O_CREAT | O_APPEND, 0644);
     if (fd1 < 0 || fd2 < 0) goto end;
 
     while (true) {
@@ -82,17 +82,17 @@ end:
     return rc;
 }
 
-bool is_regular_file(const char *path)
+bool is_regular_file(const std::string& path)
 {
     struct stat st;
-    ::stat(path, &st);
+    ::stat(path.c_str(), &st);
     return S_ISREG(st.st_mode);
 }
 
-bool is_directory(const char *path)
+bool is_directory(const std::string& path)
 {
     struct stat st;
-    ::stat(path, &st);
+    ::stat(path.c_str(), &st);
     return S_ISDIR(st.st_mode);
 }
 

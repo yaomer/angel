@@ -43,10 +43,10 @@ typedef std::vector<ConfigParam> ConfigParamlist;
 ConfigParamlist parse_conf(const char *pathname);
 
 bool write_file(int fd, const char *buf, size_t len);
-bool copy_file(const char *from, const char *to);
+bool copy_file(const std::string& from, const std::string& to);
 
-bool is_regular_file(const char *path);
-bool is_directory(const char *path);
+bool is_regular_file(const std::string& path);
+bool is_directory(const std::string& path);
 
 inline std::string to_lower(std::string_view s)
 {
