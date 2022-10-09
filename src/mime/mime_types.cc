@@ -3,24 +3,26 @@
 namespace angel {
 namespace mime {
 
-static const std::vector<std::string> known_files = {
-    "/etc/mime.types",
-    "/etc/httpd/mime.types",
-    "/etc/httpd/conf/mime.types",
-    "/etc/apache/mime.types",
-    "/etc/apache2/mime.types",
-    "/usr/local/etc/httpd/conf/mime.types",
-    "/usr/local/lib/netscape/mime.types",
-    "/usr/local/etc/mime.types",
-};
-
 static const char *get_mime_types_file()
 {
+    static const std::vector<std::string> known_files = {
+        "/etc/mime.types",
+        "/etc/httpd/mime.types",
+        "/etc/httpd/conf/mime.types",
+        "/etc/apache/mime.types",
+        "/etc/apache2/mime.types",
+        "/usr/local/etc/httpd/conf/mime.types",
+        "/usr/local/lib/netscape/mime.types",
+        "/usr/local/etc/mime.types",
+    };
+
     for (auto& file : known_files) {
-        if (util::is_regular_file(file.c_str())) {
+        if (util::is_regular_file(file)) {
             return file.c_str();
         }
     }
+    // Can not reach here.
+    fprintf(stderr, "No known mime.types file\n");
     abort();
 }
 
