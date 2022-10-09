@@ -27,20 +27,20 @@ struct encoder {
 };
 
 struct field_type {
-    field_type(const char *s) : field(s) {  }
-    field_type(std::string_view s) : field(s) {  }
-    std::string field;
+    field_type(const char *s) : val(s) {  }
+    field_type(std::string_view s) : val(s) {  }
+    std::string val;
 };
 
 inline bool operator==(const field_type& l, const field_type& r)
 {
-    return util::equal_case(l.field, r.field);
+    return util::equal_case(l.val, r.val);
 }
 
 struct field_hash {
     size_t operator()(const field_type& f) const
     {
-        return std::hash<std::string>()(util::to_lower(f.field));
+        return std::hash<std::string>()(util::to_lower(f.val));
     }
 };
 
@@ -68,6 +68,7 @@ private:
     friend struct text;
     friend struct image;
     friend struct audio;
+    friend struct video;
     friend struct application;
     friend class message;
     friend class multipart;
@@ -85,6 +86,10 @@ struct image : public base {
 
 struct audio : public base {
     audio(std::string_view audata, const char *subtype, const char *name);
+};
+
+struct video : public base {
+    video(std::string_view vidata, const char *subtype, const char *name);
 };
 
 struct application : public base {

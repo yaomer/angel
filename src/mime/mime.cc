@@ -85,7 +85,7 @@ std::string& base::str()
 
     buf.clear();
     for (auto& [field, value] : headers) {
-        buf.append(field.field).append(": ").append(value).append("\r\n");
+        buf.append(field.val).append(": ").append(value).append("\r\n");
     }
     buf.append("\r\n");
     buf.append(encoded_data);
@@ -119,6 +119,11 @@ image::image(std::string_view imgdata, const char *subtype, const char *name)
 audio::audio(std::string_view audata, const char *subtype, const char *name)
 {
     init(audata, "audio", subtype, name, charset::BASE64);
+}
+
+video::video(std::string_view vidata, const char *subtype, const char *name)
+{
+    init(vidata, "video", subtype, name, charset::BASE64);
 }
 
 application::application(std::string_view appdata, const char *name)
