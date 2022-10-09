@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 #include <angel/logger.h>
 
@@ -50,15 +51,15 @@ bool write_file(int fd, const char *buf, size_t len)
     return true;
 }
 
-bool copy_file(const char *srcfile, const char *dstfile)
+bool copy_file(const char *from, const char *to)
 {
     char buf[4096];
     bool rc = true;
 
-    if (strcmp(srcfile, dstfile) == 0) return rc;
+    if (strcmp(from, to) == 0) return rc;
 
-    int fd1 = open(srcfile, O_RDONLY);
-    int fd2 = open(dstfile, O_RDWR | O_CREAT | O_APPEND, 0644);
+    int fd1 = open(from, O_RDONLY);
+    int fd2 = open(to, O_RDWR | O_CREAT | O_APPEND, 0644);
     if (fd1 < 0 || fd2 < 0) goto end;
 
     while (true) {
@@ -79,6 +80,20 @@ end:
     close(fd1);
     close(fd2);
     return rc;
+}
+
+bool is_regular_file(const char *path)
+{
+    struct stat st;
+    ::stat(path, &st);
+    return S_ISREG(st.st_mode);
+}
+
+bool is_directory(const char *path)
+{
+    struct stat st;
+    ::stat(path, &st);
+    return S_ISDIR(st.st_mode);
 }
 
 }
