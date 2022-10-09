@@ -6,7 +6,6 @@
 #include <thread>
 
 namespace angel {
-
 namespace util {
 
 // thread-safe strerror()
@@ -42,6 +41,9 @@ bool check_ip(std::string_view ipv4_addr);
 typedef std::vector<std::string> ConfigParam;
 typedef std::vector<ConfigParam> ConfigParamlist;
 ConfigParamlist parse_conf(const char *pathname);
+
+bool write_file(int fd, const char *buf, size_t len);
+bool copy_file(const char *srcfile, const char *dstfile);
 
 inline std::string to_lower(std::string_view s)
 {
