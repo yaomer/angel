@@ -121,6 +121,22 @@ private:
 
 struct unknown_charset_exception {  };
 
+class mimetypes {
+public:
+    // Load default "angel/mime.types".
+    mimetypes();
+    // Load new "mime.types" configuration file.
+    // The existing items in the default "angel/mime.types" will be overwritten.
+    void load(const std::string& path);
+    const char *get_mime_type(const std::string& filename) const;
+    const std::vector<std::string> *get_file_extensions(const std::string& mime_type) const;
+private:
+    // Map Internet media types to unique file extension(s).
+    std::unordered_map<std::string, std::vector<std::string>> mime_types;
+    // Map unique file extension(s) to Internet media types.
+    std::unordered_multimap<std::string, std::string> file_extensions;
+};
+
 }
 }
 

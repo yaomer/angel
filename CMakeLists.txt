@@ -76,6 +76,7 @@ list(APPEND SRC_FILES
     ${SRC_DIR}/mime/mime.cc
     ${SRC_DIR}/mime/charset.cc
     ${SRC_DIR}/mime/encoder.cc
+    ${SRC_DIR}/mime/mime_types.cc
 )
 
 add_library (angel STATIC ${SRC_FILES})
