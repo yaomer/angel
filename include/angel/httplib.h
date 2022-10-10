@@ -137,6 +137,7 @@ private:
     Headers headers;
     std::string content;
     std::string buf;
+    bool chunked;
     friend class HttpServer;
 };
 
@@ -166,6 +167,9 @@ public:
 private:
     void message_handler(const connection_ptr&, buffer&);
     void process_request(const connection_ptr&);
+
+    void handle_static_file(const connection_ptr& conn, request& req, response& res);
+    void send_file(const connection_ptr& conn, response& res, const std::string& path);
 
     angel::server server;
     typedef std::unordered_map<std::string, ServerHandler> Table;

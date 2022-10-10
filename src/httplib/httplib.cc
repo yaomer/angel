@@ -8,18 +8,29 @@
 #include <iomanip>
 #include <sstream>
 
+#include <angel/mime.h>
+
 namespace angel {
 namespace httplib {
 
+static mime::mimetypes mimetypes;
+
 static const int uri_max_len = 1024 * 1024;
 
+using Clock = std::chrono::system_clock;
+
 // Date: Wed, 15 Nov 1995 06:25:24 GMT
-static std::string format_date()
+static std::string format_date(const Clock::time_point& now)
 {
     std::ostringstream oss;
-    auto tm = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    auto tm = Clock::to_time_t(now);
     oss << std::put_time(std::gmtime(&tm), "%a, %d %b %Y %T GMT");
     return oss.str();
+}
+
+static std::string format_date()
+{
+    return format_date(Clock::now());
 }
 
 static const std::unordered_map<std::string_view, Method> methods = {
@@ -146,30 +157,27 @@ void response::set_content(std::string_view data, std::string_view type)
 // Status-Line = HTTP-Version <SP> Status-Code <SP> Reason-Phrase <CRLF>
 std::string& response::str()
 {
+    buf.clear();
+
     buf.append("HTTP/1.1 ")
        .append(std::to_string(status_code)).append(" ")
        .append(status_message).append("\r\n");
 
-    add_header("Date", format_date());
     if (!content.empty()) {
         add_header("Content-Length", std::to_string(content.size()));
     }
+    add_header("Date", format_date());
 
     for (auto& [field, value] : headers) {
         buf.append(field.val).append(": ").append(value).append("\r\n");
     }
     buf.append("\r\n");
+    buf.append(content);
 
-    if (!content.empty()) buf.append(content);
+    headers.clear();
+    content.clear();
 
     return buf;
-}
-
-void response::clear()
-{
-    content.clear();
-    headers.clear();
-    buf.clear();
 }
 
 //==============================================
@@ -261,25 +269,6 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
     }
 }
 
-static bool is_file(const std::string& path)
-{
-    struct stat st;
-    ::stat(path.c_str(), &st);
-    return S_ISREG(st.st_mode);
-}
-
-static std::string read_file(const std::string& path)
-{
-    std::string res;
-    int fd = open(path.c_str(), O_RDONLY);
-    assert(fd > 0);
-    buffer buf;
-    while (buf.read_fd(fd) > 0)
-        res.append(buf.peek(), buf.readable());
-    close(fd);
-    return res;
-}
-
 void HttpServer::process_request(const connection_ptr& conn)
 {
     auto& ctx = std::any_cast<context&>(conn->get_context());
@@ -296,18 +285,13 @@ void HttpServer::process_request(const connection_ptr& conn)
         if (it != table.end()) {
             it->second(req, res);
         } else {
-            std::string path(base_dir + req.path());
-            if (req.path() == "/") {
-                path += "index.html";
-                res.add_header("Content-Type", "text/html");
-            }
-            if (is_file(path)) {
-                res.set_status_code(Ok);
-                res.set_content(read_file(path));
-            } else {
-                res.set_status_code(NotFound);
-            }
+            handle_static_file(conn, req, res);
         }
+        break;
+    }
+    case HEAD:
+    {
+        handle_static_file(conn, req, res);
         break;
     }
     case POST:
@@ -329,13 +313,100 @@ void HttpServer::process_request(const connection_ptr& conn)
     bool keep_alive = util::equal_case(req.req_headers["Connection"], "keep-alive");
     res.add_header("Connection", keep_alive ? "keep-alive" : "close");
 
-    conn->send(res.str());
-    res.clear();
+    if (!res.chunked) {
+        conn->send(res.str());
+    } else {
+        res.chunked = false;
+    }
     ctx.state = ParseLine;
 
     if (!keep_alive) {
         conn->close();
     }
+}
+
+static off_t get_file_size(const std::string& path)
+{
+    struct stat st;
+    ::stat(path.c_str(), &st);
+    return st.st_size;
+}
+
+static std::string get_last_modified(const std::string& path)
+{
+    struct stat st;
+    ::stat(path.c_str(), &st);
+    auto msec = st.st_mtimespec.tv_sec * 1000000 + st.st_mtimespec.tv_nsec / 1000;
+    Clock::duration duration = std::chrono::microseconds(msec);
+    Clock::time_point point(duration);
+    return format_date(point);
+}
+
+void HttpServer::handle_static_file(const connection_ptr& conn, request& req, response& res)
+{
+    std::string path(base_dir + req.path());
+    if (req.path() == "/") {
+        path += "index.html";
+    }
+    if (util::is_regular_file(path)) {
+        res.set_status_code(Ok);
+        res.add_header("Last-Modified", get_last_modified(path));
+        if (req.method() == GET) {
+            send_file(conn, res, path);
+        } else if (req.method() == HEAD) {
+            res.add_header("Content-Length", std::to_string(get_file_size(path)));
+        }
+    } else {
+        res.set_status_code(NotFound);
+    }
+}
+
+static const int ChunkSize = 1024 * 1024 * 4; // 4M
+
+static void send_chunk(const connection_ptr& conn, buffer& buf)
+{
+    char x[16];
+    snprintf(x, sizeof(x), "%X\r\n", (unsigned)buf.readable());
+    conn->send(x);
+    buf.append("\r\n");
+    conn->send(buf.peek(), buf.readable());
+}
+
+void HttpServer::send_file(const connection_ptr& conn, response& res, const std::string& path)
+{
+    buffer buf;
+    res.chunked = false;
+    int fd = open(path.c_str(), O_RDONLY);
+
+    const char *mime_type = mimetypes.get_mime_type(path);
+    mime_type = mime_type ? mime_type : "application/octet-stream";
+
+    auto filesize = get_file_size(path);
+    if (filesize >= ChunkSize) {
+        res.add_header("Content-Type", mime_type);
+        res.add_header("Transfer-Encoding", "chunked");
+        conn->send(res.str());
+        res.chunked = true;
+    }
+
+    while (buf.read_fd(fd) > 0) {
+        if (buf.readable() >= ChunkSize) {
+            send_chunk(conn, buf);
+            buf.retrieve_all();
+        }
+    }
+    if (buf.readable() > 0) {
+        if (res.chunked) {
+            send_chunk(conn, buf);
+        } else {
+            res.set_content(std::string_view(buf.peek(), buf.readable()), mime_type);
+        }
+    }
+    if (res.chunked) {
+        conn->send("0\r\n");
+    }
+
+    close(fd);
 }
 
 HttpServer& HttpServer::Get(std::string_view path, const ServerHandler handler)
