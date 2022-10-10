@@ -33,11 +33,12 @@ void WebSocketServer::for_each(const WebSocketHandler handler)
 
 WebSocketContext::WebSocketContext(WebSocketServer *ws, connection *conn)
     : state(Handshake), ws(ws), conn(conn), read_request_line(true),
-    required_request_headers(6), fragment(false)
+    required_request_headers(6), rcvfragment(false),
+    sndfragment(FirstFragment)
 {
 }
 
-// 主要程序逻辑
+// Main processing logic
 void WebSocketContext::message_handler(const connection_ptr& conn, buffer& buf)
 {
     uint16_t frame;
@@ -59,7 +60,7 @@ void WebSocketContext::message_handler(const connection_ptr& conn, buffer& buf)
         case WebSocketContext::Establish:
             switch (context.decode(buf)) {
             case WebSocketContext::Ok:
-                if (!context.fragment && ws->onmessage)
+                if (!context.rcvfragment && ws->onmessage)
                     ws->onmessage(context);
                 break;
             case WebSocketContext::Close:
@@ -73,7 +74,8 @@ void WebSocketContext::message_handler(const connection_ptr& conn, buffer& buf)
                 conn->send(&frame, sizeof(frame));
                 break;
             case WebSocketContext::Pong:
-                // 单向心跳，表明发送方进程还在
+                // Unidirectional Heartbeat
+                // Indicates that the sender is still alive.
                 break;
             case WebSocketContext::Error:
                 if (ws->onerror) ws->onerror(context);
@@ -101,11 +103,11 @@ int WebSocketContext::handshake(const char *line, const char *end)
 {
     if (read_request_line) {
         read_request_line = false;
-        if (strncmp(line, "GET ", 4)) return HandshakeError;
-        std::string uri; // 用于识别websocket服务端点
+        if (strncasecmp(line, "GET ", 4)) return HandshakeError;
+        std::string uri; // Identify the websocket service endpoint.
         const char *p = std::find_if(line + 4, end, isspace);
         uri.assign(line + 4, p);
-        if (strncmp(p + 1, "HTTP/1.1", 8))
+        if (strncasecmp(p + 1, "HTTP/1.1", 8))
             return HandshakeError;
     }
     if (strncmp(line, "\r\n", 2) == 0) {
@@ -208,9 +210,9 @@ int WebSocketContext::handshake(const connection_ptr& conn, buffer& buf)
 // +---------------------------------------------------------------+
 //
 // opcode:
-// 0x0(连续帧)用于分片
-// 数据帧: 0x1(文本), 0x2(二进制), 0x3-0x7(保留用于其他)
-// 控制帧: 0x8(Close), 0x9(Ping), 0xA(Pong), 0xB-0xF(保留的控制帧)
+// 0x0(continuation frame)(Used for message fragmentation)
+// Data frames: 0x1(text frame), 0x2(binary frame), 0x3-0x7(reserved)
+// Control frames: 0x8(connection close), 0x9(ping), 0xA(pong), 0xB-0xF(reserved)
 //
 
 static bool decode_payload_len(uint64_t& payload_len, const char*& masking_key,
@@ -220,13 +222,13 @@ static bool decode_payload_len(uint64_t& payload_len, const char*& masking_key,
     uint64_t i, raw_len;
     switch (payload_len) {
     case 127:
-        i = 10;
+        i = 10; // first byte + second byte + 8-byte extended payload len
         if (readable < i) return false;
         raw_len = *reinterpret_cast<const uint64_t*>(&b[2]);
         payload_len = sockops::ntoh64(raw_len);
         break;
     case 126:
-        i = 4;
+        i = 4; // 2-byte extended payload len
         if (readable < i) return false;
         raw_len = *reinterpret_cast<const uint16_t*>(&b[2]);
         payload_len = ntohs(raw_len);
@@ -235,11 +237,29 @@ static bool decode_payload_len(uint64_t& payload_len, const char*& masking_key,
         i = 2;
         break;
     }
-    // 如果mask为真，则payload_len后面跟有一个32-bit的masking_key
+    // If mask is set, the payload_len is followed by a 32-bit masking_key.
     int key_len = mask ? 4 : 0;
     if (readable < i + key_len + payload_len) return false;
     if (mask) masking_key = &b[i];
     b = &b[i + key_len];
+    return true;
+}
+
+// fragmentation:
+// 1) one first fragment: fin=0, opcode!=0
+// 2) 0 or more middle fragment: fin=0, opcode=0
+// 3) one final fragment: fin=1, opcode=0
+static bool check_fragmentation(bool fragment, bool fin, uint8_t opcode)
+{
+    if (!fin) {
+        if (!fragment) { // first fragment
+            if (!opcode) return false;
+        } else { // middle fragment
+            if (opcode) return false;
+        }
+    } else if (fragment) { // final fragment
+        if (opcode) return false;
+    }
     return true;
 }
 
@@ -249,7 +269,7 @@ int WebSocketContext::decode(buffer& raw_buf)
     uint64_t readable = raw_buf.readable();
     const char *start = b;
 
-    // 我们至少需要2-byte才能开始进行解码
+    // We need 2-byte to start decoding at least.
     if (readable < 2) return NotEnough;
 
     bool fin = b[0] >> 7;
@@ -260,25 +280,13 @@ int WebSocketContext::decode(buffer& raw_buf)
 
     (void)(rsv1); (void)(rsv2); (void)(rsv3);
 
-    // fragment:
-    // 1) one first-frame: fin=0, opcode!=0
-    // 2) 0 or more middle-frame: fin=0, opcode=0
-    // 3) one last-frame: fin=1, opcode=0
-    if (!fin) {
-        if (!fragment) { // first-frame
-            if (!opcode) return Error;
-        } else { // middle-frame
-            if (opcode) return Error;
-        }
-    } else if (fragment) { // last-frame
-        if (opcode) return Error;
-    }
+    if (!check_fragmentation(rcvfragment, fin, opcode)) return Error;
 
     bool mask = b[1] >> 7;
     uint64_t payload_len = b[1] & 0x7f;
 
-    // 所有控制帧的有效负载长度必须小于或等于125
     if (opcode >= 0x8) {
+        // The payload length of all control frames must be no more than 125.
         if (payload_len > 125) return Error;
     }
 
@@ -287,7 +295,7 @@ int WebSocketContext::decode(buffer& raw_buf)
     if (!decode_payload_len(payload_len, masking_key, b, readable, mask))
         return NotEnough;
 
-    if (!fragment) {
+    if (!rcvfragment) {
         decoded_buffer.clear();
         decoded_buffer.reserve(payload_len);
     } else {
@@ -304,7 +312,7 @@ int WebSocketContext::decode(buffer& raw_buf)
 
     raw_buf.retrieve(b - start + payload_len);
 
-    fragment = fin ? false : true;
+    rcvfragment = fin ? false : true;
 
     switch (opcode) {
     case 0x0: break;
@@ -320,12 +328,9 @@ int WebSocketContext::decode(buffer& raw_buf)
     return Ok;
 }
 
-void WebSocketContext::encode(const std::string& raw_buf)
+void WebSocketContext::encode(std::string_view raw_buf, uint8_t first_byte)
 {
-    encoded_buffer.clear();
-
-    // 1 0 0 0 0 0 0 1
-    encoded_buffer.push_back(0x81);
+    encoded_buffer.push_back(first_byte);
 
     uint64_t raw_size = raw_buf.size();
     if (raw_size <= 125) { // 0 x x x x x x x
@@ -342,10 +347,52 @@ void WebSocketContext::encode(const std::string& raw_buf)
     encoded_buffer.append(raw_buf);
 }
 
-void WebSocketContext::send(const std::string& data)
+#define opcode(is_binary_type) ((is_binary_type) ? 2 : 1)
+
+void WebSocketContext::send(std::string_view message)
 {
-    encode(data);
+    // 1 0 0 0 0 0 0 0 | (1 or 2)
+    encode(message, 0x80 | opcode(is_binary_type));
     conn->send(encoded_buffer);
+    encoded_buffer.clear();
+}
+
+// The primary purpose of fragmentation is to allow sending a message
+// that is of unknown size when the message is started without having to
+// buffer that message. If messages couldn't be fragmented, then an
+// endpoint would have to buffer the entire message so its length could
+// be counted before the first byte is sent. With fragmentation, a server
+// or intermediary may choose a reasonable size buffer and, when
+// the buffer is full, write a fragment to the network.
+//
+// A secondary use-case for fragmentation is for multiplexing, where it
+// is not desirable for a large message on one logical channel to
+// monopolize the output channel, so the multiplexing needs to be free
+// to split the message into smaller fragments to better share the
+// output channel.
+//
+void WebSocketContext::send_fragment(std::string_view fragment, bool final_fragment)
+{
+    uint8_t first_byte;
+    if (final_fragment) sndfragment = FinalFragment;
+    switch (sndfragment) {
+    case FirstFragment:
+        first_byte = opcode(is_binary_type);
+        sndfragment = MiddleFragment;
+        break;
+    case MiddleFragment:
+        first_byte = 0x00;
+        break;
+    case FinalFragment:
+        first_byte = 0x80;
+        sndfragment = FirstFragment;
+        break;
+    }
+    encode(fragment, first_byte);
+    if (final_fragment || encoded_buffer.size() >= BufferedSize) {
+        conn->send(encoded_buffer);
+        encoded_buffer.clear();
+    }
 }
 
 }

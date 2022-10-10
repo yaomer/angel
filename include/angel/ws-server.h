@@ -30,9 +30,15 @@ private:
 class WebSocketContext {
 public:
     WebSocketContext(WebSocketServer *, connection *);
-    void send(const std::string& data);
-    std::string decoded_buffer; // 解码好的数据
-    bool is_binary_type;
+    // Send message directly without buffering.
+    void send(std::string_view message);
+    // When the buffer is full or fragment is the final one, we send buffer.
+    void send_fragment(std::string_view fragment, bool final_fragment = false);
+    size_t BufferedSize = 1024 * 64; // send_fragment() buffer size
+    // 1) Indicates the received message type.
+    // 2) It is set by the user to indicate the type of sent message.
+    bool is_binary_type; // binary or text
+    std::string decoded_buffer;
     std::string origin;
     std::string host;
 private:
@@ -42,23 +48,21 @@ private:
     int handshake(const connection_ptr& conn, buffer& buf);
     int handshake(const char *line, const char *end);
     int decode(buffer& raw_buf);
-    void encode(const std::string& raw_buf);
+    void encode(std::string_view raw_buf, uint8_t first_byte);
     void sec_websocket_accept(std::string key);
     void handshake_ok(const connection_ptr& conn);
     void handshake_error(const connection_ptr& conn);
-    // void set_status_code(int code) { status_code = code; }
-    // void set_status_message(const std::string& message) { status_message = message; }
 
     int state;
     WebSocketServer *ws;
     connection *conn;
     std::string SecWebSocketAccept;
     std::string encoded_buffer;
-    // int status_code;
-    // std::string status_message;
     bool read_request_line;
     int required_request_headers;
-    bool fragment;
+    bool rcvfragment;
+    enum { FirstFragment, MiddleFragment, FinalFragment };
+    int sndfragment;
     friend class WebSocketServer;
 };
 
