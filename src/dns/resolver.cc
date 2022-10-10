@@ -48,7 +48,7 @@ static const uint16_t max_udp_size      = 512;
 static std::string to_dns_name(std::string_view name)
 {
     std::string res;
-    auto labels = angel::util::split(name.data(), name.data() + name.size(), '.');
+    auto labels = util::split(name, '.');
     for (auto& label : labels) {
         if (label.size() > max_label_size) return "";
         res.push_back(label.size());
@@ -83,7 +83,7 @@ static std::string to_ip(const char*& p)
 {
     struct in_addr addr;
     addr.s_addr = u32(p);
-    return angel::sockops::to_host_ip(&addr);
+    return sockops::to_host_ip(&addr);
 }
 
 struct query_context : public std::enable_shared_from_this<query_context> {
@@ -207,18 +207,18 @@ resolver::resolver()
     }
     log_info("(resolver) found a name server (%s)", name_server_addr.c_str());
 
-    angel::client_options ops;
+    client_options ops;
     ops.protocol = "udp";
     ops.is_reconnect = true;
-    cli.reset(new angel::client(receiver.wait_loop(), angel::inet_addr(name_server_addr, name_server_port), ops));
-    cli->set_connection_handler([this](const angel::connection_ptr& conn){
+    cli.reset(new client(receiver.wait_loop(), inet_addr(name_server_addr, name_server_port), ops));
+    cli->set_connection_handler([this](const connection_ptr& conn){
             lock_t lk(delay_task_queue_mutex);
             while (!delay_task_queue.empty()) {
                 delay_task_queue.front()();
                 delay_task_queue.pop();
             }
             });
-    cli->set_message_handler([this](const angel::connection_ptr& conn, angel::buffer& buf){
+    cli->set_message_handler([this](const connection_ptr& conn, buffer& buf){
             this->unpack(buf);
             buf.retrieve_all();
             });
@@ -330,7 +330,7 @@ static bool is_same_name(std::string_view name, const char*& p)
     return true;
 }
 
-void resolver::unpack(angel::buffer& res_buf)
+void resolver::unpack(buffer& res_buf)
 {
     const char *p = res_buf.peek();
 

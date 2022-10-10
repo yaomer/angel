@@ -96,5 +96,12 @@ bool is_directory(const std::string& path)
     return S_ISDIR(st.st_mode);
 }
 
+off_t get_file_size(const std::string& path)
+{
+    struct stat st;
+    ::stat(path.c_str(), &st);
+    return st.st_size;
+}
+
 }
 }

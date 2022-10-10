@@ -24,22 +24,6 @@ const char *strerrno()
     return strerr(errno);
 }
 
-std::vector<std::string>
-split(const char *s, const char *es, char c)
-{
-    const char *p;
-    std::vector<std::string> vlist;
-
-    while (true) {
-        p = std::find(s, es, c);
-        if (p == es) break;
-        vlist.emplace_back(s, p);
-        s = p + 1;
-    }
-    vlist.emplace_back(s, p);
-    return vlist;
-}
-
 size_t get_cur_thread_id()
 {
     return std::hash<std::thread::id>()(std::this_thread::get_id());
@@ -87,14 +71,13 @@ void set_thread_affinity(pthread_t tid, int cpu_number)
 
 bool check_ip(std::string_view ipv4_addr)
 {
-    auto fields = split(ipv4_addr.data(), ipv4_addr.data() + ipv4_addr.size(), '.');
+    auto fields = split(ipv4_addr, '.');
     if (fields.size() != 4) return false;
-    for (auto& field : fields) {
-        if (field.empty()) return false;
-        bool all_digit = std::all_of(field.begin(), field.end(), isdigit);
-        if (!all_digit) return false;
-        if (field.size() > 1 && field[0] == '0') return false;
-        if (atoi(field.c_str()) > 255) return false;
+    for (auto& s : fields) {
+        if (s.empty()) return false;
+        if (!is_digits(s)) return false;
+        if (s.size() > 1 && s[0] == '0') return false;
+        if (svtoi(s).value() > 255) return false;
     }
     return true;
 }
