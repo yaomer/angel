@@ -74,10 +74,11 @@ bool check_ip(std::string_view ipv4_addr)
     auto fields = split(ipv4_addr, '.');
     if (fields.size() != 4) return false;
     for (auto& s : fields) {
-        if (s.empty()) return false;
-        if (!is_digits(s)) return false;
-        if (s.size() > 1 && s[0] == '0') return false;
-        if (svtoi(s).value() > 255) return false;
+        if (s.empty()
+         || !is_digits(s)
+         || (s.size() > 1 && s[0] == '0')
+         || svtoi(s).value_or(256) > 255)
+            return false;
     }
     return true;
 }
