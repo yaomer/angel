@@ -1,5 +1,5 @@
-#ifndef __ANGEL_WS_SERVER_H
-#define __ANGEL_WS_SERVER_H
+#ifndef __ANGEL_WEBSOCKET_H
+#define __ANGEL_WEBSOCKET_H
 
 #include <angel/server.h>
 
@@ -68,4 +68,4 @@ private:
 
 }
 
-#endif // __ANGEL_WS_SERVER_H
+#endif // __ANGEL_WEBSOCKET_H
