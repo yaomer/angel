@@ -3,7 +3,7 @@
 // See https://www.rfc-editor.org/rfc/rfc6455.html
 //
 
-#include <angel/ws-server.h>
+#include <angel/websocket.h>
 
 #include <iostream>
 #include <numeric>
