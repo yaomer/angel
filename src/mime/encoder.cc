@@ -5,6 +5,8 @@
 namespace angel {
 namespace mime {
 
+static const char *CRLF = "\r\n";
+
 // The 76 character limit does not count the trailing CRLF.
 static const int max_line_limit = 76;
 
@@ -40,7 +42,7 @@ std::string encoder::encode_QP(std::string_view data)
             count += 3;
         } else {
             // Insert Soft line break
-            res.append("=\r\n");
+            res.append("=").append(CRLF);
             count = 0;
             i--;
         }
@@ -51,11 +53,11 @@ std::string encoder::encode_QP(std::string_view data)
     res.pop_back();
     if (c == ' ' || c == '\t') {
         if (count - 1 + 3 > max_line_limit) {
-            res.append("=\r\n");
+            res.append("=").append(CRLF);
         }
         to_QP(res, c);
     }
-    res.append("\r\n");
+    res.append(CRLF);
     return res;
 }
 
@@ -67,12 +69,12 @@ std::string encoder::encode_base64(std::string_view data)
     size_t pos = 0;
     while (pos + max_line_limit <= n) {
         res.append(base64_data.data() + pos, max_line_limit);
-        res.append("\r\n");
+        res.append(CRLF);
         pos += max_line_limit;
     }
     if (pos < n) {
         res.append(base64_data.data() + pos, n - pos);
-        res.append("\r\n");
+        res.append(CRLF);
     }
     return res;
 }

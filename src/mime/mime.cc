@@ -11,6 +11,8 @@ namespace mime {
 static charset charset;
 static encoder encoder;
 
+static const char *CRLF = "\r\n";
+
 // Date: Sun, 21 Mar 1993 23:56:48 -0800 (PST)
 std::string format_date()
 {
@@ -65,12 +67,12 @@ void base::encode(int encoding)
         break;
     case charset::BIT7:
         encoded_data = data;
-        encoded_data.append("\r\n");
+        encoded_data.append(CRLF);
         add_header("Content-Transfer-Encoding", "7bit");
         break;
     case charset::BIT7or8:
         encoded_data = data;
-        encoded_data.append("\r\n");
+        encoded_data.append(CRLF);
         add_header("Content-Transfer-Encoding", encoder.encode_7or8bit(data));
         break;
     }
@@ -85,9 +87,9 @@ std::string& base::str()
 
     buf.clear();
     for (auto& [field, value] : headers) {
-        buf.append(field.val).append(": ").append(value).append("\r\n");
+        buf.append(field.val).append(": ").append(value).append(CRLF);
     }
-    buf.append("\r\n");
+    buf.append(CRLF);
     buf.append(encoded_data);
     return buf;
 }
@@ -152,7 +154,7 @@ std::string& message::str()
     return data;
 }
 
-static std::string generate_boundary()
+std::string generate_boundary()
 {
     static thread_local size_t part = 1;
     static thread_local std::mt19937 e(time(nullptr));
@@ -184,10 +186,10 @@ std::string& multipart::str()
     data.clear();
     data.append(base::str());
     for (auto& body : bodies) {
-        data.append("--").append(boundary).append("\r\n");
+        data.append("--").append(boundary).append(CRLF);
         data.append(body->str());
     }
-    data.append("--").append(boundary).append("--\r\n\r\n");
+    data.append("--").append(boundary).append("--").append(CRLF).append(CRLF);
     return data;
 }
 

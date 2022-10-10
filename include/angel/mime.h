@@ -119,6 +119,8 @@ private:
     std::string boundary;
 };
 
+std::string generate_boundary();
+
 struct unknown_charset_exception {  };
 
 class mimetypes {
