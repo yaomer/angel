@@ -47,10 +47,18 @@ const char *get_host_name();
 
 int send_file(int fd, int sockfd);
 
-void set_keepalive(int fd, bool on);
-void set_nodelay(int fd, bool on);
 void set_reuseaddr(int fd, bool on);
 void set_reuseport(int fd, bool on);
+void set_nodelay(int fd, bool on);
+
+void set_keepalive(int fd, bool on);
+// Setting is effective only after SO_KEEPALIVE is enabled.
+// idle time (secs)
+void set_keepalive_idle(int fd, int idle);
+// interval between keepalives
+void set_keepalive_intvl(int fd, int intvl);
+// probes of keepalives before close
+void set_keepalive_probes(int fd, int probes);
 
 }
 }

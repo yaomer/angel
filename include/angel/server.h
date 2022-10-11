@@ -50,10 +50,11 @@ public:
         exit_handler = std::move(handler);
     }
 
-    void start();
-    void quit();
-
-    static void daemon();
+    void set_nodelay(bool on);
+    void set_keepalive(bool on);
+    void set_keepalive_idle(int idle);
+    void set_keepalive_intvl(int intvl);
+    void set_keepalive_probes(int probes);
 
     void set_connection_ttl(int64_t ms) { ttl_ms = ms; }
 
@@ -70,6 +71,11 @@ public:
         high_water_mark = size;
         high_water_mark_handler = std::move(handler);
     }
+
+    void start();
+    void quit();
+
+    static void daemon();
 private:
     void new_connection(int fd);
     void remove_connection(const connection_ptr& conn);

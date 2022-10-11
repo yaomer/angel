@@ -30,10 +30,11 @@ inet_addr& server::listen_addr()
 
 evloop *server::get_next_loop()
 {
-    if (io_thread_pool && io_thread_pool->threads() > 0)
+    if (io_thread_pool && io_thread_pool->threads() > 0) {
         return io_thread_pool->get_next_loop();
-    else
+    } else {
         return loop;
+    }
 }
 
 void server::new_connection(int fd)
@@ -68,10 +69,7 @@ void server::remove_connection(const connection_ptr& conn)
 connection_ptr server::get_connection(size_t id)
 {
     auto it = connection_map.find(id);
-    if (it != connection_map.cend())
-        return it->second;
-    else
-        return nullptr;
+    return (it != connection_map.cend()) ? it->second : nullptr;
 }
 
 size_t server::get_connection_nums() const
@@ -139,15 +137,45 @@ void server::clean_up()
     quit();
 }
 
+void server::set_nodelay(bool on)
+{
+    listener->nodelay = on;
+}
+
+void server::set_keepalive(bool on)
+{
+    listener->keepalive = on;
+}
+
+void server::set_keepalive_idle(int idle)
+{
+    listener->keepalive_idle = idle;
+}
+
+void server::set_keepalive_intvl(int intvl)
+{
+    listener->keepalive_intvl = intvl;
+}
+
+void server::set_keepalive_probes(int probes)
+{
+    listener->keepalive_probes = probes;
+}
+
 void server::start()
 {
     log_info("server (%s) is running", listener->addr().to_host());
-    // The SIGPIPE signal must be ignored,
-    // otherwise sending a message to a closed connection will cause the server to exit unexpectedly.
+    // The SIGPIPE signal must be ignored, otherwise sending a message
+    // to a closed connection will cause the server to exit unexpectedly.
     add_signal(SIGPIPE, nullptr);
     add_signal(SIGINT, [this]{ this->clean_up(); });
     add_signal(SIGTERM, [this]{ this->clean_up(); });
     listener->listen();
+}
+
+void server::quit()
+{
+    loop->quit();
 }
 
 void server::daemon()
@@ -155,11 +183,6 @@ void server::daemon()
     __logger.quit();
     util::daemon();
     __logger.restart();
-}
-
-void server::quit()
-{
-    loop->quit();
 }
 
 }

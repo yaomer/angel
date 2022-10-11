@@ -18,12 +18,20 @@ public:
     typedef std::function<void(int)> new_connection_handler_t;
     listener_t(evloop *, inet_addr, const new_connection_handler_t);
     ~listener_t();
+
     listener_t(const listener_t&) = delete;
     listener_t& operator=(const listener_t&) = delete;
 
     void listen();
     int fd() const { return listen_socket.fd(); }
     inet_addr& addr() { return listen_addr; }
+
+    // Set options on listen socket
+    bool nodelay   = false;
+    bool keepalive = true;
+    int keepalive_idle   = 0; // 0 will be ignored
+    int keepalive_intvl  = 0; // 0 will be ignored
+    int keepalive_probes = 0; // 0 will be ignored
 private:
     void handle_accept();
 

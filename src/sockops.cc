@@ -8,7 +8,6 @@
 
 #include <angel/util.h>
 #include <angel/logger.h>
-#include "config.h"
 
 namespace angel {
 
@@ -159,41 +158,68 @@ int send_file(int fd, int sockfd)
     return -1;
 }
 
-void set_keepalive(int fd, bool on)
-{
-    socklen_t opt = on ? 1 : 0;
-#if defined (ANGEL_HAVE_TCP_KEEPALIVE)
-    int optval = TCP_KEEPALIVE;
-#elif defined (ANGEL_HAVE_SO_KEEPALIVE)
-    int optval = SO_KEEPALIVE;
-#endif
-    if (::setsockopt(fd, SOL_SOCKET, optval, &opt, sizeof(opt)) < 0)
-        log_fatal("[setsockopt -> TCP_KEEPALIVE]: %s", strerrno());
-    log_debug("%s TCP_KEEPALIVE", (on ? "enable" : "disable"));
-}
-
 void set_nodelay(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, TCP_NODELAY, &opt, sizeof(opt)) < 0)
-        log_fatal("[setsockopt -> TCP_NODELAY]: %s", strerrno());
-    log_debug("%s TCP_NODELAY", (on ? "enable" : "disable"));
+        log_error("setsockopt(TCP_NODELAY): %s", strerrno());
 }
 
 void set_reuseaddr(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
-        log_fatal("[setsockopt -> SO_REUSEADDR]: %s", strerrno());
-    log_debug("%s SO_REUSEADDR", (on ? "enable" : "disable"));
+        log_error("setsockopt(SO_REUSEADDR): %s", strerrno());
 }
 
 void set_reuseport(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
-        log_fatal("[setsockopt -> SO_REUSEPORT]: %s", strerrno());
-    log_debug("%s SO_REUSEPORT", (on ? "enable" : "disable"));
+        log_error("setsockopt(SO_REUSEPORT): %s", strerrno());
+}
+
+void set_keepalive(int fd, bool on)
+{
+    socklen_t optval = on ? 1 : 0;
+    if (::setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0)
+        log_error("setsockopt(SO_KEEPALIVE): %s", strerrno());
+}
+
+void set_keepalive_idle(int fd, int idle)
+{
+    if (idle <= 0) return;
+#if defined (__APPLE__)
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle)) < 0)
+        log_error("setsockopt(TCP_KEEPALIVE): %s", strerrno());
+#elif defined (__linux__)
+    if (::setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) < 0)
+        log_error("setsockopt(TCP_KEEPIDLE): %s", strerrno());
+#endif
+}
+
+void set_keepalive_intvl(int fd, int intvl)
+{
+    if (intvl <= 0) return;
+#if defined (__APPLE__)
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl)) < 0)
+        log_error("setsockopt(TCP_KEEPINTVL): %s", strerrno());
+#elif defined (__linux__)
+    if (::setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl)) < 0)
+        log_error("setsockopt(TCP_KEEPINTVL): %s", strerrno());
+#endif
+}
+
+void set_keepalive_probes(int fd, int probes)
+{
+    if (probes <= 0) return;
+#if defined (__APPLE__)
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &probes, sizeof(probes)) < 0)
+        log_error("setsockopt(TCP_KEEPCNT): %s", strerrno());
+#elif defined (__linux__)
+    if (::setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &probes, sizeof(probes)) < 0)
+        log_error("setsockopt(TCP_KEEPCNT): %s", strerrno());
+#endif
 }
 
 }
