@@ -38,14 +38,11 @@ void socketpair(int sockfd[]);
 struct sockaddr_in get_local_addr(int sockfd);
 struct sockaddr_in get_peer_addr(int sockfd);
 int get_socket_error(int sockfd);
+const char *get_host_name();
 
 int to_host_port(in_port_t port);
 const char *to_host_ip(const struct in_addr *addr);
 const char *to_host(const struct sockaddr_in *addr);
-
-const char *get_host_name();
-
-int send_file(int fd, int sockfd);
 
 void set_reuseaddr(int fd, bool on);
 void set_reuseport(int fd, bool on);
@@ -59,6 +56,16 @@ void set_keepalive_idle(int fd, int idle);
 void set_keepalive_intvl(int fd, int intvl);
 // probes of keepalives before close
 void set_keepalive_probes(int fd, int probes);
+
+// sockfd should be set nonblock
+//
+// If the transfer was successful, the number of bytes written to sockfd is returned.
+// Note that a successful call to send_file() may write fewer bytes than requested;
+// the caller should be prepared to retry the call if there were unsent bytes.
+//
+// On error, -1 is returned, and errno is set to indicate the error.
+//
+ssize_t send_file(int fd, int sockfd, off_t *offset, off_t count);
 
 }
 }

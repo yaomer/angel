@@ -137,34 +137,6 @@ const char *get_host_name()
     return hostname;
 }
 
-#if defined (__linux__)
-#include <sys/sendfile.h>
-#include <sys/stat.h>
-#endif
-
-int send_file(int fd, int sockfd)
-{
-#if defined (__APPLE__)
-    off_t len = 0;
-    int ret = sendfile(fd, sockfd, 0, &len, nullptr, 0);
-    return ret;
-#elif defined (__linux__)
-    struct stat st;
-    fstat(fd, &st);
-    int ret = sendfile(sockfd, fd, nullptr, st.st_size);
-    return ret;
-#endif
-    errno = ENOTSUP;
-    return -1;
-}
-
-void set_nodelay(int fd, bool on)
-{
-    socklen_t opt = on ? 1 : 0;
-    if (::setsockopt(fd, SOL_SOCKET, TCP_NODELAY, &opt, sizeof(opt)) < 0)
-        log_error("setsockopt(TCP_NODELAY): %s", strerrno());
-}
-
 void set_reuseaddr(int fd, bool on)
 {
     socklen_t opt = on ? 1 : 0;
@@ -177,6 +149,18 @@ void set_reuseport(int fd, bool on)
     socklen_t opt = on ? 1 : 0;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
         log_error("setsockopt(SO_REUSEPORT): %s", strerrno());
+}
+
+void set_nodelay(int fd, bool on)
+{
+    socklen_t opt = on ? 1 : 0;
+#if defined (__APPLE__)
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
+        log_error("setsockopt(TCP_NODELAY): %s", strerrno());
+#elif defined (__linux__)
+    if (::setsockopt(fd, SOL_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
+        log_error("setsockopt(TCP_NODELAY): %s", strerrno());
+#endif
 }
 
 void set_keepalive(int fd, bool on)
@@ -220,6 +204,35 @@ void set_keepalive_probes(int fd, int probes)
     if (::setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &probes, sizeof(probes)) < 0)
         log_error("setsockopt(TCP_KEEPCNT): %s", strerrno());
 #endif
+}
+
+#if defined (__linux__)
+#include <sys/sendfile.h>
+#endif
+
+ssize_t send_file(int fd, int sockfd, off_t *offset, off_t count)
+{
+    if (!offset) {
+        errno = EINVAL;
+        return -1;
+    }
+#if defined (__APPLE__)
+    int rc = sendfile(fd, sockfd, *offset, &count, nullptr, 0);
+    if (rc < 0 && !(errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) {
+        return -1;
+    }
+    *offset += count;
+    return count;
+#elif defined (__linux__)
+    off_t origin_offset = *offset;
+    ssize_t rc = sendfile(sockfd, fd, offset, count);
+    if (rc < 0 && !(errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) {
+        return -1;
+    }
+    return offset - origin_offset;
+#endif
+    errno = ENOTSUP;
+    return -1;
 }
 
 }

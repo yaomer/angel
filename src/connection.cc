@@ -224,9 +224,9 @@ void connection::format_send(const char *fmt, ...)
     if (is_alloced) delete []buf;
 }
 
-int connection::send_file(int fd)
+ssize_t connection::send_file(int fd, off_t *offset, off_t count)
 {
-    return sockops::send_file(fd, conn_channel->fd());
+    return sockops::send_file(fd, conn_channel->fd(), offset, count);
 }
 
 void connection::set_ttl(size_t timer_id, int64_t ms)

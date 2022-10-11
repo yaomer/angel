@@ -56,7 +56,7 @@ public:
     void send(const char *s, size_t len);
     void send(const void *v, size_t len);
     void format_send(const char *fmt, ...);
-    int send_file(int fd);
+    ssize_t send_file(int fd, off_t *offset, off_t count);
     evloop *get_loop() { return loop; }
     std::shared_ptr<channel>& get_channel() { return conn_channel; }
     inet_addr& get_local_addr() { return local_addr; }
