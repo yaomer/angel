@@ -94,25 +94,27 @@ bool check_date_format(std::string_view date)
     if (p[2] != SP || p[6] != SP || p[11] != SP) return false;
 
     auto year = util::svtoi({p + 7, 4});
-    if (!year.has_value()) return false;
+    if (year.value_or(-1) <= 0) return false;
 
     auto it = months.find({p + 3, 3});
     if (it == months.end()) return false;
 
     auto day = util::svtoi({p, 2});
-    if (!day.has_value() || day == 0 || day > days[is_leap(year.value())][it->second])
+    if (day.value_or(-1) <= 0 || day > days[is_leap(year.value())][it->second])
         return false;
     p += 12;
 
     // check time
     // (00:00:00 - 23:59:59)
     if (p[2] != ':' || p[5] != ':' || p[8] != SP) return false;
+    // Avoid -0, although it can be correctly converted to 0, it is invalid.
+    if (p[0] == '-' || p[3] == '-' || p[6] == '-') return false;
     auto h = util::svtoi({p, 2});
-    if (!h.has_value() || h.value() < 0 || h.value() > 23) return false;
+    if (h.value_or(-1) < 0 || h.value() > 23) return false;
     auto m = util::svtoi({p + 3, 2});
-    if (!m.has_value() || m.value() < 0 || m.value() > 59) return false;
+    if (m.value_or(-1) < 0 || m.value() > 59) return false;
     auto s = util::svtoi({p + 6, 2});
-    if (!s.has_value() || s.value() < 0 || s.value() > 59) return false;
+    if (s.value_or(-1) < 0 || s.value() > 59) return false;
 
     return (p[9] == 'G' || p[10] == 'M' || p[11] == 'P');
 }
