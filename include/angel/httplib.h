@@ -109,6 +109,7 @@ private:
     StatusCode parse_line(buffer& buf, int crlf);
     StatusCode parse_header(buffer& buf, int crlf);
     void parse_body(buffer& buf);
+    void clear();
 
     Method req_method;
     std::string req_path;
@@ -130,15 +131,14 @@ public:
     void set_content(std::string_view data, std::string_view type);
 private:
     std::string& str();
-    void clear();
 
     int status_code;
     std::string status_message;
     Headers headers;
     std::string content;
     std::string buf;
-    bool chunked;
     friend class HttpServer;
+    friend struct byte_range_set;
 };
 
 struct uri {
@@ -170,6 +170,8 @@ private:
 
     void handle_static_file(const connection_ptr& conn, request& req, response& res);
     void send_file(const connection_ptr& conn, response& res, const std::string& path);
+
+    void process_range_request(const connection_ptr& conn, request& req, response& res);
 
     angel::server server;
     typedef std::unordered_map<std::string, ServerHandler> Table;
