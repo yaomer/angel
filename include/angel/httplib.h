@@ -179,6 +179,13 @@ private:
     std::string base_dir;
 };
 
+// Wed, 15 Nov 1995 06:25:24 GMT
+std::string format_date();
+// Get the last modification time of the file.
+std::string get_last_modified(const std::string& path);
+// Check rfc1123-date
+bool check_date_format(std::string_view date);
+
 }
 }
 

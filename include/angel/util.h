@@ -57,14 +57,15 @@ off_t get_file_size(const std::string& path);
 //========== Some common string operations ==========
 //===================================================
 
+// If it is completely converted, return true (such as "12a" is wrong)
 template <typename R, std::enable_if_t<std::is_integral_v<R>, int> = 0>
 inline std::optional<R> svtointegral(std::string_view s)
 {
     R val;
     auto res = std::from_chars(s.data(), s.data() + s.size(), val);
-    if (res.ec == std::errc::invalid_argument || res.ec == std::errc::result_out_of_range)
-        return std::nullopt;
-    return val;
+    if (res.ec == std::errc() && res.ptr == s.data() + s.size())
+        return val;
+    return std::nullopt;
 }
 
 inline std::optional<int> svtoi(std::string_view s)

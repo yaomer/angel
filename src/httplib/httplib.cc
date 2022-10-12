@@ -2,12 +2,7 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
-
-#include <chrono>
-#include <iomanip>
-#include <sstream>
 
 #include <angel/mime.h>
 
@@ -19,32 +14,6 @@ static const char *CRLF = "\r\n";
 static const char *SEP = ": "; // field <SEP> value
 
 static const int uri_max_len = 1024 * 1024;
-
-using Clock = std::chrono::system_clock;
-
-// Date: Wed, 15 Nov 1995 06:25:24 GMT
-static std::string format_date(const Clock::time_point& now)
-{
-    std::ostringstream oss;
-    auto tm = Clock::to_time_t(now);
-    oss << std::put_time(std::gmtime(&tm), "%a, %d %b %Y %T GMT");
-    return oss.str();
-}
-
-static std::string format_date()
-{
-    return format_date(Clock::now());
-}
-
-static std::string get_last_modified(const std::string& path)
-{
-    struct stat st;
-    ::stat(path.c_str(), &st);
-    auto msec = st.st_mtimespec.tv_sec * 1000000 + st.st_mtimespec.tv_nsec / 1000;
-    Clock::duration duration = std::chrono::microseconds(msec);
-    Clock::time_point point(duration);
-    return format_date(point);
-}
 
 static mime::mimetypes mimetypes;
 
@@ -540,13 +509,8 @@ StatusCode byte_range_set::parse_byte_ranges(request& req)
 // Return -1 if an error occurs.
 static off_t __byte_pos(std::string_view s)
 {
-    off_t pos;
-    // byte-pos is not allowed to be negative
-    if (s[0] == '-') return -1;
-    auto res = std::from_chars(s.data(), s.data() + s.size(), pos);
-    // Must be completely converted, such as "12a" is wrong.
-    if (res.ec == std::errc() && res.ptr == s.data() + s.size())
-        return pos;
+    auto r = util::svtoll(s);
+    if (r.has_value()) return r.value();
     return -1;
 }
 
@@ -559,7 +523,7 @@ bool byte_range_set::parse_byte_range_spec(byte_range& range, std::string_view s
     if (range.first_byte_pos < 0 || range.first_byte_pos >= filesize) return false;
 
     if (!byte_range_spec[1].empty()) { // bytes=0-499
-        range.last_byte_pos  = __byte_pos(util::trim(byte_range_spec[1]));
+        range.last_byte_pos = __byte_pos(util::trim(byte_range_spec[1]));
         if (range.last_byte_pos < 0 || range.last_byte_pos < range.first_byte_pos) return false;
         if (range.last_byte_pos >= filesize) range.last_byte_pos = filesize - 1;
     } else { // bytes=0-
@@ -574,7 +538,7 @@ bool byte_range_set::parse_suffix_byte_range_spec(byte_range& range, std::string
     if (suffix_length <= 0) return false;
     suffix_length = std::min(suffix_length, filesize);
     range.first_byte_pos = filesize - suffix_length;
-    range.last_byte_pos = filesize - 1;
+    range.last_byte_pos  = filesize - 1;
     return true;
 }
 
