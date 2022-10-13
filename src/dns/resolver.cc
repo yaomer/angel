@@ -173,28 +173,15 @@ static const int name_server_port = 53;
 // Pick a name server for an ipv4 address
 static std::string parse_resolv_conf()
 {
-    char buf[BUFSIZ];
-    std::string addr;
-    std::ifstream ifs(resolv_conf);
-    if (!ifs.is_open()) {
-        log_fatal("(resolver) can't open %s: %s", resolv_conf, util::strerrno());
-    }
-    while (ifs.getline(buf, sizeof(buf))) {
-        const char *p = buf;
-        const char *end = buf + strlen(buf);
-        while (p < end && isspace(*p)) p++;
-        if (p == end || *p == '#') continue;
-        if (strncmp(p, "nameserver", 10) == 0) {
-            for (p += 10; p < end && isspace(*p); p++) ;
-            while (p < end && !isspace(*p))
-                addr.push_back(*p++);
-            if (util::check_ip(addr))
-                break;
-            addr.clear();
+    auto res = util::parse_conf(resolv_conf);
+    for (auto& arg : res) {
+        if (arg[0] == "nameserver") {
+            if (util::check_ip(arg[1])) {
+                return arg[1];
+            }
         }
     }
-    ifs.close();
-    return addr;
+    return "";
 }
 
 typedef std::lock_guard<std::mutex> lock_t;
