@@ -9,9 +9,9 @@
 namespace angel {
 namespace httplib {
 
-static const char SP = ' ';
+static const char SP    = ' ';
 static const char *CRLF = "\r\n";
-static const char *SEP = ": "; // field <SEP> value
+static const char *SEP  = ": "; // field <SEP> value
 
 static const int uri_max_len = 1024 * 1024;
 
@@ -34,9 +34,21 @@ static const std::unordered_map<std::string_view, Method> methods = {
     { "CONNECT",    CONNECT },
 };
 
+// Return Code for parse request:
+// Ok: parse complete
+// Continue: data not enough
+// Other: there is an error occurs.
+
 // Request-Line = Method <SP> Request-URI <SP> HTTP-Version <CRLF>
-StatusCode request::parse_line(buffer& buf, int crlf)
+StatusCode request::parse_line(buffer& buf)
 {
+    int crlf = buf.find_crlf();
+    if (crlf < 0) return Continue;
+
+    if (crlf > uri_max_len) {
+        return RequestUriTooLong;
+    }
+
     const char *p = buf.peek();
     const char *linep = buf.peek() + crlf;
 
@@ -55,7 +67,7 @@ StatusCode request::parse_line(buffer& buf, int crlf)
     if (next == linep) return BadRequest;
     const char *version = next + 1;
 
-    auto decoded_uri = uri::decode(std::string_view(p, next - p));
+    auto decoded_uri = uri::decode({p, (size_t)(next - p)});
     p = decoded_uri.data();
     const char *end = p + decoded_uri.size();
 
@@ -77,10 +89,12 @@ StatusCode request::parse_line(buffer& buf, int crlf)
     }
 
     // Parse HTTP-Version
-    req_version = util::to_upper(std::string_view(version, linep - version));
-    if (req_version == "HTTP/1.0" || req_version == "HTTP/1.1") {
+    req_version.assign(version, linep - version);
+    if (req_version.size() != 8 || !util::starts_with(req_version, "HTTP/"))
+        return BadRequest;
+    if (util::ends_with(req_version, "1.0") || util::ends_with(req_version, "1.1")) {
         // Nothing to do.
-    } else if (req_version == "HTTP/2.0") {
+    } else if (util::ends_with(req_version, "2.0")) {
         return HttpVersionNotSupported;
     } else {
         return BadRequest;
@@ -91,35 +105,55 @@ StatusCode request::parse_line(buffer& buf, int crlf)
 }
 
 // message-header = field-name ":" [ field-value ]
-StatusCode request::parse_header(buffer& buf, int crlf)
+StatusCode request::parse_header(buffer& buf)
 {
-    if (buf.starts_with(CRLF)) {
-        buf.retrieve(crlf + 2);
-        return Ok;
-    }
+    int crlf = buf.find_crlf();
+    if (crlf < 0) return Continue;
 
     const char *p = buf.peek();
-    const char *end = buf.peek() + crlf;
+
+    if (buf.starts_with(CRLF)) {
+        buf.retrieve(crlf + 2);
+        if (headers().count("Host")) return Ok;
+        return BadRequest;
+    }
 
     int pos = buf.find(":");
     if (pos < 0) return BadRequest;
 
     std::string_view field(p, pos);
-    p += pos + 1;
-    while (p < end && isspace(*p)) p++;
-    if (p == end) return BadRequest;
-    std::string_view value(p, end - p);
+    std::string_view value(util::trim({p + pos + 1, (size_t)(crlf - pos - 1)}));
+    if (value.empty()) return BadRequest;
     req_headers.emplace(field, value);
 
     buf.retrieve(crlf + 2);
     return Continue;
 }
 
-void request::parse_body(buffer& buf)
+StatusCode request::parse_body_length()
 {
-    size_t content_length = std::stoul(req_headers["Content-Length"]);
-    req_body.assign(buf.peek(), content_length);
-    buf.retrieve(content_length);
+    auto it = headers().find("Content-Length");
+    if (it == headers().end()) return Continue;
+
+    auto r = util::svtoll(it->second);
+    if (r.value_or(-1) < 0) return BadRequest;
+
+    length = r.value();
+    return length > 0 ? Ok : Continue;
+}
+
+StatusCode request::parse_body(buffer& buf)
+{
+    if (buf.readable() >= length) {
+        req_body.append(buf.peek(), length);
+        buf.retrieve(length);
+        return Ok;
+    } else { // Not Enough
+        req_body.append(buf.peek(), buf.readable());
+        length -= buf.readable();
+        buf.retrieve_all();
+        return Continue;
+    }
 }
 
 void request::clear()
@@ -151,22 +185,31 @@ void response::set_content(std::string_view data, std::string_view type)
     content.assign(data);
 }
 
+static void format_header(std::string& buf, std::string_view field, std::string_view value)
+{
+    buf.append(field).append(SEP).append(value).append(CRLF);
+}
+
 // Status-Line = HTTP-Version <SP> Status-Code <SP> Reason-Phrase <CRLF>
+void response::append_status_line()
+{
+    buf.append("HTTP/1.1").append(1, SP)
+       .append(std::to_string(status_code)).append(1, SP)
+       .append(status_message).append(CRLF);
+}
+
 std::string& response::str()
 {
     buf.clear();
 
-    buf.append("HTTP/1.1").append(1, SP)
-       .append(std::to_string(status_code)).append(1, SP)
-       .append(status_message).append(CRLF);
+    append_status_line();
 
-    if (!content.empty()) {
-        add_header("Content-Length", std::to_string(content.size()));
-    }
+    add_header("Server", "angel");
     add_header("Date", format_date());
+    add_header("Content-Length", std::to_string(content.size()));
 
     for (auto& [field, value] : headers) {
-        buf.append(field.val).append(SEP).append(value).append(CRLF);
+        format_header(buf, field.val, value);
     }
     buf.append(CRLF);
     buf.append(content);
@@ -177,90 +220,45 @@ std::string& response::str()
     return buf;
 }
 
-//==============================================
-//================ HttpServer ==================
-//==============================================
-
-HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
-    : server(loop, listen_addr)
-{
-    server.set_connection_handler([](const connection_ptr& conn){
-            conn->set_context(context());
-            });
-    server.set_message_handler([this](const connection_ptr& conn, buffer& buf){
-            this->message_handler(conn, buf);
-            });
-}
-
-void HttpServer::set_base_dir(std::string_view dir)
-{
-    base_dir = dir;
-    if (base_dir.back() == '/') base_dir.pop_back();
-}
-
-void HttpServer::set_parallel(unsigned n)
-{
-    if (n == 0) return;
-    server.start_io_threads(n);
-}
-
-void HttpServer::start()
-{
-    set_base_dir(".");
-    server.set_nodelay(true);
-    server.set_keepalive(true);
-    server.start();
-}
+#define switch_case(code, stmt1, stmt2) \
+    switch ((code)) { \
+    case Ok: { stmt1; break; } \
+    case Continue: { stmt2; break; } \
+    default: goto err; \
+    }
 
 void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
 {
     StatusCode code;
     if (!conn->is_connected()) return;
     auto& ctx = std::any_cast<context&>(conn->get_context());
+    auto& req = ctx.request;
     // printf("%s\n", buf.c_str());
-    while (buf.readable() >= 2) {
-        int crlf = buf.find_crlf();
-        if (crlf < 0) break;
+    while (buf.readable() > 0) {
         switch (ctx.state) {
         case ParseLine:
-        {
-            if (crlf > uri_max_len) {
-                code = RequestUriTooLong;
-                goto err;
-            }
-            code = ctx.request.parse_line(buf, crlf);
-            if (code != Ok) {
-                goto err;
-            }
-            ctx.state = ParseHeader;
+            switch_case(code = req.parse_line(buf),
+                        ctx.state = ParseHeader,
+                        )
             break;
-        }
         case ParseHeader:
-        {
-            code = ctx.request.parse_header(buf, crlf);
-            switch (code) {
-            case Ok:
-                if (ctx.request.method() == POST) {
-                    if (!ctx.request.headers().count("Content-Length")) {
-                        code = LengthRequired;
-                        goto err;
-                    }
-                    ctx.request.parse_body(buf);
-                }
+            switch_case(code = req.parse_header(buf),
+                        switch_case(code = req.parse_body_length(),
+                                    ctx.state = ParseBody,
+                                    process_request(conn)),
+                        )
+            break;
+        case ParseBody:
+            if (req.parse_body(buf) == Ok) {
                 process_request(conn);
-                break;
-            case Continue:
-                break;
-            default:
-                goto err;
             }
             break;
-        }
         }
     }
     return;
 err:
     ctx.response.set_status_code(code);
+    ctx.response.add_header("Connection", "close");
     conn->send(ctx.response.str());
     conn->close();
 }
@@ -271,42 +269,25 @@ void HttpServer::process_request(const connection_ptr& conn)
     auto& req = ctx.request;
     auto& res = ctx.response;
 
-    res.add_header("Server", "angel");
-
-    bool keep_alive = util::equal_case(req.headers().at("Connection"), "keep-alive");
-    res.add_header("Connection", keep_alive ? "keep-alive" : "close");
+    auto connection = req.value_or("Connection", "close");
+    bool keepalive = util::equal_case(connection, "keep-alive");
+    res.add_header("Connection", keepalive ? "keep-alive" : "close");
 
     switch (req.method()) {
     case GET:
-    {
-        auto& table = router[GET];
-        auto it = table.find(req.path());
-        if (it != table.end()) {
-            it->second(req, res);
-            conn->send(res.str());
-        } else {
-            handle_static_file(conn, req, res);
+        if (!handle_register_request(conn, req, res)) {
+            handle_static_file_request(conn, req, res);
         }
         break;
-    }
     case HEAD:
-    {
-        handle_static_file(conn, req, res);
+        handle_static_file_request(conn, req, res);
         break;
-    }
     case POST:
-    {
-        auto& table = router[POST];
-        auto it = table.find(req.path());
-        if (it != table.end()) {
-            it->second(req, res);
-            conn->send(res.str());
-        } else {
+        if (!handle_register_request(conn, req, res)) {
             res.set_status_code(NotFound);
             conn->send(res.str());
         }
         break;
-    }
     default:
         res.set_status_code(NotImplemented);
         conn->send(res.str());
@@ -316,8 +297,45 @@ void HttpServer::process_request(const connection_ptr& conn)
     ctx.state = ParseLine;
     req.clear();
 
-    if (!keep_alive) {
+    if (!keepalive) {
         conn->close();
+    }
+}
+
+bool HttpServer::handle_register_request(const connection_ptr& conn, request& req, response& res)
+{
+    auto& table = router.at(req.method());
+    auto it = table.find(req.path());
+    if (it == table.end()) return false;
+    it->second(req, res);
+    conn->send(res.str());
+    return true;
+}
+
+void HttpServer::handle_static_file_request(const connection_ptr& conn, request& req, response& res)
+{
+    if (req.path() == "/") {
+        req.req_path = base_dir + req.path() + "index.html";
+    } else {
+        req.req_path = base_dir + req.path();
+    }
+
+    if (util::is_regular_file(req.path())) {
+        res.add_header("Last-Modified", get_last_modified(req.path()));
+        res.add_header("Accept-Ranges", "bytes");
+        if (req.method() == GET) {
+            if (req.headers().count("Range")) {
+                handle_range_request(conn, req, res);
+            } else {
+                send_file(conn, res, req.path());
+            }
+        } else if (req.method() == HEAD) {
+            size_t length = util::get_file_size(req.path());
+            res.add_header("Content-Length", std::to_string(length));
+        }
+    } else {
+        res.set_status_code(NotFound);
+        conn->send(res.str());
     }
 }
 
@@ -342,6 +360,11 @@ void HttpServer::send_file(const connection_ptr& conn, response& res, const std:
     res.add_header("Content-Type", get_mime_type(path));
 
     auto filesize = util::get_file_size(path);
+    // It's an empty file and hardly appears.
+    if (filesize == 0) {
+        conn->send(res.str());
+        return;
+    }
 
     if (filesize >= ChunkSize) {
         res.add_header("Transfer-Encoding", "chunked");
@@ -388,6 +411,8 @@ void HttpServer::send_file(const connection_ptr& conn, response& res, const std:
 struct byte_range {
     off_t first_byte_pos;
     off_t last_byte_pos;
+
+    std::string to_str();
 };
 
 struct byte_range_set {
@@ -412,19 +437,20 @@ struct byte_range_set {
 //                           ( instance-length | "*" )
 // byte-range-resp-spec    = (first-byte-pos "-" last-byte-pos) | "*"
 //
-// Accept-Ranges     = "Accept-Ranges" ":" acceptable-ranges
-// acceptable-ranges = 1#range-unit | "none"
-//
 static const char *bytes_unit = "bytes";
 
-static std::string content_range(byte_range& range, off_t filesize)
+std::string byte_range::to_str()
+{
+    std::string s(std::to_string(first_byte_pos));
+    s.append("-").append(std::to_string(last_byte_pos));
+    return s;
+}
+
+static std::string content_range(std::string_view resp, off_t filesize)
 {
     std::string range_spec;
     range_spec.append(bytes_unit).append(1, SP)
-              .append(std::to_string(range.first_byte_pos)).append("-")
-              .append(std::to_string(range.last_byte_pos))
-              .append("/")
-              .append(std::to_string(filesize));
+              .append(resp).append("/").append(std::to_string(filesize));
     return range_spec;
 }
 
@@ -450,12 +476,19 @@ static bool map_file_range(std::string& buf, int fd, byte_range& range)
 static const int BufferedSize = ChunkSize;
 
 // Range: bytes=0-100,-100\r\n
-void HttpServer::process_range_request(const connection_ptr& conn, request& req, response& res)
+void HttpServer::handle_range_request(const connection_ptr& conn, request& req, response& res)
 {
     byte_range_set range_set;
 
     range_set.filesize = util::get_file_size(req.path());
     range_set.mime_type = get_mime_type(req.path());
+
+    if (range_set.filesize == 0) {
+        res.set_status_code(Ok);
+        res.add_header("Content-Type", range_set.mime_type);
+        conn->send(res.str());
+        return;
+    }
 
     StatusCode code = range_set.parse_byte_ranges(req);
     switch (code) {
@@ -464,6 +497,7 @@ void HttpServer::process_range_request(const connection_ptr& conn, request& req,
         return;
     case RequestedRangeNotSatisfiable:
         res.set_status_code(RequestedRangeNotSatisfiable);
+        res.add_header("Content-Range", content_range("*", range_set.filesize));
         conn->send(res.str());
         conn->close();
         return;
@@ -481,7 +515,6 @@ void HttpServer::process_range_request(const connection_ptr& conn, request& req,
 // Ok: ignore the range request and return the entire file.
 StatusCode byte_range_set::parse_byte_ranges(request& req)
 {
-    assert(filesize > 0);
     std::string_view range(req.headers().at("Range"));
     if (!util::starts_with(range, "bytes=")) return Ok;
     range.remove_prefix(6);
@@ -559,7 +592,7 @@ void byte_range_set::build_multipart_header(response& res)
         // "--" boundary <CRLF>
         len += 2 + boundary.size() + crlf;
         len += field_type.size() + sep + mime_type.size() + crlf;
-        len += field_range.size() + sep + content_range(range, filesize).size() + crlf;
+        len += field_range.size() + sep + content_range(range.to_str(), filesize).size() + crlf;
         len += crlf;
         len += range.last_byte_pos - range.first_byte_pos + 1 + crlf;
     }
@@ -575,12 +608,11 @@ void byte_range_set::send_range_response(const connection_ptr& conn, request& re
     int fd = open(req.path().c_str(), O_RDONLY);
 
     res.set_status_code(PartialContent);
-    res.add_header("Accept-Ranges", bytes_unit);
 
     if (ranges.size() == 1) {
         auto& range = ranges.back();
         res.add_header("Content-Type", mime_type);
-        res.add_header("Content-Range", content_range(range, filesize));
+        res.add_header("Content-Range", content_range(range.to_str(), filesize));
         if (!map_file_range(res.content, fd, range)) {
             res.headers.clear();
             res.set_status_code(InternalServerError);
@@ -595,8 +627,8 @@ void byte_range_set::send_range_response(const connection_ptr& conn, request& re
     // Build and send each entity part in sequence.
     for (auto& range : ranges) {
         buf.append("--").append(boundary).append(CRLF);
-        buf.append("Content-Type").append(SEP).append(mime_type).append(CRLF);
-        buf.append("Content-Range").append(SEP).append(content_range(range, filesize)).append(CRLF);
+        format_header(buf, "Content-Type", mime_type);
+        format_header(buf, "Content-Range", content_range(range.to_str(), filesize));
         buf.append(CRLF);
         if (!map_file_range(buf, fd, range)) {
             res.set_status_code(InternalServerError);
@@ -612,43 +644,6 @@ void byte_range_set::send_range_response(const connection_ptr& conn, request& re
     conn->send(buf);
 end:
     close(fd);
-}
-
-void HttpServer::handle_static_file(const connection_ptr& conn, request& req, response& res)
-{
-    if (req.path() == "/") {
-        req.req_path = base_dir + req.path() + "index.html";
-    } else {
-        req.req_path = base_dir + req.path();
-    }
-
-    if (util::is_regular_file(req.path())) {
-        res.add_header("Last-Modified", get_last_modified(req.path()));
-        if (req.method() == GET) {
-            if (req.headers().count("Range")) {
-                process_range_request(conn, req, res);
-            } else {
-                send_file(conn, res, req.path());
-            }
-        } else if (req.method() == HEAD) {
-            res.add_header("Content-Length", std::to_string(util::get_file_size(req.path())));
-        }
-    } else {
-        res.set_status_code(NotFound);
-        conn->send(res.str());
-    }
-}
-
-HttpServer& HttpServer::Get(std::string_view path, const ServerHandler handler)
-{
-    router[GET].emplace(path, std::move(handler));
-    return *this;
-}
-
-HttpServer& HttpServer::Post(std::string_view path, const ServerHandler handler)
-{
-    router[POST].emplace(path, std::move(handler));
-    return *this;
 }
 
 static const std::unordered_map<StatusCode, const char*> code_map = {
@@ -697,6 +692,53 @@ const char *to_str(StatusCode code)
 {
     auto it = code_map.find(code);
     return it != code_map.end() ? it->second : nullptr;
+}
+
+//==============================================
+//================ HttpServer ==================
+//==============================================
+
+HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
+    : server(loop, listen_addr)
+{
+    server.set_connection_handler([](const connection_ptr& conn){
+            conn->set_context(context());
+            });
+    server.set_message_handler([this](const connection_ptr& conn, buffer& buf){
+            this->message_handler(conn, buf);
+            });
+}
+
+void HttpServer::set_base_dir(std::string_view dir)
+{
+    base_dir = dir;
+    if (base_dir.back() == '/') base_dir.pop_back();
+}
+
+void HttpServer::set_parallel(unsigned n)
+{
+    if (n == 0) return;
+    server.start_io_threads(n);
+}
+
+HttpServer& HttpServer::Get(std::string_view path, const ServerHandler handler)
+{
+    router[GET].emplace(path, std::move(handler));
+    return *this;
+}
+
+HttpServer& HttpServer::Post(std::string_view path, const ServerHandler handler)
+{
+    router[POST].emplace(path, std::move(handler));
+    return *this;
+}
+
+void HttpServer::start()
+{
+    set_base_dir(".");
+    server.set_nodelay(true);
+    server.set_keepalive(true);
+    server.start();
 }
 
 }

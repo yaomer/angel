@@ -116,7 +116,7 @@ bool check_date_format(std::string_view date)
     auto s = util::svtoi({p + 6, 2});
     if (s.value_or(-1) < 0 || s.value() > 59) return false;
 
-    return (p[9] == 'G' || p[10] == 'M' || p[11] == 'P');
+    return (p[9] == 'G' && p[10] == 'M' && p[11] == 'P');
 }
 
 }

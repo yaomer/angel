@@ -74,6 +74,7 @@ const char *to_str(StatusCode code);
 enum ParseState {
     ParseLine,
     ParseHeader,
+    ParseBody,
 };
 
 struct field {
@@ -105,16 +106,23 @@ public:
     const std::string& body() const { return req_body; }
     const Params& params() const { return req_params; }
     const Headers& headers() const { return req_headers; }
+    std::string_view value_or(std::string_view field, std::string_view value)
+    {
+        auto it = headers().find(field);
+        return it != headers().end() ? it->second : value;
+    }
 private:
-    StatusCode parse_line(buffer& buf, int crlf);
-    StatusCode parse_header(buffer& buf, int crlf);
-    void parse_body(buffer& buf);
+    StatusCode parse_line(buffer& buf);
+    StatusCode parse_header(buffer& buf);
+    StatusCode parse_body_length();
+    StatusCode parse_body(buffer& buf);
     void clear();
 
     Method req_method;
     std::string req_path;
     std::string req_version;
     std::string req_body;
+    size_t length;
 
     Params req_params;
     Headers req_headers;
@@ -131,6 +139,8 @@ public:
     void set_content(std::string_view data, std::string_view type);
 private:
     std::string& str();
+
+    void append_status_line();
 
     int status_code;
     std::string status_message;
@@ -168,10 +178,11 @@ private:
     void message_handler(const connection_ptr&, buffer&);
     void process_request(const connection_ptr&);
 
-    void handle_static_file(const connection_ptr& conn, request& req, response& res);
-    void send_file(const connection_ptr& conn, response& res, const std::string& path);
+    bool handle_register_request(const connection_ptr& conn, request& req, response& res);
+    void handle_static_file_request(const connection_ptr& conn, request& req, response& res);
+    void handle_range_request(const connection_ptr& conn, request& req, response& res);
 
-    void process_range_request(const connection_ptr& conn, request& req, response& res);
+    void send_file(const connection_ptr& conn, response& res, const std::string& path);
 
     angel::server server;
     typedef std::unordered_map<std::string, ServerHandler> Table;
