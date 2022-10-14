@@ -55,6 +55,8 @@ void WebSocketContext::message_handler(const connection_ptr& conn, buffer& buf)
                 if (ws->onerror) ws->onerror(context);
                 conn->close();
                 return;
+            case WebSocketContext::Handshake:
+                return;
             }
             break;
         case WebSocketContext::Establish:
@@ -171,7 +173,7 @@ void WebSocketContext::handshake_error(const connection_ptr& conn)
 int WebSocketContext::handshake(const connection_ptr& conn, buffer& buf)
 {
     auto& context = std::any_cast<WebSocketContext&>(conn->get_context());
-    while (buf.readable() >= 2) {
+    while (buf.readable() > 0) {
         int crlf = buf.find_crlf();
         if (crlf < 0) break;
         context.state = context.handshake(buf.peek(), buf.peek() + crlf);
