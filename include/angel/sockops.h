@@ -65,7 +65,7 @@ void set_keepalive_probes(int fd, int probes);
 //
 // On error, -1 is returned, and errno is set to indicate the error.
 //
-ssize_t send_file(int fd, int sockfd, off_t *offset, off_t count);
+ssize_t send_file(int fd, int sockfd, off_t offset, off_t count);
 
 }
 }

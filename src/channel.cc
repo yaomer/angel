@@ -19,8 +19,10 @@ void channel::enable_read()
 
 void channel::enable_write()
 {
-    filter |= Write;
-    loop->change_event(evfd, filter);
+    if (!is_writing()) {
+        filter |= Write;
+        loop->change_event(evfd, filter);
+    }
 }
 
 void channel::disable_write()

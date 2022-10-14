@@ -29,7 +29,6 @@ void client::new_connection(int fd)
     cli_conn->set_state(connection::state::connected);
     cli_conn->set_connection_handler(connection_handler);
     cli_conn->set_message_handler(message_handler);
-    cli_conn->set_write_complete_handler(write_complete_handler);
     cli_conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     cli_conn->set_close_handler([this](const connection_ptr& conn){
             this->close_connection(conn);

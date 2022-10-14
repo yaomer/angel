@@ -103,5 +103,12 @@ off_t get_file_size(const std::string& path)
     return st.st_size;
 }
 
+off_t get_file_size(int fd)
+{
+    struct stat st;
+    ::fstat(fd, &st);
+    return st.st_size;
+}
+
 }
 }

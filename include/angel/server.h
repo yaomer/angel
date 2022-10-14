@@ -56,16 +56,12 @@ public:
     void set_keepalive_intvl(int intvl);
     void set_keepalive_probes(int probes);
 
-    void set_connection_ttl(int64_t ms) { ttl_ms = ms; }
-
     void set_connection_handler(const connection_handler_t handler)
     { connection_handler = std::move(handler); }
     void set_message_handler(const message_handler_t handler)
     { message_handler = std::move(handler); }
     void set_close_handler(const close_handler_t handler)
     { close_handler = std::move(handler); }
-    void set_write_complete_handler(const write_complete_handler_t handler)
-    { write_complete_handler = std::move(handler); }
     void set_high_water_mark_handler(size_t size, const high_water_mark_handler_t handler)
     {
         high_water_mark = size;
@@ -79,7 +75,6 @@ public:
 private:
     void new_connection(int fd);
     void remove_connection(const connection_ptr& conn);
-    void set_ttl_timer_if_needed(evloop *loop, const connection_ptr& conn);
     evloop* get_next_loop();
     void clean_up();
 
@@ -89,11 +84,9 @@ private:
     std::unique_ptr<thread_pool> task_thread_pool;
     std::map<size_t, connection_ptr> connection_map;
     size_t conn_id;
-    int64_t ttl_ms;
     connection_handler_t connection_handler;
     message_handler_t message_handler;
     close_handler_t close_handler;
-    write_complete_handler_t write_complete_handler;
     high_water_mark_handler_t high_water_mark_handler;
     signaler_handler_t exit_handler;
     size_t high_water_mark;

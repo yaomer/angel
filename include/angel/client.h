@@ -34,8 +34,6 @@ public:
     { connection_handler = std::move(handler); }
     void set_message_handler(const message_handler_t handler)
     { message_handler = std::move(handler); }
-    void set_write_complete_handler(const write_complete_handler_t handler)
-    { write_complete_handler = std::move(handler); }
     void set_close_handler(const close_handler_t handler)
     { close_handler = std::move(handler); }
     void set_high_water_mark_handler(size_t size, const high_water_mark_handler_t handler)
@@ -58,7 +56,6 @@ private:
     std::unique_ptr<thread_pool> task_thread_pool;
     connection_handler_t connection_handler;
     message_handler_t message_handler;
-    write_complete_handler_t write_complete_handler;
     close_handler_t close_handler;
     high_water_mark_handler_t high_water_mark_handler;
     inet_addr peer_addr;

@@ -210,29 +210,17 @@ void set_keepalive_probes(int fd, int probes)
 #include <sys/sendfile.h>
 #endif
 
-ssize_t send_file(int fd, int sockfd, off_t *offset, off_t count)
+ssize_t send_file(int fd, int sockfd, off_t offset, off_t count)
 {
-    if (!offset) {
-        errno = EINVAL;
-        return -1;
-    }
 #if defined (__APPLE__)
-    int rc = sendfile(fd, sockfd, *offset, &count, nullptr, 0);
-    if (rc < 0 && !(errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) {
-        return -1;
-    }
-    *offset += count;
+    int rc = sendfile(fd, sockfd, offset, &count, nullptr, 0);
+    if (rc == -1) return rc;
     return count;
 #elif defined (__linux__)
-    off_t origin_offset = *offset;
-    ssize_t rc = sendfile(sockfd, fd, offset, count);
-    if (rc < 0 && !(errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) {
-        return -1;
-    }
-    return offset - origin_offset;
+    ssize_t rc = sendfile(sockfd, fd, &offset, count);
+    if (rc == -1) return rc;
+    return rc;
 #endif
-    errno = ENOTSUP;
-    return -1;
 }
 
 }

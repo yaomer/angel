@@ -5,6 +5,7 @@
 #include <memory>
 #include <atomic>
 #include <any> // only c++17
+#include <queue>
 
 #include <angel/channel.h>
 #include <angel/buffer.h>
@@ -24,14 +25,10 @@ typedef std::function<void(const connection_ptr&)> connection_handler_t;
 typedef std::function<void(const connection_ptr&, buffer&)> message_handler_t;
 // Called after the connection is closed.
 typedef std::function<void(const connection_ptr&)> close_handler_t;
-// Low water mark callback
-// Called after data is sent, can be used to continuously send data.
-typedef std::function<void(const connection_ptr&)> write_complete_handler_t;
-// High water mark callback
 // Called when the data to be sent accumulates to a certain threshold.
 typedef std::function<void(const connection_ptr&)> high_water_mark_handler_t;
-// Called when there is a connection error. (not used yet)
-typedef std::function<void()> error_handler_t;
+// Called after all previous data has been sent.
+typedef std::function<void(const connection_ptr&)> send_complete_handler_t;
 
 //
 // A higher-level encapsulation than channel,
@@ -52,29 +49,54 @@ public:
     connection& operator=(const connection&) = delete;
 
     size_t id() const { return conn_id; }
+    evloop *get_loop() { return loop; }
+    std::shared_ptr<channel>& get_channel() { return channel; }
+    inet_addr& get_local_addr() { return local_addr; }
+    inet_addr& get_peer_addr() { return peer_addr; }
+    bool is_connected() { return conn_state == state::connected; }
+    bool is_closing() { return conn_state == state::closing; }
+    bool is_closed() { return conn_state == state::closed; }
+    // Save the context needed for the connection. (used by user)
+    //
+    // There should not be a connection_ptr in the context,
+    // otherwise it will cause a circular reference.
+    //
+    // If necessary,
+    // <connection*> or <weak_ptr<connection>> can be.
+    void set_context(std::any ctx) { context = std::move(ctx); }
+    std::any& get_context() { return context; }
+    // Set idle TTL(Time to Live) for connection.
+    void set_ttl(int64_t ms);
+    // Close connection, there are two kinds of states:
+    // closed: Close the connection immediately.
+    // closing: Some data haven't been sent yet, so close after sending.
+    void close() { handle_close(false); }
+
+    // thread-safe
     void send(std::string_view s);
     void send(const char *s, size_t len);
     void send(const void *v, size_t len);
     void format_send(const char *fmt, ...);
-    ssize_t send_file(int fd, off_t *offset, off_t count);
-    evloop *get_loop() { return loop; }
-    std::shared_ptr<channel>& get_channel() { return conn_channel; }
-    inet_addr& get_local_addr() { return local_addr; }
-    inet_addr& get_peer_addr() { return peer_addr; }
-    void set_state(state state) { conn_state = state; }
-    bool is_connected() { return conn_state == state::connected; }
-    bool is_closed() { return conn_state == state::closed; }
-    std::any& get_context() { return context; }
-    void set_context(std::any ctx) { context = std::move(ctx); }
-    void set_ttl(size_t timer_id, int64_t ms);
+    // send_file() async-sends the specified file by zero copy.
+    void send_file(int fd, off_t offset, off_t count);
+    // If you want to close fd after sending the file, you can do that.
+    // send_file(), and then
+    // set_send_complete_handler([]{ close(fd); })
+    //
+    // Or after send(), you can also do something with it.
+    void set_send_complete_handler(const send_complete_handler_t handler);
+
+    // Invoked by server and client only,
+    // users should not call them directly.
+
+    // Called by server or client after the connection is successfully established.
+    // Used to register channel into evloop.
     void establish();
-    void close() { handle_close(false); }
+    void set_state(state state) { conn_state = state; }
     void set_connection_handler(const connection_handler_t handler)
     { connection_handler = std::move(handler); }
     void set_message_handler(const message_handler_t handler)
     { message_handler = std::move(handler); }
-    void set_write_complete_handler(const write_complete_handler_t handler)
-    { write_complete_handler = std::move(handler); }
     void set_close_handler(const close_handler_t handler)
     { close_handler = std::move(handler); }
     void set_high_water_mark_handler(size_t size, const high_water_mark_handler_t handler)
@@ -89,33 +111,42 @@ private:
     void handle_error();
     void force_close_connection() { handle_close(true); }
     void send_in_loop(const char *data, size_t len);
+    void send_file_in_loop(int fd, off_t offset, off_t count);
     void update_ttl_timer_if_needed();
     const char *get_state_str();
 
     size_t conn_id;
     evloop *loop;
-    std::shared_ptr<channel> conn_channel;
-    std::unique_ptr<socket> conn_socket;
+    std::shared_ptr<channel> channel;
+    std::unique_ptr<socket> socket;
     buffer input_buf;
-    buffer output_buf;
     inet_addr local_addr;
     inet_addr peer_addr;
-    // Save the context needed for the connection
-    //
-    // There should not be a connection_ptr in the context,
-    // otherwise it will cause a circular reference.
-    //
-    // If necessary, <connection*> or <weak_ptr<connection>> can be.
-    //
     std::any context;
     std::atomic<state> conn_state;
     size_t ttl_timer_id;
     int64_t ttl_ms;
+
+    struct file {
+        int   fd;
+        off_t offset;
+        off_t count;
+    };
+    buffer output_buf;
+    // pair<send_id, output_buf offset len>
+    std::queue<std::pair<size_t, size_t>> byte_stream_queue;
+    std::queue<std::pair<size_t, file>> send_file_queue;
+    std::queue<std::pair<size_t, send_complete_handler_t>> send_complete_handler_queue;
+    bool send_queue_is_empty() { return byte_stream_queue.empty() && send_file_queue.empty(); }
+    // Increment id, assigned to each send task.
+    // (send byte stream) or (send file)
+    size_t send_id;
+    // Id of the next send task to be processed.
+    size_t next_id;
+
     connection_handler_t connection_handler;
     message_handler_t message_handler;
-    write_complete_handler_t write_complete_handler;
     close_handler_t close_handler;
-    error_handler_t error_handler;
     high_water_mark_handler_t high_water_mark_handler;
     size_t high_water_mark;
 };

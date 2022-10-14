@@ -14,7 +14,6 @@ server::server(evloop *loop, inet_addr listen_addr)
     listener(new listener_t(
                 loop, listen_addr, [this](int fd){ this->new_connection(fd); })),
     conn_id(1),
-    ttl_ms(0),
     high_water_mark(0)
 {
     // if (is_set_cpu_affinity)
@@ -44,13 +43,11 @@ void server::new_connection(int fd)
     connection_ptr conn(new connection(id, io_loop, fd));
     conn->set_connection_handler(connection_handler);
     conn->set_message_handler(message_handler);
-    conn->set_write_complete_handler(write_complete_handler);
     conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     conn->set_close_handler([this](const connection_ptr& conn){
             this->remove_connection(conn);
             });
     connection_map.emplace(id, conn);
-    set_ttl_timer_if_needed(io_loop, conn);
     io_loop->run_in_loop([conn]{ conn->establish(); });
 }
 
@@ -94,13 +91,6 @@ void server::for_each(const for_each_functor_t functor)
             for (auto& it : this->connection_map)
                 functor(it.second);
             });
-}
-
-void server::set_ttl_timer_if_needed(evloop *loop, const connection_ptr& conn)
-{
-    if (ttl_ms <= 0) return;
-    size_t id = loop->run_after(ttl_ms, [conn]{ conn->close(); });
-    conn->set_ttl(id, ttl_ms);
 }
 
 void server::start_io_threads(size_t thread_nums)

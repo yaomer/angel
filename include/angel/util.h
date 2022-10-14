@@ -52,6 +52,7 @@ bool is_regular_file(const std::string& path);
 bool is_directory(const std::string& path);
 
 off_t get_file_size(const std::string& path);
+off_t get_file_size(int fd);
 
 //===================================================
 //========== Some common string operations ==========
