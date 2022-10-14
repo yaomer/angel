@@ -140,13 +140,13 @@ int main(void)
     angel::evloop loop;
     angel::server server(&loop, angel::inet_addr(8888));
     server.set_connection_handler([ttl](const angel::connection_ptr& conn){
+            conn->set_ttl(ttl);
             conn->format_send("hello, bye bye in %d s\n", ttl / 1000);
             });
     // ttl ms后连接关闭时该回调会被触发
     server.set_close_handler([](const angel::connection_ptr& conn){
             conn->send(">bye bye<\n");
             });
-    server.set_connection_ttl(ttl);
     server.start();
     loop.run();
 }
