@@ -66,7 +66,6 @@ bool uri_decode(std::string_view uri, std::string& res)
 // month    = "Jan" | "Feb" | "Mar" | "Apr"
 //          | "May" | "Jun" | "Jul" | "Aug"
 //          | "Sep" | "Oct" | "Nov" | "Dec"
-//
 
 using Clock = std::chrono::system_clock;
 
@@ -159,8 +158,7 @@ int64_t get_last_modified(const std::string& path)
 {
     struct stat st;
     ::stat(path.c_str(), &st);
-    auto msecs = (int64_t)st.st_mtimespec.tv_sec * 1000000 + st.st_mtimespec.tv_nsec / 1000;
-    return msecs;
+    return (int64_t)st.st_mtimespec.tv_sec * 1000000 + st.st_mtimespec.tv_nsec / 1000;
 }
 
 std::string format_last_modified(int64_t msecs)
@@ -170,11 +168,63 @@ std::string format_last_modified(int64_t msecs)
     return format_date(point);
 }
 
+// entity-tag = [ weak ] opaque-tag
+// weak       = "W/"
+// opaque-tag = quoted-string
+//
 // A strong entity tag MUST change whenever the associated
 // entity value changes in any way.
 // A weak entity tag SHOULD change whenever the associated
 // entity changes in a semantically significant way.
+//
+// e.g.
+// strong ETag: "xyz"
+// weak ETag: W/"xyz"
+//
+static bool is_strong_etag(std::string_view etag)
+{
+    return etag.size() >= 2 && etag.front() == '\"' && etag.back() == '\"';
+}
 
+static bool is_weak_etag(std::string_view etag)
+{
+    if (!util::starts_with(etag, "W/")) return false;
+    etag.remove_prefix(2);
+    return is_strong_etag(etag);
+}
+
+bool is_etag(std::string_view etag)
+{
+    return is_strong_etag(etag) || is_weak_etag(etag);
+}
+
+// The strong comparison function: in order to be considered equal,
+// both validators MUST be identical in every way, and both MUST
+// NOT be weak.
+bool strong_etag_equal(std::string_view etag1, std::string_view etag2)
+{
+    if (!is_strong_etag(etag1) || !is_strong_etag(etag2)) return false;
+    return etag1 == etag2;
+}
+
+// The weak comparison function: in order to be considered equal,
+// both validators MUST be identical in every way, but either or
+// both of them MAY be tagged as "weak" without affecting the
+// result.
+bool weak_etag_equal(std::string_view etag1, std::string_view etag2)
+{
+    if (!is_etag(etag1) || !is_etag(etag2)) return false;
+
+    if (util::starts_with(etag1, "W/")) {
+        etag1.remove_prefix(2);
+    }
+    if (util::starts_with(etag2, "W/")) {
+        etag2.remove_prefix(2);
+    }
+    return etag1 == etag2;
+}
+
+// file etag = last_modified_time "-" filesize
 std::string generate_file_etag(int64_t last_modified_time, off_t filesize)
 {
     std::ostringstream oss;
@@ -186,9 +236,10 @@ std::string generate_file_etag(int64_t last_modified_time, off_t filesize)
 
 std::string generate_etag(std::string_view data)
 {
-    std::string etag(util::sha1(data, false).substr(0, 13));
+    std::string etag("\"");
+    etag.append(util::sha1(data, false).substr(0, 20));
     etag.append("-").append(std::to_string(data.size()));
-    return etag;
+    return etag.append("\"");
 }
 
 }

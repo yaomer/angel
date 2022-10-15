@@ -128,6 +128,8 @@ private:
     bool chunked = false;
     ssize_t chunk_size = -1;
     off_t filesize;
+    std::string last_modified;
+    std::string etag;
 
     Params req_params;
     Headers req_headers;
@@ -162,6 +164,12 @@ struct context {
     int state = ParseLine;
 };
 
+enum ConditionCode {
+    NoHeader,
+    Successful,
+    Failed,
+};
+
 typedef std::function<void(request&, response&)> ServerHandler;
 
 class HttpServer {
@@ -180,6 +188,13 @@ private:
     bool handle_register_request(const connection_ptr& conn, request& req, response& res);
     void handle_static_file_request(const connection_ptr& conn, request& req, response& res);
     void handle_range_request(const connection_ptr& conn, request& req, response& res);
+
+    ConditionCode handle_conditional(const connection_ptr& conn, request& req, response& res);
+    ConditionCode if_match(const connection_ptr& conn, request& req, response& res);
+    ConditionCode if_modified_since(const connection_ptr& conn, request& req, response& res);
+    ConditionCode if_none_match(const connection_ptr& conn, request& req, response& res);
+    ConditionCode if_range(const connection_ptr& conn, request& req, response& res);
+    ConditionCode if_unmodified_since(const connection_ptr& conn, request& req, response& res);
 
     void send_file(const connection_ptr& conn, request& req, response& res);
 

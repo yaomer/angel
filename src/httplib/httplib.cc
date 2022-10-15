@@ -63,6 +63,7 @@ StatusCode request::parse_line(buffer& buf)
     const char *p = res[1].data();
     const char *end = p + res[1].size();
 
+    req_path.clear();
     const char *sep = std::find(p, end, '?');
     if (!uri_decode({p, (size_t)(sep - p)}, req_path)) return BadRequest;
 
@@ -397,10 +398,9 @@ bool HttpServer::handle_register_request(const connection_ptr& conn, request& re
 void HttpServer::handle_static_file_request(const connection_ptr& conn, request& req, response& res)
 {
     if (req.path() == "/") {
-        req.req_path = base_dir + req.path() + "index.html";
-    } else {
-        req.req_path = base_dir + req.path();
+        req.req_path += "index.html";
     }
+    req.req_path = base_dir + req.path();
 
     if (!util::is_regular_file(req.path())) {
         res.set_status_code(NotFound);
@@ -409,29 +409,18 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
     }
 
     auto last_modified_time = get_last_modified(req.path());
-    auto last_modified = format_last_modified(last_modified_time);
 
     req.filesize = util::get_file_size(req.path());
+    req.last_modified = format_last_modified(last_modified_time);
+    req.etag = generate_file_etag(last_modified_time, req.filesize);
 
-    res.add_header("Last-Modified", last_modified);
+    res.add_header("Last-Modified", req.last_modified);
     res.add_header("Accept-Ranges", "bytes");
-    res.add_header("ETag", generate_file_etag(last_modified_time, req.filesize));
+    res.add_header("ETag", req.etag);
 
-    auto it = req.headers().find("If-Unmodified-Since");
-    if (it != req.headers().end()) {
-        if (it->second != last_modified) {
-            res.set_status_code(PreconditionFailed);
-            conn->send(res.str());
-            return;
-        }
-    }
+    if (handle_conditional(conn, req, res) == Failed) return;
 
     if (req.method() == GET) {
-        if (req.value_or("If-Modified-Since") == last_modified) {
-            res.set_status_code(NotModified);
-            conn->send(res.str());
-            return;
-        }
         if (req.headers().count("Range")) {
             handle_range_request(conn, req, res);
         } else {
@@ -443,6 +432,191 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
         conn->send(res.str());
         return;
     }
+}
+
+// If-Match
+// If-Modified-Since
+// If-None-Match
+// If-Range
+// If-Unmodified-Since
+//
+// This several request-header fields are used with a method to
+// make it conditional.
+//
+// The purpose of these features is to allow efficient updates of
+// cached information with a minimum amount of transaction overhead.
+
+// Because they are mutually exclusive, we call them
+// in the following reasonable order.
+//
+// If-Match (exclusive: If-None-Match, If-Modified-Since)
+// If-None-Match (exclusive: If-Match, If-Unmodified-Since)
+//
+// If-Match -> If-Unmodified-Since
+// If-None-Match -> If-Modified-Since
+// If-Modified-Since
+// If-Unmodified-Since
+ConditionCode HttpServer::handle_conditional(const connection_ptr& conn, request& req, response& res)
+{
+    if_range(conn, req, res);
+
+    auto code = if_match(conn, req, res);
+    switch (code) {
+    case Failed: return Failed;
+    case Successful:
+        return if_unmodified_since(conn, req, res);
+    case NoHeader: // No If-Match header
+        code = if_none_match(conn, req, res);
+        switch (code) {
+        case Failed: return Failed;
+        case Successful:
+            return if_modified_since(conn, req, res);
+        case NoHeader: // No If-None-Match header
+            code = if_modified_since(conn, req, res);
+            if (code != NoHeader) return code;
+            // No If-Modified-Since header
+            return if_unmodified_since(conn, req, res);
+        }
+    }
+}
+
+// If-Match = "If-Match" ":" ( "*" | 1#entity-tag )
+//
+// It is used on updating requests, to prevent inadvertent
+// modification of the wrong version of a resource.
+ConditionCode HttpServer::if_match(const connection_ptr& conn, request& req, response& res)
+{
+    auto it = req.headers().find("If-Match");
+    if (it == req.headers().end()) return NoHeader;
+
+    if (it->second == "*") return Successful;
+
+    auto etags = util::split(it->second, ',');
+    for (auto& etag : etags) {
+        if (strong_etag_equal(etag, req.etag)) {
+            return Successful;
+        }
+    }
+    // None of the entity tags match.
+    res.set_status_code(PreconditionFailed);
+    conn->send(res.str());
+    return Failed;
+}
+
+// If-Modified-Since = "If-Modified-Since" ":" HTTP-date
+//
+// If the requested variant has not been modified since the time
+// specified in this field, an entity will not be returned from
+// the server; instead, a 304 (not modified) response will be
+// returned without any message-body.
+ConditionCode HttpServer::if_modified_since(const connection_ptr& conn, request& req, response& res)
+{
+    auto it = req.headers().find("If-Modified-Since");
+    if (it == req.headers().end()) return NoHeader;
+
+    if (it->second != req.last_modified) {
+        return Successful;
+    }
+    res.set_status_code(NotModified);
+    conn->send(res.str());
+    return Failed;
+}
+
+// If-None-Match = "If-None-Match" ":" ( "*" | 1#entity-tag )
+//
+// It is used to prevent a method (e.g. PUT) from inadvertently
+// modifying an existing resource when the client believes that
+// the resource does not exist.
+ConditionCode HttpServer::if_none_match(const connection_ptr& conn, request& req, response& res)
+{
+    auto it = req.headers().find("If-None-Match");
+    if (it == req.headers().end()) return NoHeader;
+
+    auto etags = util::split(it->second, ',');
+
+    auto *etag_equal = (req.method() == GET || req.method() == HEAD) ? weak_etag_equal : strong_etag_equal;
+
+    if (it->second == "*") goto end;
+
+    for (auto& etag : etags) {
+        if (etag_equal(etag, req.etag)) {
+            goto end;
+        }
+    }
+    // If none of the entity tags match, then the server MAY perform the
+    // requested method as if the If-None-Match header field did not exist,
+    // but MUST also ignore any If-Modified-Since header field(s) in the
+    // request.
+    //
+    // That is, if no entity tags match, then the server MUST NOT return
+    // a 304 (Not Modified) response.
+    //
+    req.req_headers.erase("If-Modified-Since");
+    return Successful;
+end:
+    if (req.method() == GET || req.method() == HEAD) {
+        res.set_status_code(NotModified);
+    } else {
+        res.set_status_code(PreconditionFailed);
+    }
+    conn->send(res.str());
+    return Failed;
+}
+
+// If-Range = "If-Range" ":" ( entity-tag | HTTP-date )
+//
+// If a client has a partial copy of an entity in its cache, and wishes
+// to have an up-to-date copy of the entire entity in its cache, it
+// could use the Range request-header with a conditional GET (using
+// either or both of If-Unmodified-Since and If-Match.)
+//
+// However, if the condition fails because the entity has been modified,
+// the client would then have to make a second request to obtain the
+// entire current entity-body.
+//
+// The If-Range header allows a client to "short-circuit" the second
+// request. Informally, its meaning is `if the entity is unchanged,
+// send me the part(s) that I am missing; otherwise, send me the
+// entire new entity`.
+ConditionCode HttpServer::if_range(const connection_ptr& conn, request& req, response& res)
+{
+    auto it = req.headers().find("If-Range");
+    if (it == req.headers().end()) return NoHeader;
+
+    // The If-Range header SHOULD only be used together with a Range header,
+    // and MUST be ignored if the request does not include a Range header.
+    if (!req.headers().count("Range")) return Successful;
+
+    if (is_etag(it->second)) {
+        if (strong_etag_equal(it->second, req.etag)) {
+            return Successful;
+        }
+    } else {
+        if (it->second == req.last_modified) {
+            return Successful;
+        }
+    }
+    // Perform it as if the Range header were not present.
+    req.req_headers.erase("Range");
+    return Successful;
+}
+
+// If-Unmodified-Since = "If-Unmodified-Since" ":" HTTP-date
+//
+// If the requested variant has been modified since the specified time,
+// the server MUST NOT perform the requested operation, and MUST return
+// a 412 (Precondition Failed).
+ConditionCode HttpServer::if_unmodified_since(const connection_ptr& conn, request& req, response& res)
+{
+    auto it = req.headers().find("If-Unmodified-Since");
+    if (it == req.headers().end()) return NoHeader;
+
+    if (it->second == req.last_modified) {
+        return Successful;
+    }
+    res.set_status_code(PreconditionFailed);
+    conn->send(res.str());
+    return Failed;
 }
 
 void HttpServer::send_file(const connection_ptr& conn, request& req, response& res)

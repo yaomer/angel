@@ -19,8 +19,13 @@ bool check_date_format(std::string_view date);
 int64_t get_last_modified(const std::string& path);
 std::string format_last_modified(int64_t msecs);
 
+bool is_etag(std::string_view etag);
+bool strong_etag_equal(std::string_view etag1, std::string_view etag2);
+bool weak_etag_equal(std::string_view etag1, std::string_view etag2);
+
 std::string generate_file_etag(int64_t last_modified_time, off_t filesize);
 std::string generate_etag(std::string_view data);
+
 
 }
 }
