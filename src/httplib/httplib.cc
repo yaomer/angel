@@ -6,6 +6,8 @@
 
 #include <angel/mime.h>
 
+#include "util.h"
+
 namespace angel {
 namespace httplib {
 
@@ -62,7 +64,7 @@ StatusCode request::parse_line(buffer& buf)
     const char *end = p + res[1].size();
 
     const char *sep = std::find(p, end, '?');
-    req_path = uri::decode({p, (size_t)(sep - p)});
+    if (!uri_decode({p, (size_t)(sep - p)}, req_path)) return BadRequest;
 
     if (sep != end) { // have parameters
         auto args = util::split({sep + 1, (size_t)(end - sep - 1)}, '&');
@@ -71,7 +73,9 @@ StatusCode request::parse_line(buffer& buf)
             if (sep == arg.end()) return BadRequest;
             std::string_view key(arg.begin(), (size_t)(sep - arg.begin()));
             std::string_view value(sep + 1, (size_t)(arg.end() - sep - 1));
-            req_params.emplace(uri::decode(key), uri::decode(value));
+            std::string decoded_key, decoded_value;
+            if (!uri_decode(key, decoded_key) || !uri_decode(value, decoded_value)) return BadRequest;
+            req_params.emplace(std::move(decoded_key), std::move(decoded_value));
         }
     }
 
@@ -398,35 +402,58 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
         req.req_path = base_dir + req.path();
     }
 
-    if (util::is_regular_file(req.path())) {
-        res.add_header("Last-Modified", get_last_modified(req.path()));
-        res.add_header("Accept-Ranges", "bytes");
-        if (req.method() == GET) {
-            if (req.headers().count("Range")) {
-                handle_range_request(conn, req, res);
-            } else {
-                send_file(conn, res, req.path());
-            }
-        } else if (req.method() == HEAD) {
-            size_t length = util::get_file_size(req.path());
-            res.add_header("Content-Length", std::to_string(length));
-        }
-    } else {
+    if (!util::is_regular_file(req.path())) {
         res.set_status_code(NotFound);
         conn->send(res.str());
+        return;
+    }
+
+    auto last_modified_time = get_last_modified(req.path());
+    auto last_modified = format_last_modified(last_modified_time);
+
+    req.filesize = util::get_file_size(req.path());
+
+    res.add_header("Last-Modified", last_modified);
+    res.add_header("Accept-Ranges", "bytes");
+    res.add_header("ETag", generate_file_etag(last_modified_time, req.filesize));
+
+    auto it = req.headers().find("If-Unmodified-Since");
+    if (it != req.headers().end()) {
+        if (it->second != last_modified) {
+            res.set_status_code(PreconditionFailed);
+            conn->send(res.str());
+            return;
+        }
+    }
+
+    if (req.method() == GET) {
+        if (req.value_or("If-Modified-Since") == last_modified) {
+            res.set_status_code(NotModified);
+            conn->send(res.str());
+            return;
+        }
+        if (req.headers().count("Range")) {
+            handle_range_request(conn, req, res);
+        } else {
+            send_file(conn, req, res);
+        }
+    } else if (req.method() == HEAD) {
+        res.set_status_code(Ok);
+        res.add_header("Content-Length", std::to_string(req.filesize));
+        conn->send(res.str());
+        return;
     }
 }
 
-void HttpServer::send_file(const connection_ptr& conn, response& res, const std::string& path)
+void HttpServer::send_file(const connection_ptr& conn, request& req, response& res)
 {
-    int fd = open(path.c_str(), O_RDONLY);
-    auto filesize = util::get_file_size(fd);
+    int fd = open(req.path().c_str(), O_RDONLY);
 
     res.set_status_code(Ok);
-    res.add_header("Content-Type", get_mime_type(path));
+    res.add_header("Content-Type", get_mime_type(req.path()));
 
     // Send small files directly.
-    if (filesize < 256 * 1024) {
+    if (req.filesize < 256 * 1024) {
         buffer buf;
         while (buf.read_fd(fd) > 0) ;
         res.set_content({buf.peek(), buf.readable()});
@@ -435,9 +462,9 @@ void HttpServer::send_file(const connection_ptr& conn, response& res, const std:
         return;
     }
 
-    res.add_header("Content-Length", std::to_string(filesize));
+    res.add_header("Content-Length", std::to_string(req.filesize));
     conn->send(res.str());
-    conn->send_file(fd, 0, filesize);
+    conn->send_file(fd, 0, req.filesize);
     conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
 }
 
@@ -527,7 +554,7 @@ void HttpServer::handle_range_request(const connection_ptr& conn, request& req, 
 {
     byte_range_set range_set;
 
-    range_set.filesize = util::get_file_size(req.path());
+    range_set.filesize = req.filesize;
     range_set.mime_type = get_mime_type(req.path());
 
     // It's an empty file and hardly appears.
@@ -541,7 +568,7 @@ void HttpServer::handle_range_request(const connection_ptr& conn, request& req, 
     StatusCode code = range_set.parse_byte_ranges(req);
     switch (code) {
     case Ok:
-        send_file(conn, res, req.path());
+        send_file(conn, req, res);
         return;
     case RequestedRangeNotSatisfiable:
         res.set_status_code(RequestedRangeNotSatisfiable);

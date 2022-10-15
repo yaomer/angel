@@ -1,14 +1,60 @@
-#include <angel/httplib.h>
+#include "util.h"
 
 #include <sys/stat.h>
 
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
+
+#include <angel/util.h>
 
 namespace angel {
 namespace httplib {
+
+static constexpr const char *hexchars = "0123456789ABCDEF";
+
+std::string uri_encode(std::string_view uri)
+{
+    std::string res;
+    size_t n = uri.size();
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = uri[i];
+        if (!isalnum(c) && !strchr("-_.~", c)) {
+            res.push_back('%');
+            res.push_back(hexchars[c >> 4]);
+            res.push_back(hexchars[c & 0x0f]);
+        } else {
+            res.push_back(c);
+        }
+    }
+    return res;
+}
+
+static char from_hex(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    else if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    else return -1;
+}
+
+bool uri_decode(std::string_view uri, std::string& res)
+{
+    size_t n = uri.size();
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = uri[i];
+        if (c == '%') {
+            char c1 = from_hex(uri[++i]);
+            char c2 = from_hex(uri[++i]);
+            if (c1 == -1 || c2 == -1) return false;
+            res.push_back(((unsigned char)c1 << 4) | c2);
+        } else {
+            res.push_back(c);
+        }
+    }
+    return true;
+}
 
 // We only support rfc1123-date, do not support rfc850-date | asctime-date
 //
@@ -36,16 +82,6 @@ static std::string format_date(const Clock::time_point& now)
 std::string format_date()
 {
     return format_date(Clock::now());
-}
-
-std::string get_last_modified(const std::string& path)
-{
-    struct stat st;
-    ::stat(path.c_str(), &st);
-    auto msec = st.st_mtimespec.tv_sec * 1000000 + st.st_mtimespec.tv_nsec / 1000;
-    Clock::duration duration = std::chrono::microseconds(msec);
-    Clock::time_point point(duration);
-    return format_date(point);
 }
 
 static const std::unordered_set<std::string_view> wkdays = {
@@ -117,6 +153,42 @@ bool check_date_format(std::string_view date)
     if (s.value_or(-1) < 0 || s.value() > 59) return false;
 
     return (p[9] == 'G' && p[10] == 'M' && p[11] == 'P');
+}
+
+int64_t get_last_modified(const std::string& path)
+{
+    struct stat st;
+    ::stat(path.c_str(), &st);
+    auto msecs = (int64_t)st.st_mtimespec.tv_sec * 1000000 + st.st_mtimespec.tv_nsec / 1000;
+    return msecs;
+}
+
+std::string format_last_modified(int64_t msecs)
+{
+    Clock::duration duration = std::chrono::microseconds(msecs);
+    Clock::time_point point(duration);
+    return format_date(point);
+}
+
+// A strong entity tag MUST change whenever the associated
+// entity value changes in any way.
+// A weak entity tag SHOULD change whenever the associated
+// entity changes in a semantically significant way.
+
+std::string generate_file_etag(int64_t last_modified_time, off_t filesize)
+{
+    std::ostringstream oss;
+    oss << "\"" << std::hex << last_modified_time;
+    oss.unsetf(oss.hex);
+    oss << "-" << filesize << "\"";
+    return oss.str();
+}
+
+std::string generate_etag(std::string_view data)
+{
+    std::string etag(util::sha1(data, false).substr(0, 13));
+    etag.append("-").append(std::to_string(data.size()));
+    return etag;
 }
 
 }

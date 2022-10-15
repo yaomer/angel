@@ -106,7 +106,7 @@ public:
     const std::string& body() const { return req_body; }
     const Params& params() const { return req_params; }
     const Headers& headers() const { return req_headers; }
-    std::string_view value_or(std::string_view field, std::string_view value)
+    std::string_view value_or(std::string_view field, std::string_view value = "")
     {
         auto it = headers().find(field);
         return it != headers().end() ? it->second : value;
@@ -127,6 +127,7 @@ private:
     size_t length;
     bool chunked = false;
     ssize_t chunk_size = -1;
+    off_t filesize;
 
     Params req_params;
     Headers req_headers;
@@ -155,12 +156,6 @@ private:
     friend struct byte_range_set;
 };
 
-struct uri {
-    // Encode characters other than "-_.~", letters and numbers.
-    static std::string encode(std::string_view uri);
-    static std::string decode(std::string_view uri);
-};
-
 struct context {
     request request;
     response response;
@@ -186,20 +181,13 @@ private:
     void handle_static_file_request(const connection_ptr& conn, request& req, response& res);
     void handle_range_request(const connection_ptr& conn, request& req, response& res);
 
-    void send_file(const connection_ptr& conn, response& res, const std::string& path);
+    void send_file(const connection_ptr& conn, request& req, response& res);
 
     angel::server server;
     typedef std::unordered_map<std::string, ServerHandler> Table;
     std::unordered_map<Method, Table> router;
     std::string base_dir;
 };
-
-// Wed, 15 Nov 1995 06:25:24 GMT
-std::string format_date();
-// Get the last modification time of the file.
-std::string get_last_modified(const std::string& path);
-// Check rfc1123-date
-bool check_date_format(std::string_view date);
 
 }
 }
