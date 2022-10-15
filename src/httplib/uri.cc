@@ -36,8 +36,8 @@ std::string uri::decode(std::string_view uri)
     for (size_t i = 0; i < n; i++) {
         unsigned char c = uri[i];
         if (c == '%') {
-            char c1 = from_hex(uri[++i]);
-            char c2 = from_hex(uri[++i]);
+            unsigned char c1 = from_hex(uri[++i]);
+            unsigned char c2 = from_hex(uri[++i]);
             res.push_back((c1 << 4) | c2);
         } else {
             res.push_back(c);

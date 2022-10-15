@@ -49,52 +49,38 @@ StatusCode request::parse_line(buffer& buf)
         return RequestUriTooLong;
     }
 
-    const char *p = buf.peek();
-    const char *linep = buf.peek() + crlf;
+    auto res = util::split({buf.peek(), (size_t)crlf}, SP);
+    if (res.size() != 3) return BadRequest;
 
     // Parse Method
-    const char *next = std::find(p, linep, SP);
-    if (next == linep) return BadRequest;
-
-    std::string_view method(p, next - p);
-    auto it = methods.find(method);
+    auto it = methods.find(res[0]);
     if (it == methods.end()) return BadRequest;
     req_method = it->second;
-    p = next + 1;
 
     // Parse Request-URI
-    next = std::find(p, linep, SP);
-    if (next == linep) return BadRequest;
-    const char *version = next + 1;
+    const char *p = res[1].data();
+    const char *end = p + res[1].size();
 
-    auto decoded_uri = uri::decode({p, (size_t)(next - p)});
-    p = decoded_uri.data();
-    const char *end = p + decoded_uri.size();
+    const char *sep = std::find(p, end, '?');
+    req_path = uri::decode({p, (size_t)(sep - p)});
 
-    // Have Parameters ?
-    next = std::find(p, end, '?');
-    req_path.assign(p, next);
-    if (next != end) {
-        p = next + 1;
-        while (true) {
-            const char *eq = std::find(p, end, '=');
-            if (eq == end) return BadRequest;
-            std::string_view key(p, eq - p);
-            const char *sep = std::find(++eq, end, '&');
-            std::string_view value(eq, sep - eq);
-            req_params.emplace(key, value);
-            if (sep == end) break;
-            p = sep + 1;
+    if (sep != end) { // have parameters
+        auto args = util::split({sep + 1, (size_t)(end - sep - 1)}, '&');
+        for (auto& arg : args) {
+            sep = std::find(arg.begin(), arg.end(), '=');
+            if (sep == arg.end()) return BadRequest;
+            std::string_view key(arg.begin(), (size_t)(sep - arg.begin()));
+            std::string_view value(sep + 1, (size_t)(arg.end() - sep - 1));
+            req_params.emplace(uri::decode(key), uri::decode(value));
         }
     }
 
     // Parse HTTP-Version
-    req_version.assign(version, linep - version);
-    if (req_version.size() != 8 || !util::starts_with(req_version, "HTTP/"))
+    if (res[2].size() != 8 || !util::starts_with(res[2], "HTTP/"))
         return BadRequest;
-    if (util::ends_with(req_version, "1.0") || util::ends_with(req_version, "1.1")) {
-        // Nothing to do.
-    } else if (util::ends_with(req_version, "2.0")) {
+    if (util::ends_with(res[2], "1.0") || util::ends_with(res[2], "1.1")) {
+        req_version = res[2];
+    } else if (util::ends_with(res[2], "2.0")) {
         return HttpVersionNotSupported;
     } else {
         return BadRequest;
@@ -107,26 +93,28 @@ StatusCode request::parse_line(buffer& buf)
 // message-header = field-name ":" [ field-value ]
 StatusCode request::parse_header(buffer& buf)
 {
-    int crlf = buf.find_crlf();
-    if (crlf < 0) return Continue;
+    while (buf.readable() > 0) {
+        int crlf = buf.find_crlf();
+        if (crlf < 0) break;
 
-    const char *p = buf.peek();
+        if (buf.starts_with(CRLF)) {
+            buf.retrieve(crlf + 2);
+            if (headers().count("Host")) return Ok;
+            return BadRequest;
+        }
 
-    if (buf.starts_with(CRLF)) {
+        int pos = buf.find(":");
+        if (pos < 0) return BadRequest;
+
+        std::string_view field(buf.peek(), pos);
+        std::string_view value(util::trim({buf.peek() + pos + 1, (size_t)(crlf - pos - 1)}));
+        // Ignore header with null value.
+        if (!value.empty()) {
+            req_headers.emplace(field, value);
+        }
+
         buf.retrieve(crlf + 2);
-        if (headers().count("Host")) return Ok;
-        return BadRequest;
     }
-
-    int pos = buf.find(":");
-    if (pos < 0) return BadRequest;
-
-    std::string_view field(p, pos);
-    std::string_view value(util::trim({p + pos + 1, (size_t)(crlf - pos - 1)}));
-    if (value.empty()) return BadRequest;
-    req_headers.emplace(field, value);
-
-    buf.retrieve(crlf + 2);
     return Continue;
 }
 
