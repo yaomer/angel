@@ -132,7 +132,17 @@ StatusCode request::parse_header(buffer& buf)
 
 StatusCode request::parse_body_length()
 {
-    auto it = headers().find("Content-Length");
+    // The transfer-length of that body is determined by
+    // prefer use Transfer-Encoding header field.
+    auto it = headers().find("Transfer-Encoding");
+    if (it != headers().end()) {
+        if (it->second == "chunked") {
+            chunked = true;
+            return Ok;
+        }
+    }
+
+    it = headers().find("Content-Length");
     if (it == headers().end()) return Continue;
 
     auto r = util::svtoll(it->second);
@@ -144,6 +154,11 @@ StatusCode request::parse_body_length()
 
 StatusCode request::parse_body(buffer& buf)
 {
+    return chunked ? parse_body_by_chunked(buf) : parse_body_by_content_length(buf);
+}
+
+StatusCode request::parse_body_by_content_length(buffer& buf)
+{
     if (buf.readable() >= length) {
         req_body.append(buf.peek(), length);
         buf.retrieve(length);
@@ -154,6 +169,63 @@ StatusCode request::parse_body(buffer& buf)
         buf.retrieve_all();
         return Continue;
     }
+}
+
+// Chunked Transfer Coding
+//
+// Chunked-Body   = *chunk
+//                  last-chunk
+//                  trailer
+//                  CRLF
+//
+// chunk          = chunk-size [ chunk-extension ] CRLF
+//                  chunk-data CRLF
+// chunk-size     = 1*HEX
+// last-chunk     = 1*("0") [ chunk-extension ] CRLF
+
+static ssize_t from_hex_str(const std::string& str)
+{
+    char *end;
+    auto chunk_size = std::strtoll(str.c_str(), &end, 16);
+    if (end == str.data() + str.size()) {
+        return chunk_size;
+    } else {
+        return -1;
+    }
+}
+
+StatusCode request::parse_body_by_chunked(buffer& buf)
+{
+    while (buf.readable() > 0) {
+        // Parse chunk-size <CRLF>
+        if (chunk_size == -1) {
+            int crlf = buf.find_crlf();
+            if (crlf < 0) return Continue;
+            chunk_size = from_hex_str({buf.peek(), (size_t)crlf});
+            buf.retrieve(crlf + 2);
+            if (chunk_size < 0) return BadRequest;
+            if (chunk_size == 0) { // last-chunk
+                chunk_size = -1;
+                chunked = false;
+                return Ok;
+            }
+        }
+        // chunk-data <CRLF>
+        if (buf.readable() > chunk_size) {
+            if (buf.readable() < chunk_size + 2) return Continue;
+            req_body.append(buf.peek(), chunk_size);
+            buf.retrieve(chunk_size);
+            if (!buf.starts_with(CRLF)) return BadRequest;
+            buf.retrieve(2);
+            chunk_size = -1;
+        } else { // Not Enough
+            req_body.append(buf.peek(), buf.readable());
+            chunk_size -= buf.readable();
+            buf.retrieve_all();
+            return Continue;
+        }
+    }
+    return Continue;
 }
 
 void request::clear()
@@ -220,13 +292,6 @@ std::string& response::str()
     return buf;
 }
 
-#define switch_case(code, stmt1, stmt2) \
-    switch ((code)) { \
-    case Ok: { stmt1; break; } \
-    case Continue: { stmt2; break; } \
-    default: goto err; \
-    }
-
 void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
 {
     StatusCode code;
@@ -237,20 +302,45 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
     while (buf.readable() > 0) {
         switch (ctx.state) {
         case ParseLine:
-            switch_case(code = req.parse_line(buf),
-                        ctx.state = ParseHeader,
-                        )
+            switch (code = req.parse_line(buf)) {
+            case Ok:
+                ctx.state = ParseHeader;
+                break;
+            case Continue:
+                return;
+            default:
+                goto err;
+            }
             break;
         case ParseHeader:
-            switch_case(code = req.parse_header(buf),
-                        switch_case(code = req.parse_body_length(),
-                                    ctx.state = ParseBody,
-                                    process_request(conn)),
-                        )
+            switch (code = req.parse_header(buf)) {
+            case Ok:
+                switch (code = req.parse_body_length()) {
+                case Ok:
+                    ctx.state = ParseBody;
+                    break;
+                case Continue:
+                    process_request(conn);
+                    break;
+                default:
+                    goto err;
+                }
+                break;
+            case Continue:
+                return;
+            default:
+                goto err;
+            }
             break;
         case ParseBody:
-            if (req.parse_body(buf) == Ok) {
+            switch (code = req.parse_body(buf)) {
+            case Ok:
                 process_request(conn);
+                break;
+            case Continue:
+                return;
+            default:
+                goto err;
             }
             break;
         }
@@ -339,60 +429,28 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
     }
 }
 
-static const int ChunkSize = 1024 * 512;
-
-static void send_chunk(const connection_ptr& conn, buffer& buf)
-{
-    char x[16];
-    snprintf(x, sizeof(x), "%X%s", (unsigned)buf.readable(), CRLF);
-    conn->send(x);
-    buf.append(CRLF);
-    conn->send(buf.peek(), buf.readable());
-}
-
 void HttpServer::send_file(const connection_ptr& conn, response& res, const std::string& path)
 {
-    buffer buf;
-    bool chunked = false;
     int fd = open(path.c_str(), O_RDONLY);
+    auto filesize = util::get_file_size(fd);
 
     res.set_status_code(Ok);
     res.add_header("Content-Type", get_mime_type(path));
 
-    auto filesize = util::get_file_size(path);
-    // It's an empty file and hardly appears.
-    if (filesize == 0) {
+    // Send small files directly.
+    if (filesize < 256 * 1024) {
+        buffer buf;
+        while (buf.read_fd(fd) > 0) ;
+        res.set_content({buf.peek(), buf.readable()});
         conn->send(res.str());
+        close(fd);
         return;
     }
 
-    if (filesize >= ChunkSize) {
-        res.add_header("Transfer-Encoding", "chunked");
-        conn->send(res.str());
-        chunked = true;
-    }
-
-    while (buf.read_fd(fd) > 0) {
-        if (buf.readable() >= ChunkSize) {
-            send_chunk(conn, buf);
-            buf.retrieve_all();
-        }
-    }
-    if (buf.readable() > 0) {
-        if (chunked) {
-            send_chunk(conn, buf);
-        } else {
-            res.set_content({buf.peek(), buf.readable()});
-            conn->send(res.str());
-        }
-    }
-    if (chunked) {
-        std::string final_chunk;
-        final_chunk.append("0").append(CRLF);
-        conn->send(final_chunk);
-    }
-
-    close(fd);
+    res.add_header("Content-Length", std::to_string(filesize));
+    conn->send(res.str());
+    conn->send_file(fd, 0, filesize);
+    conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
 }
 
 // Byte Ranges
@@ -413,6 +471,7 @@ struct byte_range {
     off_t last_byte_pos;
 
     std::string to_str();
+    off_t length() { return last_byte_pos - first_byte_pos + 1; }
 };
 
 struct byte_range_set {
@@ -465,7 +524,7 @@ static bool map_file_range(std::string& buf, int fd, byte_range& range)
 {
     off_t offset = __map_offset(range.first_byte_pos);
     off_t diff = range.first_byte_pos - offset;
-    size_t len = range.last_byte_pos - range.first_byte_pos + 1;
+    size_t len = range.length();
     char *start = reinterpret_cast<char*>(mmap(nullptr, len + diff, PROT_READ, MAP_SHARED, fd, offset));
     if (start == MAP_FAILED) return false;
     buf.append(start + diff, len).append(CRLF);
@@ -473,7 +532,7 @@ static bool map_file_range(std::string& buf, int fd, byte_range& range)
     return true;
 }
 
-static const int BufferedSize = ChunkSize;
+static const int BufferedSize = 1024 * 256;
 
 // Range: bytes=0-100,-100\r\n
 void HttpServer::handle_range_request(const connection_ptr& conn, request& req, response& res)
@@ -483,6 +542,7 @@ void HttpServer::handle_range_request(const connection_ptr& conn, request& req, 
     range_set.filesize = util::get_file_size(req.path());
     range_set.mime_type = get_mime_type(req.path());
 
+    // It's an empty file and hardly appears.
     if (range_set.filesize == 0) {
         res.set_status_code(Ok);
         res.add_header("Content-Type", range_set.mime_type);
@@ -594,7 +654,7 @@ void byte_range_set::build_multipart_header(response& res)
         len += field_type.size() + sep + mime_type.size() + crlf;
         len += field_range.size() + sep + content_range(range.to_str(), filesize).size() + crlf;
         len += crlf;
-        len += range.last_byte_pos - range.first_byte_pos + 1 + crlf;
+        len += range.length() + crlf;
     }
     // Last boundary = "--" boundary "--" <CRLF>
     len += 2 + boundary.size() + 2 + crlf;

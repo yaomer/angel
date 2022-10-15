@@ -116,6 +116,8 @@ private:
     StatusCode parse_header(buffer& buf);
     StatusCode parse_body_length();
     StatusCode parse_body(buffer& buf);
+    StatusCode parse_body_by_content_length(buffer& buf);
+    StatusCode parse_body_by_chunked(buffer& buf);
     void clear();
 
     Method req_method;
@@ -123,6 +125,8 @@ private:
     std::string req_version;
     std::string req_body;
     size_t length;
+    bool chunked = false;
+    ssize_t chunk_size = -1;
 
     Params req_params;
     Headers req_headers;
