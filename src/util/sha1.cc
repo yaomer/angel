@@ -6,12 +6,6 @@
 namespace angel {
 namespace util {
 
-static inline void assert_little_endian()
-{
-    int a = 1;
-    assert(*(char *)&a == 1);
-}
-
 static const uint32_t ChunkWords = 16;
 static const uint32_t ChunkBytes = ChunkWords * 4;
 
@@ -24,17 +18,28 @@ static const uint32_t ChunkBytes = ChunkWords * 4;
 //          high    <-   low
 //
 
-static void padding(std::string& buf, uint64_t origin_bits)
+static void padding(std::string& buf, std::string_view& data)
 {
-    // Padding bit '1'
-    buf.push_back((char)0x80);
+    // Padding bit '1' (0x80)
     // Padding bit '0' to (total_bits % 512 == 448)
-    size_t r = (buf.size() * 8) % 512;
+    int r = ((data.size() + 1) * 8) % 512;
     int k = r <= 448 ? 0 : 1;
-    buf.insert(buf.size(), (k * 512 + 448 - r) / 8, (char)0x00);
+    int padding_zeros = (k * 512 + 448 - r) / 8;
+    int padding_bytes = 1 + padding_zeros + 8;
+
+    int remain_bytes = ChunkBytes * (k + 1) - padding_bytes;
+    buf.append(data.data() + data.size() - remain_bytes, remain_bytes);
+
+    buf.append(1, (char)0x80);
+
+    buf.append(padding_zeros, (char)0x00);
+
     // Padding 64-bits(8-bytes) origin data bits
-    uint64_t encoded_bits = angel::sockops::hton64(origin_bits);
+    uint64_t encoded_bits = sockops::hton64(data.size() * 8);
     buf.append(reinterpret_cast<const char*>(&encoded_bits), 8);
+
+    data.remove_suffix(remain_bytes);
+    assert(data.size() % ChunkBytes == 0);
     assert(buf.size() % ChunkBytes == 0);
 }
 
@@ -125,17 +130,21 @@ static std::string to_hex_digest(uint32_t h[5])
 
 std::string sha1(std::string_view data, bool normal)
 {
-    std::string buf{ data };
+    std::string buf;
+    buf.reserve(ChunkBytes);
+    padding(buf, data);
 
-    assert_little_endian();
-    padding(buf, data.size() * 8);
-
-    const char *p = buf.data();
     uint32_t h[] = { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0 };
-    while (p < buf.data() + buf.size()) {
-        chunk_cal(p, h);
-        p += ChunkBytes;
+
+    while (!data.empty()) {
+        chunk_cal(data.data(), h);
+        data.remove_prefix(ChunkBytes);
     }
+    // Calculate last one or two padding chunk(s).
+    chunk_cal(buf.data(), h);
+    if (buf.size() > ChunkBytes)
+        chunk_cal(buf.data() + ChunkBytes, h);
+
     return normal ? to_digest(h) : to_hex_digest(h);
 }
 
