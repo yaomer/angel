@@ -106,11 +106,6 @@ public:
     const std::string& body() const { return req_body; }
     const Params& params() const { return req_params; }
     const Headers& headers() const { return req_headers; }
-    std::string_view value_or(std::string_view field, std::string_view value = "")
-    {
-        auto it = headers().find(field);
-        return it != headers().end() ? it->second : value;
-    }
 private:
     StatusCode parse_line(buffer& buf);
     StatusCode parse_header(buffer& buf);
@@ -119,6 +114,8 @@ private:
     StatusCode parse_body_by_content_length(buffer& buf);
     StatusCode parse_body_by_chunked(buffer& buf);
     void clear();
+
+    int state = ParseLine;
 
     Method req_method;
     std::string req_path;
@@ -161,7 +158,6 @@ private:
 struct context {
     request request;
     response response;
-    int state = ParseLine;
 };
 
 enum ConditionCode {
@@ -183,11 +179,13 @@ public:
     void start();
 private:
     void message_handler(const connection_ptr&, buffer&);
-    void process_request(const connection_ptr&);
+    void process_request(const connection_ptr&, request& req, response& res);
 
-    bool handle_register_request(const connection_ptr& conn, request& req, response& res);
-    void handle_static_file_request(const connection_ptr& conn, request& req, response& res);
+    bool handle_register_request(request& req, response& res);
+    bool handle_static_file_request(const connection_ptr& conn, request& req, response& res);
     void handle_range_request(const connection_ptr& conn, request& req, response& res);
+
+    bool keepalive(request& req);
 
     ConditionCode handle_conditional(const connection_ptr& conn, request& req, response& res);
     ConditionCode if_match(const connection_ptr& conn, request& req, response& res);
@@ -195,6 +193,8 @@ private:
     ConditionCode if_none_match(const connection_ptr& conn, request& req, response& res);
     ConditionCode if_range(const connection_ptr& conn, request& req, response& res);
     ConditionCode if_unmodified_since(const connection_ptr& conn, request& req, response& res);
+
+    ConditionCode expect(const connection_ptr& conn, request& req, response& res);
 
     void send_file(const connection_ptr& conn, request& req, response& res);
 

@@ -63,7 +63,6 @@ StatusCode request::parse_line(buffer& buf)
     const char *p = res[1].data();
     const char *end = p + res[1].size();
 
-    req_path.clear();
     const char *sep = std::find(p, end, '?');
     if (!uri_decode({p, (size_t)(sep - p)}, req_path)) return BadRequest;
 
@@ -104,8 +103,7 @@ StatusCode request::parse_header(buffer& buf)
 
         if (buf.starts_with(CRLF)) {
             buf.retrieve(crlf + 2);
-            if (headers().count("Host")) return Ok;
-            return BadRequest;
+            return Ok;
         }
 
         int pos = buf.find(":");
@@ -223,6 +221,9 @@ StatusCode request::parse_body_by_chunked(buffer& buf)
 
 void request::clear()
 {
+    state = ParseLine;
+    req_path.clear();
+    req_version.clear();
     req_body.clear();
     req_params.clear();
     req_headers.clear();
@@ -291,13 +292,14 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
     if (!conn->is_connected()) return;
     auto& ctx = std::any_cast<context&>(conn->get_context());
     auto& req = ctx.request;
+    auto& res = ctx.response;
     // printf("%s\n", buf.c_str());
     while (buf.readable() > 0) {
-        switch (ctx.state) {
+        switch (req.state) {
         case ParseLine:
             switch (code = req.parse_line(buf)) {
             case Ok:
-                ctx.state = ParseHeader;
+                req.state = ParseHeader;
                 break;
             case Continue:
                 return;
@@ -308,12 +310,21 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
         case ParseHeader:
             switch (code = req.parse_header(buf)) {
             case Ok:
+                if (!req.headers().count("Host")) {
+                    code = BadRequest;
+                    goto err;
+                }
+                if (expect(conn, req, res) == Failed) {
+                    req.clear();
+                    return;
+                }
+
                 switch (code = req.parse_body_length()) {
                 case Ok:
-                    ctx.state = ParseBody;
+                    req.state = ParseBody;
                     break;
                 case Continue:
-                    process_request(conn);
+                    process_request(conn, req, res);
                     break;
                 default:
                     goto err;
@@ -328,7 +339,7 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
         case ParseBody:
             switch (code = req.parse_body(buf)) {
             case Ok:
-                process_request(conn);
+                process_request(conn, req, res);
                 break;
             case Continue:
                 return;
@@ -346,27 +357,32 @@ err:
     conn->close();
 }
 
-void HttpServer::process_request(const connection_ptr& conn)
+void HttpServer::process_request(const connection_ptr& conn, request& req, response& res)
 {
-    auto& ctx = std::any_cast<context&>(conn->get_context());
-    auto& req = ctx.request;
-    auto& res = ctx.response;
-
-    auto connection = req.value_or("Connection", "close");
-    bool keepalive = util::equal_case(connection, "keep-alive");
-    res.add_header("Connection", keepalive ? "keep-alive" : "close");
+    bool is_keepalive = keepalive(req);
+    res.add_header("Connection", is_keepalive ? "keep-alive" : "close");
 
     switch (req.method()) {
     case GET:
-        if (!handle_register_request(conn, req, res)) {
-            handle_static_file_request(conn, req, res);
+        if (!handle_register_request(req, res)) {
+            if (!handle_static_file_request(conn, req, res)) {
+                res.set_status_code(NotFound);
+                conn->send(res.str());
+            }
+        } else {
+            if (!handle_static_file_request(conn, req, res)) {
+                conn->send(res.str());
+            }
         }
         break;
     case HEAD:
-        handle_static_file_request(conn, req, res);
+        if (!handle_static_file_request(conn, req, res)) {
+            res.set_status_code(NotFound);
+            conn->send(res.str());
+        }
         break;
     case POST:
-        if (!handle_register_request(conn, req, res)) {
+        if (!handle_register_request(req, res)) {
             res.set_status_code(NotFound);
             conn->send(res.str());
         }
@@ -377,25 +393,30 @@ void HttpServer::process_request(const connection_ptr& conn)
         break;
     }
 
-    ctx.state = ParseLine;
     req.clear();
 
-    if (!keepalive) {
+    if (!is_keepalive) {
         conn->close();
     }
 }
 
-bool HttpServer::handle_register_request(const connection_ptr& conn, request& req, response& res)
+bool HttpServer::keepalive(request& req)
+{
+    auto it = req.headers().find("Connection");
+    if (it == req.headers().end()) return false;
+    return util::equal_case(it->second, "keep-alive");
+}
+
+bool HttpServer::handle_register_request(request& req, response& res)
 {
     auto& table = router.at(req.method());
     auto it = table.find(req.path());
     if (it == table.end()) return false;
     it->second(req, res);
-    conn->send(res.str());
     return true;
 }
 
-void HttpServer::handle_static_file_request(const connection_ptr& conn, request& req, response& res)
+bool HttpServer::handle_static_file_request(const connection_ptr& conn, request& req, response& res)
 {
     if (req.path() == "/") {
         req.req_path += "index.html";
@@ -403,9 +424,7 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
     req.req_path = base_dir + req.path();
 
     if (!util::is_regular_file(req.path())) {
-        res.set_status_code(NotFound);
-        conn->send(res.str());
-        return;
+        return false;
     }
 
     auto last_modified_time = get_last_modified(req.path());
@@ -418,7 +437,7 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
     res.add_header("Accept-Ranges", "bytes");
     res.add_header("ETag", req.etag);
 
-    if (handle_conditional(conn, req, res) == Failed) return;
+    if (handle_conditional(conn, req, res) == Failed) return true;
 
     if (req.method() == GET) {
         if (req.headers().count("Range")) {
@@ -430,8 +449,8 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
         res.set_status_code(Ok);
         res.add_header("Content-Length", std::to_string(req.filesize));
         conn->send(res.str());
-        return;
     }
+    return true;
 }
 
 // If-Match
@@ -446,38 +465,30 @@ void HttpServer::handle_static_file_request(const connection_ptr& conn, request&
 // The purpose of these features is to allow efficient updates of
 // cached information with a minimum amount of transaction overhead.
 
-// Because they are mutually exclusive, we call them
-// in the following reasonable order.
+// ETag/If-None-Match has a higher priority than Last-Modified/If-Modified-Since,
+// And (If-None-Match, If-Modified-Since) and (If-Match, If-Unmodified-Since)
+// are mutually exclusive.
 //
-// If-Match (exclusive: If-None-Match, If-Modified-Since)
-// If-None-Match (exclusive: If-Match, If-Unmodified-Since)
-//
-// If-Match -> If-Unmodified-Since
-// If-None-Match -> If-Modified-Since
+// So we check the conditions in the following order:
+// If-None-Match
 // If-Modified-Since
+// If-Match
 // If-Unmodified-Since
+//
 ConditionCode HttpServer::handle_conditional(const connection_ptr& conn, request& req, response& res)
 {
     if_range(conn, req, res);
 
-    auto code = if_match(conn, req, res);
-    switch (code) {
-    case Failed: return Failed;
-    case Successful:
-        return if_unmodified_since(conn, req, res);
-    case NoHeader: // No If-Match header
-        code = if_none_match(conn, req, res);
-        switch (code) {
-        case Failed: return Failed;
-        case Successful:
-            return if_modified_since(conn, req, res);
-        case NoHeader: // No If-None-Match header
-            code = if_modified_since(conn, req, res);
-            if (code != NoHeader) return code;
-            // No If-Modified-Since header
-            return if_unmodified_since(conn, req, res);
-        }
-    }
+    auto code = if_none_match(conn, req, res);
+    if (code != NoHeader) return code;
+
+    code = if_modified_since(conn, req, res);
+    if (code != NoHeader) return code;
+
+    code = if_match(conn, req, res);
+    if (code != NoHeader) return code;
+
+    return if_unmodified_since(conn, req, res);
 }
 
 // If-Match = "If-Match" ":" ( "*" | 1#entity-tag )
@@ -551,7 +562,6 @@ ConditionCode HttpServer::if_none_match(const connection_ptr& conn, request& req
     // That is, if no entity tags match, then the server MUST NOT return
     // a 304 (Not Modified) response.
     //
-    req.req_headers.erase("If-Modified-Since");
     return Successful;
 end:
     if (req.method() == GET || req.method() == HEAD) {
@@ -615,6 +625,24 @@ ConditionCode HttpServer::if_unmodified_since(const connection_ptr& conn, reques
         return Successful;
     }
     res.set_status_code(PreconditionFailed);
+    conn->send(res.str());
+    return Failed;
+}
+
+// Expect       =  "Expect" ":" 1#expectation
+// expectation  =  "100-continue" | expectation-extension
+//
+// The Expect request-header field is used to indicate that particular
+// server behaviors are required by the client.
+ConditionCode HttpServer::expect(const connection_ptr& conn, request& req, response& res)
+{
+    auto it = req.headers().find("Expect");
+    if (it == req.headers().end()) return NoHeader;
+
+    if (util::equal_case(it->second, "100-continue")) {
+        return Successful;
+    }
+    res.set_status_code(ExpectationFailed);
     conn->send(res.str());
     return Failed;
 }
