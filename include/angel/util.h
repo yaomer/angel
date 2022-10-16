@@ -30,6 +30,7 @@ std::string base64_decode(std::string_view data);
 // If normal is true, generate a 20-byte digest;
 // else generate a 40-byte hex digest.
 std::string sha1(std::string_view data, bool normal);
+std::string sha1_file(const std::string& path, bool normal);
 
 // check ipv4 addr format
 bool check_ip(std::string_view ipv4_addr);
@@ -47,6 +48,7 @@ typedef std::vector<std::string> ConfigParam;
 typedef std::vector<ConfigParam> ConfigParamlist;
 ConfigParamlist parse_conf(const char *pathname);
 
+ssize_t read_file(int fd, const char *buf, size_t len);
 bool write_file(int fd, const char *buf, size_t len);
 bool copy_file(const std::string& from, const std::string& to);
 
@@ -55,6 +57,8 @@ bool is_directory(const std::string& path);
 
 off_t get_file_size(const std::string& path);
 off_t get_file_size(int fd);
+
+off_t page_aligned(off_t offset);
 
 //===================================================
 //========== Some common string operations ==========

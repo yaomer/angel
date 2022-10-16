@@ -36,6 +36,23 @@ ConfigParamlist parse_conf(const char *pathname)
     return paramlist;
 }
 
+ssize_t read_file(int fd, const char *buf, size_t len)
+{
+    size_t nbytes = len;
+    while (len > 0) {
+        ssize_t n = read(fd, (void*)buf, len);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            return -1;
+        }
+        if (n == 0) break;
+        buf += n;
+        len -= n;
+    }
+    return nbytes - len;
+}
+
 bool write_file(int fd, const char *buf, size_t len)
 {
     while (len > 0) {
@@ -63,10 +80,8 @@ bool copy_file(const std::string& from, const std::string& to)
     if (fd1 < 0 || fd2 < 0) goto end;
 
     while (true) {
-        ssize_t n = read(fd1, buf, sizeof(buf));
+        ssize_t n = read_file(fd1, buf, sizeof(buf));
         if (n < 0) {
-            if (errno == EINTR)
-                continue;
             rc = false;
             break;
         }
@@ -108,6 +123,13 @@ off_t get_file_size(int fd)
     struct stat st;
     ::fstat(fd, &st);
     return st.st_size;
+}
+
+off_t page_aligned(off_t offset)
+{
+    static const int pagesize = getpagesize();
+
+    return (offset / pagesize) * pagesize;
 }
 
 }
