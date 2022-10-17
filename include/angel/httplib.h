@@ -101,9 +101,9 @@ typedef std::unordered_map<field, std::string, field_hash> Headers;
 class request {
 public:
     Method method() const { return req_method; }
-    const std::string& path() const { return req_path; }
-    const std::string& version() const { return req_version; }
-    const std::string& body() const { return req_body; }
+    const std::string& path() const { return abs_path; }
+    const std::string& version() const { return http_version; }
+    const std::string& body() const { return message_body; }
     const Params& params() const { return req_params; }
     const Headers& headers() const { return req_headers; }
 private:
@@ -118,12 +118,13 @@ private:
     int state = ParseLine;
 
     Method req_method;
-    std::string req_path;
-    std::string req_version;
-    std::string req_body;
+    std::string abs_path;
+    std::string http_version;
+    std::string message_body;
     size_t length;
     bool chunked = false;
     ssize_t chunk_size = -1;
+    bool has_file;
     off_t filesize;
     std::string last_modified;
     std::string etag;
@@ -145,12 +146,14 @@ private:
     std::string& str();
 
     void append_status_line();
+    void clear_content_if_none_file();
 
-    int status_code;
+    StatusCode status_code;
     std::string status_message;
     Headers headers;
     std::string content;
     std::string buf;
+    bool none_file;
     friend class HttpServer;
     friend struct byte_range_set;
 };
@@ -175,7 +178,12 @@ public:
     HttpServer& Post(std::string_view path, const ServerHandler handler);
     // For static file
     void set_base_dir(std::string_view dir);
+    // Set parallel threads for request
     void set_parallel(unsigned n);
+    // Set how to generate file etag
+    // 1) default: file mtime "-" file size
+    // 2) sha1: file sha1 digest "-" file size
+    void generate_file_etag_by(std::string_view way);
     void start();
 private:
     void message_handler(const connection_ptr&, buffer&);
@@ -197,11 +205,14 @@ private:
     ConditionCode expect(const connection_ptr& conn, request& req, response& res);
 
     void send_file(const connection_ptr& conn, request& req, response& res);
+    void update_file(const connection_ptr& conn, request& req, response& res);
+    void delete_file(const connection_ptr& conn, request& req, response& res);
 
     angel::server server;
     typedef std::unordered_map<std::string, ServerHandler> Table;
     std::unordered_map<Method, Table> router;
     std::string base_dir;
+    bool generate_file_etag_by_sha1 = false;
 };
 
 }

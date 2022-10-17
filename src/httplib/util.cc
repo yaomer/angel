@@ -234,10 +234,18 @@ std::string generate_file_etag(int64_t last_modified_time, off_t filesize)
     return oss.str();
 }
 
+std::string generate_file_etag(const std::string& path, off_t filesize)
+{
+    std::string etag("\"");
+    etag.append(util::sha1_file(path, false));
+    etag.append("-").append(std::to_string(filesize));
+    return etag.append("\"");
+}
+
 std::string generate_etag(std::string_view data)
 {
     std::string etag("\"");
-    etag.append(util::sha1(data, false).substr(0, 20));
+    etag.append(util::sha1(data, false));
     etag.append("-").append(std::to_string(data.size()));
     return etag.append("\"");
 }
