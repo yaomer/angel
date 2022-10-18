@@ -5,11 +5,13 @@
 
 #include <angel/websocket.h>
 
-#include <iostream>
+#include <fcntl.h>
+
 #include <numeric>
 
 #include <angel/sockops.h>
 #include <angel/util.h>
+#include <angel/logger.h>
 
 namespace angel {
 
@@ -46,44 +48,44 @@ void WebSocketContext::message_handler(const connection_ptr& conn, buffer& buf)
     WebSocketServer *ws = context.ws;
     while (buf.readable() > 0) {
         switch (context.state) {
-        case WebSocketContext::Handshake:
+        case Handshake:
             switch (context.handshake(conn, buf)) {
-            case WebSocketContext::HandshakeOK:
+            case HandshakeOK:
                 if (ws->onopen) ws->onopen(context);
                 break;
-            case WebSocketContext::HandshakeError:
+            case HandshakeError:
                 if (ws->onerror) ws->onerror(context);
                 conn->close();
                 return;
-            case WebSocketContext::Handshake:
+            case Handshake:
                 return;
             }
             break;
-        case WebSocketContext::Establish:
+        case Establish:
             switch (context.decode(buf)) {
-            case WebSocketContext::Ok:
+            case Ok:
                 if (!context.rcvfragment && ws->onmessage)
                     ws->onmessage(context);
                 break;
-            case WebSocketContext::Close:
+            case Close:
                 if (ws->onclose) ws->onclose(context);
                 frame = (0x88 << 8) | 0x00;
                 conn->send(&frame, sizeof(frame));
                 conn->close();
                 return;
-            case WebSocketContext::Ping:
+            case Ping:
                 frame = (0x8A << 8) | 0x00;
                 conn->send(&frame, sizeof(frame));
                 break;
-            case WebSocketContext::Pong:
+            case Pong:
                 // Unidirectional Heartbeat
                 // Indicates that the sender is still alive.
                 break;
-            case WebSocketContext::Error:
+            case Error:
                 if (ws->onerror) ws->onerror(context);
                 conn->close();
                 return;
-            case WebSocketContext::NotEnough:
+            case NotEnough:
                 return;
             }
             break;
@@ -101,53 +103,63 @@ void WebSocketContext::message_handler(const connection_ptr& conn, buffer& buf)
 // Sec-WebSocket-Protocol: chat # Optional
 // Sec-WebSocket-Version: 13
 // ...
-int WebSocketContext::handshake(const char *line, const char *end)
+int WebSocketContext::handshake(buffer& buf, size_t crlf)
 {
+    const char *line = buf.peek();
     if (read_request_line) {
         read_request_line = false;
-        if (strncasecmp(line, "GET ", 4)) return HandshakeError;
+        // GET <SP> URI <SP> HTTP-Version <CRLF>
+        if (!buf.starts_with("GET ")) return HandshakeError;
         std::string uri; // Identify the websocket service endpoint.
-        const char *p = std::find_if(line + 4, end, isspace);
+        const char *p = std::find(line + 4, line + crlf - 4, ' ');
         uri.assign(line + 4, p);
-        if (strncasecmp(p + 1, "HTTP/1.1", 8))
-            return HandshakeError;
+        std::string version(p + 1, line + crlf);
+        if (version != "HTTP/1.1") return HandshakeError;
+        buf.retrieve(crlf + 2);
+        return Handshake;
     }
-    if (strncmp(line, "\r\n", 2) == 0) {
+    // <CRLF>
+    if (buf.starts_with("\r\n")) {
+        buf.retrieve(2);
         return (required_request_headers == 0) ? HandshakeOK : HandshakeError;
     }
-    if (strncasecmp(line, "Host: ", 6) == 0) {
+    if (buf.starts_with_case("Host:")) {
         required_request_headers--;
-        host.assign(line + 6, end);
-    } else if (strncasecmp(line, "Connection: ", 12) == 0) {
+        host.assign(util::trim({line + 5, crlf - 5}));
+    } else if (buf.starts_with_case("Connection:")) {
         required_request_headers--;
-        if (strncasecmp(line + 12, "Upgrade", 7))
+        std::string_view upgrade(util::trim({line + 11, crlf - 11}));
+        if (!util::equal_case(upgrade, "Upgrade"))
             return HandshakeError;
-    } else if (strncasecmp(line, "Upgrade: ", 9) == 0) {
+    } else if (buf.starts_with_case("Upgrade:")) {
         required_request_headers--;
-        if (strncasecmp(line + 9, "websocket", 9))
+        std::string_view websocket(util::trim({line + 8, crlf - 8}));
+        if (!util::equal_case(websocket, "websocket"))
             return HandshakeError;
-    } else if (strncasecmp(line, "Sec-WebSocket-Key: ", 19) == 0) {
+    } else if (buf.starts_with_case("Sec-WebSocket-Key:")) {
         required_request_headers--;
-        sec_websocket_accept(std::string(line + 19, std::find_if(line + 19, end, isspace)));
-    } else if (strncasecmp(line, "Sec-WebSocket-Version: ", 23) == 0) {
+        sec_websocket_accept(util::trim({line + 18, crlf - 18}));
+    } else if (buf.starts_with_case("Sec-WebSocket-Version:")) {
         required_request_headers--;
-        if (atoi(line + 23) != 13)
-            return HandshakeError;
-    } else if (strncasecmp(line, "Origin: ", 8) == 0) {
+        int version = util::svtoi(util::trim({line + 22, crlf - 22})).value_or(0);
+        if (version != 13) return HandshakeError;
+    } else if (buf.starts_with_case("Origin:")) {
         required_request_headers--;
-        origin.assign(line + 8, end);
+        origin.assign(util::trim({line + 7, crlf - 7}));
     } else {
         // Other headers
     }
-
+    buf.retrieve(crlf + 2);
     return Handshake;
 }
 
-void WebSocketContext::sec_websocket_accept(std::string key)
+void WebSocketContext::sec_websocket_accept(std::string_view key)
 {
     static const char *guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    key = util::sha1(key + guid, true);
-    SecWebSocketAccept = util::base64_encode(key);
+
+    std::string sec_key(key);
+    sec_key = util::sha1(sec_key + guid, true);
+    SecWebSocketAccept = util::base64_encode(sec_key);
 }
 
 // Server:
@@ -176,18 +188,16 @@ int WebSocketContext::handshake(const connection_ptr& conn, buffer& buf)
     while (buf.readable() > 0) {
         int crlf = buf.find_crlf();
         if (crlf < 0) break;
-        context.state = context.handshake(buf.peek(), buf.peek() + crlf);
+        context.state = context.handshake(buf, crlf);
         switch (context.state) {
-        case WebSocketContext::HandshakeOK:
-            buf.retrieve(2);
-            context.state = WebSocketContext::Establish;
+        case HandshakeOK:
+            context.state = Establish;
             context.handshake_ok(conn);
             return HandshakeOK;
-        case WebSocketContext::HandshakeError:
+        case HandshakeError:
             context.handshake_error(conn);
             return HandshakeError;
         }
-        buf.retrieve(crlf + 2);
     }
     return Handshake;
 }
@@ -330,11 +340,10 @@ int WebSocketContext::decode(buffer& raw_buf)
     return Ok;
 }
 
-void WebSocketContext::encode(std::string_view raw_buf, uint8_t first_byte)
+void WebSocketContext::encode(uint64_t raw_size, uint8_t first_byte)
 {
     encoded_buffer.push_back(first_byte);
 
-    uint64_t raw_size = raw_buf.size();
     if (raw_size <= 125) { // 0 x x x x x x x
         encoded_buffer.push_back((unsigned char)raw_size);
     } else if (raw_size <= std::numeric_limits<uint16_t>().max()) {
@@ -346,16 +355,23 @@ void WebSocketContext::encode(std::string_view raw_buf, uint8_t first_byte)
         uint64_t encoded_size = sockops::hton64(raw_size);
         encoded_buffer.append(reinterpret_cast<const char*>(&encoded_size), 8);
     }
-    encoded_buffer.append(raw_buf);
 }
+
+static const int BufferedSize = 4096;
 
 #define opcode(is_binary_type) ((is_binary_type) ? 2 : 1)
 
 void WebSocketContext::send(std::string_view message)
 {
     // 1 0 0 0 0 0 0 0 | (1 or 2)
-    encode(message, 0x80 | opcode(is_binary_type));
-    conn->send(encoded_buffer);
+    encode(message.size(), 0x80 | opcode(is_binary_type));
+    if (message.size() >= BufferedSize) {
+        conn->send(encoded_buffer);
+        conn->send(message);
+    } else {
+        encoded_buffer.append(message);
+        conn->send(encoded_buffer);
+    }
     encoded_buffer.clear();
 }
 
@@ -390,11 +406,34 @@ void WebSocketContext::send_fragment(std::string_view fragment, bool final_fragm
         sndfragment = FirstFragment;
         break;
     }
-    encode(fragment, first_byte);
-    if (final_fragment || encoded_buffer.size() >= BufferedSize) {
+    encode(fragment.size(), first_byte);
+    if (fragment.size() >= BufferedSize) {
         conn->send(encoded_buffer);
+        conn->send(fragment);
         encoded_buffer.clear();
+    } else {
+        encoded_buffer.append(fragment);
+        if (final_fragment || encoded_buffer.size() >= BufferedSize) {
+            conn->send(encoded_buffer);
+            encoded_buffer.clear();
+        }
     }
+}
+
+void WebSocketContext::send_file(const std::string& path)
+{
+    int fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        log_error("can't open %s: %s", path.c_str(), util::strerrno());
+        return;
+    }
+    off_t filesize = util::get_file_size(fd);
+    // 1 0 0 0 0 0 0 0 | (1 or 2)
+    encode(filesize, 0x80 | opcode(is_binary_type));
+    conn->send(encoded_buffer);
+    conn->send_file(fd, 0, filesize);
+    conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
+    encoded_buffer.clear();
 }
 
 }

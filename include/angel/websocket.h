@@ -32,9 +32,10 @@ public:
     WebSocketContext(WebSocketServer *, connection *);
     // Send message directly without buffering.
     void send(std::string_view message);
-    // When the buffer is full or fragment is the final one, we send buffer.
+    // Send a fragment, must end with send_fragment(,true).
     void send_fragment(std::string_view fragment, bool final_fragment = false);
-    size_t BufferedSize = 1024 * 64; // send_fragment() buffer size
+    // Async send a file.
+    void send_file(const std::string& path);
     // 1) Indicates the received message type.
     // 2) It is set by the user to indicate the type of sent message.
     bool is_binary_type; // binary or text
@@ -46,10 +47,10 @@ private:
     enum { Ok, Error, NotEnough, Ping, Pong, Close };
     static void message_handler(const connection_ptr& conn, buffer& buf);
     int handshake(const connection_ptr& conn, buffer& buf);
-    int handshake(const char *line, const char *end);
+    int handshake(buffer& buf, size_t crlf);
     int decode(buffer& raw_buf);
-    void encode(std::string_view raw_buf, uint8_t first_byte);
-    void sec_websocket_accept(std::string key);
+    void encode(uint64_t raw_size, uint8_t first_byte);
+    void sec_websocket_accept(std::string_view key);
     void handshake_ok(const connection_ptr& conn);
     void handshake_error(const connection_ptr& conn);
 
