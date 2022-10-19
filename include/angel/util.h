@@ -2,6 +2,7 @@
 #define _ANGEL_UTIL_H
 
 #include <vector>
+#include <sstream>
 #include <algorithm>
 #include <thread>
 #include <charconv>
@@ -163,6 +164,23 @@ inline std::string_view trim(std::string_view s)
     auto pos = left - s.begin();
     auto n = (s.rend() - right) - pos;
     return s.substr(pos, n);
+}
+
+template<typename Container>
+std::string join(const std::string& delimiter, const Container& c)
+{
+    if(std::begin(c) == std::end(c)) return "";
+
+    std::ostringstream oss;
+
+    auto last = std::begin(c);
+    std::advance(last, std::size(c) - 1);
+
+    using element_type = typename std::iterator_traits<decltype(std::begin(c))>::value_type;
+    std::copy(std::begin(c), last, std::ostream_iterator<element_type>(oss, delimiter.c_str()));
+    oss << *last;
+
+    return oss.str();
 }
 
 #define UNUSED(x) ((void)(x))
