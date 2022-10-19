@@ -62,7 +62,7 @@ void listener_t::handle_accept()
         }
         return;
     }
-    log_info("accept a new connection(fd=%d)", connfd);
+    log_info("Accept a new connection(fd=%d)", connfd);
     sockops::set_nonblock(connfd);
     new_connection_handler(connfd);
 }

@@ -90,10 +90,10 @@ void signaler_t::add_signal_in_loop(int signo, const signaler_handler_t handler)
     if (handler) {
         sa.sa_handler = &sig_handler;
         sig_callback_map.emplace(signo, std::move(handler));
-        log_debug("set sig_handler for %s", signal_str(signo));
+        log_debug("Set signal handler for %s", signal_str(signo));
     } else {
         sa.sa_handler = SIG_IGN;
-        log_debug("ignore %s", signal_str(signo));
+        log_debug("Ignore %s", signal_str(signo));
     }
     // Restart syscall interrupted by signal
     sa.sa_flags |= SA_RESTART;

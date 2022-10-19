@@ -121,7 +121,7 @@ void server::executor(const task_callback_t task)
 void server::clean_up()
 {
     if (exit_handler) exit_handler();
-    log_info("server ready to exit...");
+    log_info("Server ready to exit...");
     __logger.quit();
     fprintf(stderr, "\n");
     quit();
@@ -154,7 +154,7 @@ void server::set_keepalive_probes(int probes)
 
 void server::start()
 {
-    log_info("server (%s) is running", listener->addr().to_host());
+    log_info("Server (%s) is running", listener->addr().to_host());
     // The SIGPIPE signal must be ignored, otherwise sending a message
     // to a closed connection will cause the server to exit unexpectedly.
     add_signal(SIGPIPE, nullptr);

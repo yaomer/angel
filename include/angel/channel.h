@@ -35,14 +35,13 @@ public:
 
     int fd() const { return evfd; }
     void set_fd(int fd) { evfd = fd; }
-    int filter_events() const { return filter; }
-    int trigger_events() const { return trigger; }
     void set_trigger_events(int revents) { trigger = revents; }
     bool is_reading() { return filter & Read; }
     bool is_writing() { return filter & Write; }
     void enable_read();
     void enable_write();
     void disable_write();
+    void disable_all();
     void set_read_handler(const event_handler_t handler)
     { read_handler = std::move(handler); }
     void set_write_handler(const event_handler_t handler)

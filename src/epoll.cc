@@ -5,24 +5,20 @@
 #include "epoll.h"
 
 #include <unistd.h>
-#include <sys/epoll.h>
-
-#include <vector>
 
 #include <angel/evloop.h>
 #include <angel/logger.h>
+#include <angel/util.h>
 
 namespace angel {
 
 using namespace util;
 
-static const size_t evlist_init_size = 64;
-
 epoll_base_t::epoll_base_t()
-    : added_fds(0)
 {
     epfd = epoll_create(1);
-    evlist.resize(evlist_init_size);
+    evlist.resize(EVLIST_INIT_SIZE);
+    evmap.resize(EVLIST_INIT_SIZE);
     set_name("epoll");
 }
 
@@ -31,41 +27,49 @@ epoll_base_t::~epoll_base_t()
     close(epfd);
 }
 
-static inline void evset(struct epoll_event& ev, int fd, int events)
-{
-    ev.data.fd = fd;
-    ev.events = 0;
-    if (events & Read)
-        ev.events |= EPOLLIN;
-    if (events & Write)
-        ev.events |= EPOLLOUT;
-}
+#define EEV_SET(eev, efd, filter) do { \
+    (eev).data.fd = (efd); \
+    if ((filter) & Read) (eev).events |= EPOLLIN; \
+    if ((filter) & Write) (eev).events |= EPOLLOUT; \
+} while (0)
+
 
 void epoll_base_t::add(int fd, int events)
 {
-    struct epoll_event ev;
-    evset(ev, fd, events);
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
-        log_error("[epoll_ctl -> EPOLL_CTL_ADD]: %s", strerrno());
-    if (++added_fds >= evlist.size()) {
-        evlist.resize(evlist.size() * 2);
-    }
-}
+    resize_if(fd, evmap);
 
-void epoll_base_t::change(int fd, int events)
-{
-    struct epoll_event ev;
-    evset(ev, fd, events);
-    if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) < 0)
-        log_error("[epoll_ctl -> EPOLL_CTL_MOD]: %s", strerrno());
+    auto& filter = evmap[fd];
+    int op = filter ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
+
+    if (!filter) resize_if(++added_fds, evlist);
+    filter |= events;
+
+    struct epoll_event eev;
+    EEV_SET(eev, fd, filter);
+
+    if (epoll_ctl(epfd, op, fd, &eev) < 0)
+        log_error("epoll_ctl: %s", strerrno());
 }
 
 void epoll_base_t::remove(int fd, int events)
 {
-    UNUSED(events);
-    if (epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL) < 0)
-        log_error("[epoll_ctl -> EPOLL_CTL_DEL]: %s", strerrno());
-    added_fds--;
+    struct epoll_event eev;
+    struct epoll_event *eevp = nullptr;
+
+    auto& filter = evmap[fd];
+    filter &= ~events;
+
+    int op = filter ? EPOLL_CTL_MOD : EPOLL_CTL_DEL;
+
+    if (filter) {
+        EEV_SET(eev, fd, filter);
+        eevp = &eev;
+    } else {
+        added_fds--;
+    }
+
+    if (epoll_ctl(epfd, op, fd, eevp) < 0)
+        log_error("epoll_ctl: %s", strerrno());
 }
 
 static int evret(int events)

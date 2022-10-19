@@ -60,12 +60,12 @@ void set_keepalive_probes(int fd, int probes);
 // sockfd should be set nonblock
 //
 // If the transfer was successful, the number of bytes written to sockfd is returned.
-// Note that a successful call to send_file() may write fewer bytes than requested;
+// Note that a successful call to sendfile() may write fewer bytes than requested;
 // the caller should be prepared to retry the call if there were unsent bytes.
 //
 // On error, -1 is returned, and errno is set to indicate the error.
 //
-ssize_t send_file(int fd, int sockfd, off_t offset, off_t count);
+ssize_t sendfile(int fd, int sockfd, off_t offset, off_t count);
 
 }
 }

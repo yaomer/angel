@@ -31,12 +31,8 @@ public:
     evloop(const evloop&) = delete;
     evloop& operator=(const evloop&) = delete;
 
-    // Register an event with the loop
     void add_channel(const channel_ptr& chl);
-    // Remove an event from the loop (you may need close(fd))
     void remove_channel(const channel_ptr& chl);
-    // Modify events associated with fd
-    void change_event(int fd, int events);
 
     channel_ptr search_channel(int fd)
     { return channel_map.find(fd)->second; }
@@ -74,12 +70,12 @@ private:
     std::vector<functor> functors;
     std::mutex mutex;
     int wake_fd[2];
-    size_t nloops;
 
     friend class select_base_t;
     friend class poll_base_t;
     friend class kqueue_base_t;
     friend class epoll_base_t;
+    friend class channel;
 };
 
 } // angel

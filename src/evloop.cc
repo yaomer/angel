@@ -31,8 +31,7 @@ static thread_local evloop *this_thread_loop = nullptr;
 evloop::evloop()
     : timer(new timer_t(this)),
     is_quit(false),
-    cur_tid(std::this_thread::get_id()),
-    nloops(0)
+    cur_tid(std::this_thread::get_id())
 {
 #if defined (ANGEL_HAVE_EPOLL)
     poller.reset(new epoll_base_t);
@@ -47,8 +46,10 @@ evloop::evloop()
 #endif
     if (this_thread_loop) {
         log_fatal("Only have one evloop in this thread");
-    } else
+    } else {
         this_thread_loop = this;
+    }
+    log_info("Use I/O multiplexing (%s)", poller->name());
     sockops::socketpair(wake_fd);
     std::lock_guard<std::mutex> mlock(_SYNC_SIG_INIT_LOCK);
     if (!__signaler_ptr) {
@@ -57,37 +58,31 @@ evloop::evloop()
     }
 }
 
-evloop::~evloop() = default;
+evloop::~evloop()
+{
+}
 
 void evloop::add_channel(const channel_ptr& chl)
 {
-    log_debug("add channel(fd=%d)...", chl->fd());
     run_in_loop([this, chl]{ this->add_channel_in_loop(chl); });
 }
 
 void evloop::remove_channel(const channel_ptr& chl)
 {
-    log_debug("remove channel(fd=%d)...", chl->fd());
     run_in_loop([this, chl]{ this->remove_channel_in_loop(chl); });
-}
-
-void evloop::change_event(int fd, int events)
-{
-    poller->change(fd, events);
 }
 
 void evloop::add_channel_in_loop(const channel_ptr& chl)
 {
-    log_debug("channel(fd=%d) has been added to the loop", chl->fd());
     chl->enable_read();
-    poller->add(chl->fd(), chl->filter_events());
     channel_map.emplace(chl->fd(), chl);
+    log_debug("Add channel(fd=%d) to loop", chl->fd());
 }
 
 void evloop::remove_channel_in_loop(const channel_ptr& chl)
 {
-    log_debug("channel(fd=%d) has been removed from the loop", chl->fd());
-    poller->remove(chl->fd(), chl->filter_events());
+    log_debug("Remove channel(fd=%d) from loop", chl->fd());
+    chl->disable_all();
     channel_map.erase(chl->fd());
 }
 
@@ -98,7 +93,6 @@ void evloop::run()
     while (!is_quit) {
         int64_t timeout = timer->timeout();
         int nevents = poller->wait(this, timeout);
-        log_debug("nloops=%zu, timeout=%lld, nevents=%d", nloops++, timeout, nevents);
         if (nevents > 0) {
             for (auto& channel : active_channels) {
                 channel->handle_event();
@@ -180,7 +174,7 @@ size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
     int64_t expire = get_cur_time_ms() + timeout;
     timer_task_t *task = new timer_task_t(expire, 0, std::move(cb));
     size_t id = timer->add_timer(task);
-    log_debug("add a timer(id=%zu) after %lld ms", id, timeout);
+    log_debug("Add a timer(id=%zu) after %lld ms", id, timeout);
     return id;
 }
 
@@ -189,14 +183,14 @@ size_t evloop::run_every(int64_t interval, const timer_callback_t cb)
     int64_t expire = get_cur_time_ms() + interval;
     timer_task_t *task = new timer_task_t(expire, interval, std::move(cb));
     size_t id = timer->add_timer(task);
-    log_debug("add a timer(id=%zu) every %lld ms", id, interval);
+    log_debug("Add a timer(id=%zu) every %lld ms", id, interval);
     return id;
 }
 
 void evloop::cancel_timer(size_t id)
 {
     timer->cancel_timer(id);
-    log_debug("cancel a timer(id=%zu)", id);
+    log_debug("Cancel a timer(id=%zu)", id);
 }
 
 void evloop::quit()

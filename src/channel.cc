@@ -3,6 +3,8 @@
 #include <angel/evloop.h>
 #include <angel/logger.h>
 
+#include "poller.h"
+
 namespace angel {
 
 channel::channel(evloop *loop)
@@ -10,25 +12,41 @@ channel::channel(evloop *loop)
 {
 }
 
-channel::~channel() = default;
+channel::~channel()
+{
+    log_debug("~channel(fd=%d)", evfd);
+}
 
 void channel::enable_read()
 {
-    filter |= Read;
+    if (!is_reading()) {
+        filter |= Read;
+        loop->poller->add(evfd, Read);
+        log_debug("channel(fd=%d) enable <Read>", evfd);
+    }
 }
 
 void channel::enable_write()
 {
     if (!is_writing()) {
         filter |= Write;
-        loop->change_event(evfd, filter);
+        loop->poller->add(evfd, Write);
+        log_debug("channel(fd=%d) enable <Write>", evfd);
     }
 }
 
 void channel::disable_write()
 {
-    filter &= ~Write;
-    loop->change_event(evfd, filter);
+    if (is_writing()) {
+        filter &= ~Write;
+        loop->poller->remove(evfd, Write);
+        log_debug("channel(fd=%d) disable <Write>", evfd);
+    }
+}
+
+void channel::disable_all()
+{
+    loop->poller->remove(evfd, filter);
 }
 
 static const char *ev2str(int events)

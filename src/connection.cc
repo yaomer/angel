@@ -53,7 +53,7 @@ void connection::establish()
 void connection::handle_read()
 {
     ssize_t n = input_buf.read_fd(channel->fd());
-    log_debug("read %zd bytes from connection(id=%d, fd=%d)", n, conn_id, channel->fd());
+    log_debug("Read (%zd) bytes from connection(id=%d, fd=%d)", n, conn_id, channel->fd());
     if (n > 0) {
         if (message_handler) {
             message_handler(shared_from_this(), input_buf);
@@ -74,7 +74,7 @@ void connection::handle_read()
 void connection::handle_write()
 {
     if (is_closed()) {
-        log_warn("unable to write, connection(id=%zu, fd=%d) is %s",
+        log_warn("Unable to write, connection(id=%zu, fd=%d) is %s",
                  conn_id, channel->fd(), get_state_str());
         return;
     }
@@ -82,32 +82,32 @@ void connection::handle_write()
 
     if (!byte_stream_queue.empty() && byte_stream_queue.front().first == next_id) {
         auto& len = byte_stream_queue.front().second;
-        ssize_t n = write(channel->fd(), output_buf.peek(), len);
-        if (n >= 0) {
+        ssize_t n = write(output_buf.peek(), len);
+        if (n > 0) {
             len -= n;
             output_buf.retrieve(n);
             if (len == 0) {
+                log_debug("Send complete for byte stream(send_id=%zu)", next_id);
                 byte_stream_queue.pop();
                 next_id++;
             }
-        } else {
-            handle_error();
-            if (is_closed()) return;
+        } else if (n == -2) {
+            return;
         }
     }
     if (!send_file_queue.empty() && send_file_queue.front().first == next_id) {
-        auto& file = send_file_queue.front().second;
-        ssize_t n = sockops::send_file(file.fd, channel->fd(), file.offset, file.count);
-        if (n >= 0) {
-            file.offset += n;
-            file.count  -= n;
-            if (file.count == 0) {
+        auto& f = send_file_queue.front().second;
+        ssize_t n = sendfile(f.fd, f.offset, f.count);
+        if (n > 0) {
+            f.offset += n;
+            f.count  -= n;
+            if (f.count == 0) {
+                log_debug("Send complete for file stream(send_id=%zu, fd=%d)", next_id, f.fd);
                 send_file_queue.pop();
                 next_id++;
             }
-        } else {
-            handle_error();
-            if (is_closed()) return;
+        } else if (n == -2) {
+            return;
         }
     }
     if (!send_complete_handler_queue.empty() &&
@@ -147,7 +147,9 @@ void connection::handle_close(bool is_forced)
 
 void connection::handle_error()
 {
-    if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+        log_warn("connection(id=%d, fd=%d): %s", conn_id, channel->fd(), strerrno());
+    } else {
         log_error("connection(id=%d, fd=%d): %s", conn_id, channel->fd(), strerrno());
         force_close_connection();
     }
@@ -158,21 +160,20 @@ void connection::send_in_loop(const char *data, size_t len)
     ssize_t n = 0;
 
     if (is_closed()) {
-        log_warn("unable to send, connection(id=%zu, fd=%d) is %s",
+        log_warn("Unable to send, connection(id=%zu, fd=%d) is %s",
                  conn_id, channel->fd(), get_state_str());
         return;
     }
+    log_debug("A new byte stream(len=%zu)", len);
     if (!channel->is_writing() && send_queue_is_empty()) {
-        n = write(channel->fd(), data, len);
-        log_debug("write %zd bytes to connection(id=%d, fd=%d)", n, conn_id, channel->fd());
-        if (n >= 0) {
+        if ((n = write(data, len)) > 0) {
             len -= n;
-        } else {
-            handle_error();
-            if (is_closed()) return;
+        } else if (n == -2) {
+            return;
         }
     }
     if (len > 0) {
+        log_debug("Remaining (%zu) bytes, queued(send_id=%zu)...", len, send_id);
         output_buf.append(data + n, len);
         byte_stream_queue.emplace(send_id++, len);
 
@@ -190,18 +191,18 @@ void connection::send_in_loop(const char *data, size_t len)
 void connection::send_file_in_loop(int fd, off_t offset, off_t count)
 {
     if (is_closed()) {
-        log_warn("unable to send file, connection(id=%zu, fd=%d) is %s",
+        log_warn("Unable to send file, connection(id=%zu, fd=%d) is %s",
                  conn_id, channel->fd(), get_state_str());
         return;
     }
+    log_debug("A new file stream(fd=%d, offset=%lld, count=%lld)", fd, offset, count);
     if (!channel->is_writing() && send_queue_is_empty()) {
-        ssize_t n = sockops::send_file(fd, channel->fd(), offset, count);
-        if (n >= 0) {
+        ssize_t n = sendfile(fd, offset, count);
+        if (n > 0) {
             offset += n;
             count  -= n;
-        } else {
-            handle_error();
-            if (is_closed()) return;
+        } else if (n == -2) {
+            return;
         }
     }
     if (count > 0) {
@@ -209,6 +210,8 @@ void connection::send_file_in_loop(int fd, off_t offset, off_t count)
         f.fd     = fd;
         f.offset = offset;
         f.count  = count;
+        log_debug("Remaining (%lld, %lld) for file(fd=%d), queued(send_id=%zu)...",
+                  offset, count, fd, send_id);
         send_file_queue.emplace(send_id++, std::move(f));
         channel->enable_write();
     }
@@ -220,6 +223,31 @@ void connection::set_send_complete_handler(const send_complete_handler_t handler
             conn->send_complete_handler_queue.emplace(conn->send_id++, handler);
             conn->channel->enable_write();
             });
+}
+
+ssize_t connection::write(const char *data, size_t len)
+{
+    int fd = channel->fd();
+    ssize_t n = ::write(fd, data, len);
+    log_debug("Write (%zd) bytes to connection(id=%d, fd=%d)", n, conn_id, fd);
+    if (n < 0) {
+        handle_error();
+        return is_closed() ? -2 : -1;
+    }
+    return n;
+}
+
+ssize_t connection::sendfile(int fd, off_t offset, off_t count)
+{
+    int sockfd = channel->fd();
+    ssize_t n = sockops::sendfile(fd, sockfd, offset, count);
+    log_debug("Send file(fd=%d) (%lld, %lld) (%zu) bytes to connection(id=%d, fd=%d)",
+              fd, offset, offset + n, n, conn_id, sockfd);
+    if (n < 0) {
+        handle_error();
+        return is_closed() ? -2 : -1;
+    }
+    return n;
 }
 
 void connection::send(const char *s, size_t len)

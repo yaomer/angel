@@ -3,8 +3,7 @@
 
 #include <sys/select.h>
 
-#include <vector>
-#include <map>
+#include <unordered_set>
 
 #include "poller.h"
 
@@ -19,14 +18,11 @@ public:
 
     int wait(evloop *loop, int64_t timeout) override;
     void add(int fd, int events) override;
-    void change(int fd, int events) override;
     void remove(int fd, int events) override;
 private:
-    fd_set rdset;
-    fd_set wrset;
-    std::vector<int> fds;
-    // <fd, index>, index for fds
-    std::map<int, int> indexs;
+    fd_set rdset, _rdset;
+    fd_set wrset, _wrset;
+    std::unordered_set<int> fds;
     int maxfd;
 };
 }

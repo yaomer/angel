@@ -19,41 +19,40 @@ poll_base_t::poll_base_t()
     set_name("poll");
 }
 
-poll_base_t::~poll_base_t() = default;
-
-static inline void evset(struct pollfd& ev, int fd, int events)
+poll_base_t::~poll_base_t()
 {
-    ev.fd = fd;
-    ev.events = 0;
-    ev.revents = 0;
-    if (events & Read)
-        ev.events |= POLLIN;
-    if (events & Write)
-        ev.events |= POLLOUT;
 }
 
 void poll_base_t::add(int fd, int events)
 {
-    struct pollfd ev;
-    evset(ev, fd, events);
-    poll_fds.emplace_back(ev);
-    indexs.emplace(ev.fd, poll_fds.size() - 1);
-}
+    struct pollfd pfd{0};
+    pfd.fd = fd;
+    if (events & Read) pfd.events |= POLLIN;
+    if (events & Write) pfd.events |= POLLOUT;
 
-void poll_base_t::change(int fd, int events)
-{
     auto it = indexs.find(fd);
-    struct pollfd *pfd = &poll_fds[it->second];
-    evset(*pfd, fd, events);
+    if (it == indexs.end()) {
+        pollfds.emplace_back(pfd);
+        indexs.emplace(fd, pollfds.size() - 1);
+    } else {
+        pollfds[it->second].events |= pfd.events;
+    }
 }
 
 void poll_base_t::remove(int fd, int events)
 {
-    auto it = indexs.find(fd);
-    size_t end = poll_fds.size() - 1;
-    std::swap(poll_fds[it->second], poll_fds[end]);
-    poll_fds.pop_back();
-    indexs.erase(fd);
+    int poll_events = 0;
+    if (events & Read) poll_events |= POLLIN;
+    if (events & Write) poll_events |= POLLOUT;
+
+    auto& pfd = pollfds[indexs[fd]];
+    pfd.events &= ~poll_events;
+
+    if (!pfd.events) {
+        std::swap(pfd, pollfds.back());
+        pollfds.pop_back();
+        indexs.erase(fd);
+    }
 }
 
 static int evret(int events)
@@ -67,13 +66,13 @@ static int evret(int events)
 
 int poll_base_t::wait(evloop *loop, int64_t timeout)
 {
-    int nevents = poll(&poll_fds[0], poll_fds.size(), timeout);
-    int ret = nevents;
+    int nevents = poll(&pollfds[0], pollfds.size(), timeout);
+    int retval = nevents;
     if (nevents > 0) {
-        for (auto& it : poll_fds) {
-            if (it.revents > 0) {
-                auto chl = loop->search_channel(it.fd);
-                chl->set_trigger_events(evret(it.revents));
+        for (auto& pfd : pollfds) {
+            if (pfd.revents > 0) {
+                auto chl = loop->search_channel(pfd.fd);
+                chl->set_trigger_events(evret(pfd.revents));
                 loop->active_channels.emplace_back(chl);
                 if (--nevents == 0)
                     break;
@@ -83,7 +82,7 @@ int poll_base_t::wait(evloop *loop, int64_t timeout)
         if (errno != EINTR)
             log_error("poll: %s", strerrno());
     }
-    return ret;
+    return retval;
 }
 
 }

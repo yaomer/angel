@@ -3,9 +3,6 @@
 
 #include <sys/event.h>
 
-#include <vector>
-#include <map>
-
 #include "poller.h"
 
 namespace angel {
@@ -21,12 +18,12 @@ public:
 
     int wait(evloop *loop, int64_t timeout) override;
     void add(int fd, int events) override;
-    void change(int fd, int events) override;
     void remove(int fd, int events) override;
 private:
     int kqfd;
-    size_t added_fds;
+    int added_fds = 0;
     std::vector<struct kevent> evlist;
+    std::vector<int> evmap;
 };
 }
 

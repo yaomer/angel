@@ -5,7 +5,6 @@
 #include "kqueue.h"
 
 #include <unistd.h>
-#include <string.h>
 
 #include <angel/evloop.h>
 #include <angel/logger.h>
@@ -15,13 +14,11 @@ namespace angel {
 
 using namespace util;
 
-static const size_t evlist_init_size = 64;
-
 kqueue_base_t::kqueue_base_t()
-    : added_fds(0)
 {
     kqfd = kqueue();
-    evlist.resize(evlist_init_size);
+    evlist.resize(EVLIST_INIT_SIZE);
+    evmap.resize(EVLIST_INIT_SIZE);
     set_name("kqueue");
 }
 
@@ -30,67 +27,60 @@ kqueue_base_t::~kqueue_base_t()
     ::close(kqfd);
 }
 
+// Adds the events to the kqueue.
+//
+// Re-adding an existing event will modify the parameters of the original event,
+// and not result in a duplicate entry.
+//
+// Adding an event automatically enables it, unless overridden by
+// the EV_DISABLE flag.
 void kqueue_base_t::add(int fd, int events)
-{
-    change(fd, events);
-    if (++added_fds >= evlist.size()) {
-        evlist.resize(evlist.size() * 2);
-    }
-}
-
-void kqueue_base_t::change(int fd, int events)
 {
     struct kevent kev;
     if (events & Read) {
         EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            log_error("[kevent -> EV_ADD]: %s", strerrno());
+            log_error("kevent: %s", strerrno());
     }
     if (events & Write) {
         EV_SET(&kev, fd, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            log_error("[kevent -> EV_ADD]: %s", strerrno());
+            log_error("kevent: %s", strerrno());
     }
+    resize_if(fd, evmap);
+    if (!evmap[fd]) resize_if(++added_fds, evlist);
+    evmap[fd] |= events;
 }
 
+// Removes all events registered on the fd,
+// and kqueue will remove the fd from the kernel event list.
 void kqueue_base_t::remove(int fd, int events)
 {
     struct kevent kev;
-    // Delete all events registered on the fd,
-    // and kqueue will remove the fd from the kernel event list.
     if (events & Read) {
         EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            log_error("[kevent -> EV_DELETE]: %s", strerrno());
+            log_error("kevent: %s", strerrno());
     }
     if (events & Write) {
         EV_SET(&kev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) < 0)
-            log_error("[kevent -> EV_DELETE]: %s", strerrno());
+            log_error("kevent: %s", strerrno());
     }
-    added_fds--;
+    evmap[fd] &= ~events;
+    if (!evmap[fd]) added_fds--;
 }
 
 static int evret(struct kevent& ev)
 {
     int revs = 0;
-    if (ev.filter == EVFILT_READ)
+    if (ev.filter == EVFILT_READ) {
         revs = Read;
-    else if (ev.filter == EVFILT_WRITE)
+    } else if (ev.filter == EVFILT_WRITE) {
         revs = Write;
-    else if (ev.flags) {
-        switch (ev.flags) {
-        case ENOENT:
-        case EINVAL:
-        case EPIPE:
-        case EPERM:
-        case EBADF:
-            break;
-        default:
-            errno = ev.data;
-            revs = Error;
-            break;
-        }
+    } else if (ev.flags == EV_ERROR) {
+        errno = ev.data;
+        revs = Error;
     }
     return revs;
 }
@@ -113,6 +103,9 @@ int kqueue_base_t::wait(evloop *loop, int64_t timeout)
             chl->set_trigger_events(evret(evlist[i]));
             loop->active_channels.emplace_back(chl);
         }
+    } else if (nevents < 0) {
+        if (errno != EINTR)
+            log_error("kevent: %s", strerrno());
     }
     return nevents;
 }

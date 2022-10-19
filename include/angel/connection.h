@@ -115,6 +115,9 @@ private:
     void update_ttl_timer_if_needed();
     const char *get_state_str();
 
+    ssize_t write(const char *data, size_t len);
+    ssize_t sendfile(int fd, off_t offset, off_t count);
+
     size_t conn_id;
     evloop *loop;
     std::shared_ptr<channel> channel;

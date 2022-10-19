@@ -3,8 +3,6 @@
 
 #include <sys/epoll.h>
 
-#include <vector>
-
 #include "poller.h"
 
 namespace angel {
@@ -20,12 +18,12 @@ public:
 
     int wait(evloop *loop, int64_t timeout) override;
     void add(int fd, int events) override;
-    void change(int fd, int events) override;
     void remove(int fd, int events) override;
 private:
     int epfd;
-    size_t added_fds;
+    int added_fds = 0;
     std::vector<struct epoll_event> evlist;
+    std::vector<int> evmap;
 };
 
 }

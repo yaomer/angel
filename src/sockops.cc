@@ -210,16 +210,19 @@ void set_keepalive_probes(int fd, int probes)
 #include <sys/sendfile.h>
 #endif
 
-ssize_t send_file(int fd, int sockfd, off_t offset, off_t count)
+ssize_t sendfile(int fd, int sockfd, off_t offset, off_t count)
 {
 #if defined (__APPLE__)
-    int rc = sendfile(fd, sockfd, offset, &count, nullptr, 0);
-    if (rc == -1) return rc;
+    int rc = ::sendfile(fd, sockfd, offset, &count, nullptr, 0);
+    // If errno == EAGAIN or EINTR,
+    // the number of bytes successfully sent will be returned in *len.
+    if (rc == -1 && errno != EAGAIN && errno != EINTR) return -1;
     return count;
 #elif defined (__linux__)
-    ssize_t rc = sendfile(sockfd, fd, &offset, count);
-    if (rc == -1) return rc;
-    return rc;
+    // If the transfer was successful, the number of bytes written to
+    // sockfd is returned. Note that a successful call to sendfile()
+    // may write fewer bytes than requested.
+    return ::sendfile(sockfd, fd, &offset, count);
 #endif
 }
 
