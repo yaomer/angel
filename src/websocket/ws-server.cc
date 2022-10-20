@@ -11,6 +11,7 @@
 
 #include <angel/sockops.h>
 #include <angel/util.h>
+#include <angel/sha1.h>
 #include <angel/logger.h>
 
 namespace angel {
@@ -155,11 +156,12 @@ int WebSocketContext::handshake(buffer& buf, size_t crlf)
 
 void WebSocketContext::sec_websocket_accept(std::string_view key)
 {
+    static sha1 sha1;
     static const char *guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
     std::string sec_key(key);
-    sec_key = util::sha1(sec_key + guid, true);
-    SecWebSocketAccept = util::base64_encode(sec_key);
+    sha1.update(sec_key + guid);
+    SecWebSocketAccept = util::base64_encode(sha1.digest());
 }
 
 // Server:

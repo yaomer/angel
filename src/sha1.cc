@@ -1,19 +1,19 @@
-#include <angel/util.h>
+#include <angel/sha1.h>
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
 
 #include <angel/sockops.h>
+#include <angel/util.h>
 
 namespace angel {
-namespace util {
 
 static const uint32_t ChunkWords = 16;
 static const uint32_t ChunkBytes = ChunkWords * 4;
 
 // The conversion between Word and Byte follows the "big-endian"
-// e.g. Convert "ABCD" to a Word(32-bits):
+// e.g. Convert "ABCD" to a Word(32-bit):
 //
 // 0100 0001 0100 0010 0100 0011 0100 0100
 // ---------+---------+---------+---------
@@ -23,7 +23,7 @@ static const uint32_t ChunkBytes = ChunkWords * 4;
 
 // Copy the data with less than 512 bits at the end to the head of
 // buf, and form one or two new chunk(s) with padding bytes.
-static int padding(std::string& buf, const char *endptr, size_t size)
+static void padding(std::string& buf, const char *endptr, size_t size)
 {
     // Padding bit '1' (0x80)
     // Padding bit '0' to (total_bits % 512 == 448)
@@ -39,18 +39,17 @@ static int padding(std::string& buf, const char *endptr, size_t size)
 
     buf.append(padding_zeros, (char)0x00);
 
-    // Padding 64-bits(8-bytes) origin data bits
+    // Padding 64-bit(8-byte) origin data bits
     uint64_t encoded_bits = sockops::hton64(size * 8);
     buf.append(reinterpret_cast<const char*>(&encoded_bits), 8);
 
     assert(buf.size() % ChunkBytes == 0);
-    return remain_bytes;
 }
 
 // Rotate Left Shift
 #define rls(x, n) ((x << n) | (x >> (32 - n)))
 
-static void chunk_cal(const char *chunk, uint32_t h[5])
+static void __chunk_cal(const char *chunk, uint32_t h[5])
 {
     uint32_t a = h[0];
     uint32_t b = h[1];
@@ -98,34 +97,115 @@ static void chunk_cal(const char *chunk, uint32_t h[5])
     h[4] += e;
 }
 
-// Calculate last one or two padding chunk(s).
-static void final_cal(std::string& buf, uint32_t h[5])
+//======================================================
+//======================== SHA1 ========================
+//======================================================
+
+sha1::sha1()
 {
-    chunk_cal(buf.data(), h);
-    if (buf.size() > ChunkBytes)
-        chunk_cal(buf.data() + ChunkBytes, h);
+    init();
 }
 
-// Convert to a 20-byte string
-static std::string to_digest(uint32_t h[5])
+sha1::sha1(std::string_view data)
+{
+    init();
+    update(data);
+}
+
+void sha1::init()
+{
+    h[0] = 0x67452301;
+    h[1] = 0xEFCDAB89;
+    h[2] = 0x98BADCFE;
+    h[3] = 0x10325476;
+    h[4] = 0xC3D2E1F0;
+    payload = 0;
+}
+
+void sha1::chunk_cal(const char *data, size_t chunks)
+{
+    for (size_t i = 0; i < chunks; i++) {
+        __chunk_cal(data + ChunkBytes * i, h);
+    }
+}
+
+// Calculate the last remaining bytes.
+void sha1::final_cal()
+{
+    std::string padding_buf;
+    padding_buf.reserve(ChunkBytes);
+
+    padding(padding_buf, buf.data() + buf.size(), payload);
+    chunk_cal(padding_buf.data(), padding_buf.size() / ChunkBytes);
+    buf.clear();
+}
+
+void sha1::update(std::string_view data)
+{
+    if (!buf.empty()) {
+        assert(buf.size() < ChunkBytes);
+        size_t len = std::min(ChunkBytes - buf.size(), data.size());
+        buf.append(data.data(), len);
+        data.remove_prefix(len);
+        if (buf.size() == ChunkBytes) {
+            chunk_cal(buf.data(), 1);
+            buf.clear();
+        }
+    }
+
+    size_t chunks = data.size() / ChunkBytes;
+    size_t remain_bytes = data.size() % ChunkBytes;
+
+    chunk_cal(data.data(), chunks);
+    if (remain_bytes > 0) {
+        buf.append(data.end() - remain_bytes, remain_bytes);
+    }
+    payload += data.size();
+}
+
+bool sha1::file(const std::string& path)
+{
+    static thread_local char fbuf[ChunkBytes * 256]; // 16K
+
+    int fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0) return false;
+
+    while (true) {
+        ssize_t n = util::read_file(fd, fbuf, sizeof(fbuf));
+        if (n > 0) {
+            update({fbuf, (size_t)n});
+        } else if (n == 0) {
+            break;
+        } else {
+            close(fd);
+            return false;
+        }
+    }
+    close(fd);
+    return true;
+}
+
+std::string sha1::digest()
 {
     uint32_t u32;
     std::string buf;
     // digest = h0 + h1 + h2 + h3 + h4;
+    final_cal();
     buf.reserve(20);
     for (int i = 0; i < 5; i++) {
         u32 = htonl(h[i]);
         buf.append(reinterpret_cast<const char*>(&u32), 4);
     }
+    init();
     return buf;
 }
 
-// Convert to a 40-byte hex string
-static std::string to_hex_digest(uint32_t h[5])
+std::string sha1::hex_digest()
 {
     std::string buf;
     static const char *tohex = "0123456789ABCDEF";
 
+    final_cal();
     buf.reserve(40);
     for (int i = 0; i < 5; i++) {
         buf.push_back(tohex[(h[i] >> 4 * 7) & 0x0f]);
@@ -137,61 +217,8 @@ static std::string to_hex_digest(uint32_t h[5])
         buf.push_back(tohex[(h[i] >> 4 * 1) & 0x0f]);
         buf.push_back(tohex[(h[i] >> 4 * 0) & 0x0f]);
     }
+    init();
     return buf;
 }
 
-std::string sha1(std::string_view data, bool normal)
-{
-    std::string buf;
-    buf.reserve(ChunkBytes);
-
-    int remain_bytes = padding(buf, data.data() + data.size(), data.size());
-    data.remove_suffix(remain_bytes);
-
-    uint32_t h[] = { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0 };
-
-    while (!data.empty()) {
-        chunk_cal(data.data(), h);
-        data.remove_prefix(ChunkBytes);
-    }
-    final_cal(buf, h);
-
-    return normal ? to_digest(h) : to_hex_digest(h);
-}
-
-std::string sha1_file(const std::string& path, bool normal)
-{
-    static thread_local char fbuf[ChunkBytes * 1024]; // 64K
-
-    int fd = open(path.c_str(), O_RDONLY);
-    if (fd < 0) return "";
-
-    uint32_t h[] = { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0 };
-
-    ssize_t n;
-    off_t filesize = get_file_size(fd);
-    size_t read_blocks = filesize / sizeof(fbuf) + 1;
-
-    for (size_t i = 0; i < read_blocks; i++) {
-        n = read_file(fd, fbuf, sizeof(fbuf));
-        if (n < 0) { close(fd); return ""; }
-
-        size_t chunks = n / ChunkBytes;
-        for (size_t i = 0; i < chunks; i++) {
-            chunk_cal(fbuf + ChunkBytes * i, h);
-        }
-    }
-
-    std::string buf;
-    buf.reserve(ChunkBytes);
-    padding(buf, fbuf + n, filesize);
-
-    final_cal(buf, h);
-
-    close(fd);
-
-    return normal ? to_digest(h) : to_hex_digest(h);
-}
-
-}
 }

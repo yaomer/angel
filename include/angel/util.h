@@ -28,11 +28,6 @@ void set_thread_affinity(pthread_t tid, int cpu_number);
 std::string base64_encode(std::string_view data);
 std::string base64_decode(std::string_view data);
 
-// If normal is true, generate a 20-byte digest;
-// else generate a 40-byte hex digest.
-std::string sha1(std::string_view data, bool normal);
-std::string sha1_file(const std::string& path, bool normal);
-
 // check ipv4 addr format
 bool check_ip(std::string_view ipv4_addr);
 

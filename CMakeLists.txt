@@ -34,9 +34,9 @@ set (SRC_FILES
     ${SRC_DIR}/signaler.cc
     ${SRC_DIR}/buffer.cc
     ${SRC_DIR}/logger.cc
+    ${SRC_DIR}/sha1.cc
     ${SRC_DIR}/util/util.cc
     ${SRC_DIR}/util/daemon.cc
-    ${SRC_DIR}/util/sha1.cc
     ${SRC_DIR}/util/base64.cc
     ${SRC_DIR}/util/file.cc
 )

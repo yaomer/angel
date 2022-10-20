@@ -9,6 +9,7 @@
 #include <unordered_set>
 
 #include <angel/util.h>
+#include <angel/sha1.h>
 
 namespace angel {
 namespace httplib {
@@ -234,10 +235,13 @@ std::string generate_file_etag(int64_t last_modified_time, off_t filesize)
     return oss.str();
 }
 
+static thread_local sha1 sha1;
+
 std::string generate_file_etag(const std::string& path, off_t filesize)
 {
     std::string etag("\"");
-    etag.append(util::sha1_file(path, false));
+    sha1.file(path);
+    etag.append(sha1.hex_digest());
     etag.append("-").append(std::to_string(filesize));
     return etag.append("\"");
 }
@@ -245,7 +249,8 @@ std::string generate_file_etag(const std::string& path, off_t filesize)
 std::string generate_etag(std::string_view data)
 {
     std::string etag("\"");
-    etag.append(util::sha1(data, false));
+    sha1.update(data);
+    etag.append(sha1.hex_digest());
     etag.append("-").append(std::to_string(data.size()));
     return etag.append("\"");
 }
