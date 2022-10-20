@@ -139,21 +139,23 @@ public:
     response() = default;
     void set_status_code(StatusCode code);
     void add_header(std::string_view field, std::string_view value);
-    // default type = "text/plain"
-    void set_content(std::string_view data);
-    void set_content(std::string_view data, std::string_view type);
+    void set_content(std::string_view body, std::string_view type = "text/plain");
+    void send_chunk(std::string_view chunk);
+    void send_done();
 private:
-    std::string& str();
+    std::string& header();
 
     void append_status_line();
-    void clear_content_if_none_file();
 
+    void send(std::string_view body = "");
+    void send_err();
+
+    connection *conn;
     StatusCode status_code;
-    std::string status_message;
     Headers headers;
-    std::string content;
     std::string buf;
-    bool none_file;
+    bool chunked = false;
+    std::string chunked_buf;
     friend class HttpServer;
     friend struct byte_range_set;
 };
@@ -170,12 +172,14 @@ enum ConditionCode {
 };
 
 typedef std::function<void(request&, response&)> ServerHandler;
+typedef std::function<void(request&, Headers&)> FileHandler;
 
 class HttpServer {
 public:
     HttpServer(evloop *, inet_addr);
     HttpServer& Get(std::string_view path, const ServerHandler handler);
     HttpServer& Post(std::string_view path, const ServerHandler handler);
+    HttpServer& File(std::string_view path, const FileHandler handler);
     // For static file
     void set_base_dir(std::string_view dir);
     // Set parallel threads for request
@@ -189,28 +193,30 @@ private:
     void message_handler(const connection_ptr&, buffer&);
     void process_request(const connection_ptr&, request& req, response& res);
 
-    bool handle_register_request(request& req, response& res);
-    bool handle_static_file_request(const connection_ptr& conn, request& req, response& res);
-    void handle_range_request(const connection_ptr& conn, request& req, response& res);
+    bool handle_user_router(request& req, response& res);
+    void handle_file_router(request& req, response& res);
+    void handle_static_file_request(request& req, response& res);
+    void handle_range_request(request& req, response& res);
 
     bool keepalive(request& req);
 
-    ConditionCode handle_conditional(const connection_ptr& conn, request& req, response& res);
-    ConditionCode if_match(const connection_ptr& conn, request& req, response& res);
-    ConditionCode if_modified_since(const connection_ptr& conn, request& req, response& res);
-    ConditionCode if_none_match(const connection_ptr& conn, request& req, response& res);
-    ConditionCode if_range(const connection_ptr& conn, request& req, response& res);
-    ConditionCode if_unmodified_since(const connection_ptr& conn, request& req, response& res);
+    ConditionCode handle_conditional(request& req, response& res);
+    ConditionCode if_match(request& req, response& res);
+    ConditionCode if_modified_since(request& req, response& res);
+    ConditionCode if_none_match(request& req, response& res);
+    ConditionCode if_range(request& req, response& res);
+    ConditionCode if_unmodified_since(request& req, response& res);
 
-    ConditionCode expect(const connection_ptr& conn, request& req, response& res);
+    ConditionCode expect(request& req, response& res);
 
-    void send_file(const connection_ptr& conn, request& req, response& res);
-    void update_file(const connection_ptr& conn, request& req, response& res);
-    void delete_file(const connection_ptr& conn, request& req, response& res);
+    void send_file(request& req, response& res);
+    void update_file(request& req, response& res);
+    void delete_file(request& req, response& res);
 
     angel::server server;
     typedef std::unordered_map<std::string, ServerHandler> Table;
     std::unordered_map<Method, Table> router;
+    std::unordered_map<std::string, FileHandler> file_table;
     std::string base_dir;
     bool generate_file_etag_by_sha1 = false;
 };

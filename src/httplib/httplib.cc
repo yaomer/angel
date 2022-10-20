@@ -2,7 +2,6 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 
 #include <angel/mime.h>
 
@@ -194,10 +193,16 @@ StatusCode request::parse_body_by_chunked(buffer& buf)
         if (chunk_size == -1) {
             int crlf = buf.find_crlf();
             if (crlf < 0) return Continue;
+            if (buf.readable() < crlf + 4) return Continue;
             chunk_size = from_hex_str({buf.peek(), (size_t)crlf});
             buf.retrieve(crlf + 2);
             if (chunk_size < 0) return BadRequest;
+            // 0\r\n\r\n
             if (chunk_size == 0) { // last-chunk
+                if (!buf.starts_with(CRLF)) {
+                    return BadRequest;
+                }
+                buf.retrieve(2);
                 chunk_size = -1;
                 chunked = false;
                 return Ok;
@@ -234,7 +239,6 @@ void request::clear()
 void response::set_status_code(StatusCode code)
 {
     status_code = code;
-    status_message = to_str(code);
 }
 
 void response::add_header(std::string_view field, std::string_view value)
@@ -242,15 +246,10 @@ void response::add_header(std::string_view field, std::string_view value)
     headers.emplace(field, value);
 }
 
-void response::set_content(std::string_view data)
-{
-    set_content(data, "text/plain");
-}
-
-void response::set_content(std::string_view data, std::string_view type)
+void response::set_content(std::string_view body, std::string_view type)
 {
     add_header("Content-Type", type);
-    content.assign(data);
+    send(body);
 }
 
 static void format_header(std::string& buf, std::string_view field, std::string_view value)
@@ -258,47 +257,91 @@ static void format_header(std::string& buf, std::string_view field, std::string_
     buf.append(field).append(SEP).append(value).append(CRLF);
 }
 
-void response::clear_content_if_none_file()
-{
-    if (none_file) {
-        content.clear();
-        headers.erase("Content-Type");
-    }
-}
-
 // Status-Line = HTTP-Version <SP> Status-Code <SP> Reason-Phrase <CRLF>
 void response::append_status_line()
 {
     buf.append("HTTP/1.1").append(1, SP)
        .append(std::to_string(status_code)).append(1, SP)
-       .append(status_message).append(CRLF);
+       .append(to_str(status_code)).append(CRLF);
 }
 
-std::string& response::str()
+// Build Response-Header
+std::string& response::header()
 {
     buf.clear();
 
     append_status_line();
 
-    if (status_code >= 400) {
-        set_content(err_page(status_code), "text/html");
-    }
-
     add_header("Server", "angel");
     add_header("Date", format_date());
-    add_header("Content-Length", std::to_string(content.size()));
 
     for (auto& [field, value] : headers) {
         format_header(buf, field.val, value);
     }
     buf.append(CRLF);
-    buf.append(content);
 
     headers.clear();
-    content.clear();
 
     return buf;
 }
+
+static const int BufferedSize = 4096;
+
+void response::send(std::string_view body)
+{
+    if (body.size() > 0)
+        add_header("Content-Length", std::to_string(body.size()));
+    if (body.size() >= BufferedSize) {
+        conn->send(header());
+        conn->send(body);
+    } else {
+        conn->send(header().append(body));
+    }
+}
+
+void response::send_chunk(std::string_view chunk)
+{
+    if (!chunked) {
+        chunked = true;
+        add_header("Transfer-Encoding", "chunked");
+        if (chunk.size() >= BufferedSize) {
+            conn->send(header());
+        } else {
+            chunked_buf.append(header());
+        }
+    }
+    char x[16];
+    snprintf(x, sizeof(x), "%zx\r\n", chunk.size());
+    if (chunk.size() >= BufferedSize) {
+        conn->send(chunked_buf.append(x));
+        conn->send(chunk);
+        chunked_buf.clear();
+        chunked_buf.append(CRLF);
+    } else {
+        chunked_buf.append(x).append(chunk).append(CRLF);
+        if (chunked_buf.size() >= BufferedSize) {
+            conn->send(chunked_buf);
+            chunked_buf.clear();
+        }
+    }
+}
+
+void response::send_done()
+{
+    chunked = false;
+    chunked_buf.append("0\r\n\r\n");
+    conn->send(chunked_buf);
+    chunked_buf.clear();
+}
+
+void response::send_err()
+{
+    add_header("Content-Type", "text/html");
+    send(err_page(status_code));
+}
+
+//==============================================
+//==============================================
 
 void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
 {
@@ -328,7 +371,7 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
                     code = BadRequest;
                     goto err;
                 }
-                if (expect(conn, req, res) == Failed) {
+                if (expect(req, res) == Failed) {
                     req.clear();
                     return;
                 }
@@ -367,7 +410,7 @@ void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
 err:
     ctx.response.set_status_code(code);
     ctx.response.add_header("Connection", "close");
-    conn->send(ctx.response.str());
+    ctx.response.send_err();
     conn->close();
 }
 
@@ -378,46 +421,24 @@ void HttpServer::process_request(const connection_ptr& conn, request& req, respo
 
     switch (req.method()) {
     case GET:
-        if (!handle_register_request(req, res)) {
-            if (!handle_static_file_request(conn, req, res)) {
-                res.set_status_code(NotFound);
-                conn->send(res.str());
-            }
-        } else {
-            if (!handle_static_file_request(conn, req, res)) {
-                req.etag = generate_etag(res.content);
-                res.add_header("ETag", req.etag);
-                res.none_file = true;
-                if (handle_conditional(conn, req, res) != Failed)
-                    conn->send(res.str());
-            }
-        }
+        if (handle_user_router(req, res)) break;
+        handle_static_file_request(req, res);
         break;
     case HEAD:
-        if (!handle_static_file_request(conn, req, res)) {
-            res.set_status_code(NotFound);
-            conn->send(res.str());
-        }
+        handle_static_file_request(req, res);
         break;
     case POST:
-        if (!handle_register_request(req, res)) {
-            res.set_status_code(NotFound);
-            conn->send(res.str());
-        } else {
-            req.etag = generate_etag(res.content);
-            res.add_header("ETag", req.etag);
-            res.none_file = true;
-            if (handle_conditional(conn, req, res) != Failed)
-                conn->send(res.str());
-        }
+        handle_user_router(req, res);
         break;
     case PUT:
+        handle_static_file_request(req, res);
+        break;
     case DELETE:
-        handle_static_file_request(conn, req, res);
+        handle_static_file_request(req, res);
         break;
     default:
         res.set_status_code(NotImplemented);
-        conn->send(res.str());
+        res.send_err();
         break;
     }
 
@@ -435,7 +456,7 @@ bool HttpServer::keepalive(request& req)
     return util::equal_case(it->second, "keep-alive");
 }
 
-bool HttpServer::handle_register_request(request& req, response& res)
+bool HttpServer::handle_user_router(request& req, response& res)
 {
     auto& table = router.at(req.method());
     auto it = table.find(req.path());
@@ -444,7 +465,15 @@ bool HttpServer::handle_register_request(request& req, response& res)
     return true;
 }
 
-bool HttpServer::handle_static_file_request(const connection_ptr& conn, request& req, response& res)
+void HttpServer::handle_file_router(request& req, response& res)
+{
+    auto it = file_table.find(req.path());
+    if (it != file_table.end()) {
+        it->second(req, res.headers);
+    }
+}
+
+void HttpServer::handle_static_file_request(request& req, response& res)
 {
     if (req.path() == "/") {
         req.abs_path += "index.html";
@@ -453,14 +482,18 @@ bool HttpServer::handle_static_file_request(const connection_ptr& conn, request&
     req.has_file = util::is_regular_file(req.path());
 
     if (req.method() == PUT) {
-        update_file(conn, req, res);
-        return true;
+        update_file(req, res);
+        return;
     } else if (req.method() == DELETE) {
-        delete_file(conn, req, res);
-        return true;
+        delete_file(req, res);
+        return;
     }
 
-    if (!req.has_file) return false;
+    if (!req.has_file) {
+        res.set_status_code(NotFound);
+        res.send_err();
+        return;
+    }
 
     auto last_modified_time = get_last_modified(req.path());
 
@@ -476,21 +509,20 @@ bool HttpServer::handle_static_file_request(const connection_ptr& conn, request&
     res.add_header("Accept-Ranges", "bytes");
     res.add_header("ETag", req.etag);
 
-    res.none_file = false;
-    if (handle_conditional(conn, req, res) == Failed) return true;
+    if (handle_conditional(req, res) == Failed) return;
 
     if (req.method() == GET) {
+        handle_file_router(req, res);
         if (req.headers().count("Range")) {
-            handle_range_request(conn, req, res);
+            handle_range_request(req, res);
         } else {
-            send_file(conn, req, res);
+            send_file(req, res);
         }
     } else if (req.method() == HEAD) {
         res.set_status_code(Ok);
         res.add_header("Content-Length", std::to_string(req.filesize));
-        conn->send(res.str());
+        res.send();
     }
-    return true;
 }
 
 // If-Match
@@ -515,27 +547,27 @@ bool HttpServer::handle_static_file_request(const connection_ptr& conn, request&
 // If-Match
 // If-Unmodified-Since
 //
-ConditionCode HttpServer::handle_conditional(const connection_ptr& conn, request& req, response& res)
+ConditionCode HttpServer::handle_conditional(request& req, response& res)
 {
-    if_range(conn, req, res);
+    if_range(req, res);
 
-    auto code = if_none_match(conn, req, res);
+    auto code = if_none_match(req, res);
     if (code != NoHeader) return code;
 
-    code = if_modified_since(conn, req, res);
+    code = if_modified_since(req, res);
     if (code != NoHeader) return code;
 
-    code = if_match(conn, req, res);
+    code = if_match(req, res);
     if (code != NoHeader) return code;
 
-    return if_unmodified_since(conn, req, res);
+    return if_unmodified_since(req, res);
 }
 
 // If-Match = "If-Match" ":" ( "*" | 1#entity-tag )
 //
 // It is used on updating requests, to prevent inadvertent
 // modification of the wrong version of a resource.
-ConditionCode HttpServer::if_match(const connection_ptr& conn, request& req, response& res)
+ConditionCode HttpServer::if_match(request& req, response& res)
 {
     auto it = req.headers().find("If-Match");
     if (it == req.headers().end()) return NoHeader;
@@ -550,8 +582,7 @@ ConditionCode HttpServer::if_match(const connection_ptr& conn, request& req, res
     }
     // None of the entity tags match.
     res.set_status_code(PreconditionFailed);
-    res.clear_content_if_none_file();
-    conn->send(res.str());
+    res.send_err();
     return Failed;
 }
 
@@ -561,7 +592,7 @@ ConditionCode HttpServer::if_match(const connection_ptr& conn, request& req, res
 // specified in this field, an entity will not be returned from
 // the server; instead, a 304 (not modified) response will be
 // returned without any message-body.
-ConditionCode HttpServer::if_modified_since(const connection_ptr& conn, request& req, response& res)
+ConditionCode HttpServer::if_modified_since(request& req, response& res)
 {
     auto it = req.headers().find("If-Modified-Since");
     if (it == req.headers().end()) return NoHeader;
@@ -570,8 +601,7 @@ ConditionCode HttpServer::if_modified_since(const connection_ptr& conn, request&
         return Successful;
     }
     res.set_status_code(NotModified);
-    res.clear_content_if_none_file();
-    conn->send(res.str());
+    res.send();
     return Failed;
 }
 
@@ -580,7 +610,7 @@ ConditionCode HttpServer::if_modified_since(const connection_ptr& conn, request&
 // It is used to prevent a method (e.g. PUT) from inadvertently
 // modifying an existing resource when the client believes that
 // the resource does not exist.
-ConditionCode HttpServer::if_none_match(const connection_ptr& conn, request& req, response& res)
+ConditionCode HttpServer::if_none_match(request& req, response& res)
 {
     auto it = req.headers().find("If-None-Match");
     if (it == req.headers().end()) return NoHeader;
@@ -608,11 +638,11 @@ ConditionCode HttpServer::if_none_match(const connection_ptr& conn, request& req
 end:
     if (req.method() == GET || req.method() == HEAD) {
         res.set_status_code(NotModified);
+        res.send();
     } else {
         res.set_status_code(PreconditionFailed);
+        res.send_err();
     }
-    res.clear_content_if_none_file();
-    conn->send(res.str());
     return Failed;
 }
 
@@ -631,7 +661,7 @@ end:
 // request. Informally, its meaning is `if the entity is unchanged,
 // send me the part(s) that I am missing; otherwise, send me the
 // entire new entity`.
-ConditionCode HttpServer::if_range(const connection_ptr& conn, request& req, response& res)
+ConditionCode HttpServer::if_range(request& req, response& res)
 {
     auto it = req.headers().find("If-Range");
     if (it == req.headers().end()) return NoHeader;
@@ -659,7 +689,7 @@ ConditionCode HttpServer::if_range(const connection_ptr& conn, request& req, res
 // If the requested variant has been modified since the specified time,
 // the server MUST NOT perform the requested operation, and MUST return
 // a 412 (Precondition Failed).
-ConditionCode HttpServer::if_unmodified_since(const connection_ptr& conn, request& req, response& res)
+ConditionCode HttpServer::if_unmodified_since(request& req, response& res)
 {
     auto it = req.headers().find("If-Unmodified-Since");
     if (it == req.headers().end()) return NoHeader;
@@ -668,8 +698,7 @@ ConditionCode HttpServer::if_unmodified_since(const connection_ptr& conn, reques
         return Successful;
     }
     res.set_status_code(PreconditionFailed);
-    res.clear_content_if_none_file();
-    conn->send(res.str());
+    res.send_err();
     return Failed;
 }
 
@@ -678,7 +707,7 @@ ConditionCode HttpServer::if_unmodified_since(const connection_ptr& conn, reques
 //
 // The Expect request-header field is used to indicate that particular
 // server behaviors are required by the client.
-ConditionCode HttpServer::expect(const connection_ptr& conn, request& req, response& res)
+ConditionCode HttpServer::expect(request& req, response& res)
 {
     auto it = req.headers().find("Expect");
     if (it == req.headers().end()) return NoHeader;
@@ -687,12 +716,11 @@ ConditionCode HttpServer::expect(const connection_ptr& conn, request& req, respo
         return Successful;
     }
     res.set_status_code(ExpectationFailed);
-    res.clear_content_if_none_file();
-    conn->send(res.str());
+    res.send_err();
     return Failed;
 }
 
-void HttpServer::send_file(const connection_ptr& conn, request& req, response& res)
+void HttpServer::send_file(request& req, response& res)
 {
     int fd = open(req.path().c_str(), O_RDONLY);
 
@@ -703,31 +731,30 @@ void HttpServer::send_file(const connection_ptr& conn, request& req, response& r
     if (req.filesize < 256 * 1024) {
         buffer buf;
         while (buf.read_fd(fd) > 0) ;
-        res.set_content({buf.peek(), buf.readable()});
-        conn->send(res.str());
+        res.send({buf.peek(), buf.readable()});
         close(fd);
         return;
     }
 
     res.add_header("Content-Length", std::to_string(req.filesize));
-    conn->send(res.str());
-    conn->send_file(fd, 0, req.filesize);
-    conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
+    res.send();
+    res.conn->send_file(fd, 0, req.filesize);
+    res.conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
 }
 
 // Update or create a file
-void HttpServer::update_file(const connection_ptr& conn, request& req, response& res)
+void HttpServer::update_file(request& req, response& res)
 {
     int fd = open(req.path().c_str(), O_RDWR | O_TRUNC | O_CREAT, 0644);
     if (fd < 0) {
         res.set_status_code(InternalServerError);
-        conn->send(res.str());
+        res.send_err();
         return;
     }
     bool rc = util::write_file(fd, req.message_body.data(), req.message_body.size());
     if (!rc) {
         res.set_status_code(InternalServerError);
-        conn->send(res.str());
+        res.send_err();
         close(fd);
         return;
     }
@@ -736,17 +763,17 @@ void HttpServer::update_file(const connection_ptr& conn, request& req, response&
     location.append(req.headers().at("Host"));
     location.append(req.path());
     res.add_header("Location", location);
-    conn->send(res.str());
+    res.send();
     close(fd);
 }
 
-void HttpServer::delete_file(const connection_ptr& conn, request& req, response& res)
+void HttpServer::delete_file(request& req, response& res)
 {
     if (req.has_file) {
         ::unlink(req.path().c_str());
     }
     res.set_status_code(NoContent);
-    conn->send(res.str());
+    res.send();
 }
 
 // Byte Ranges
@@ -781,7 +808,7 @@ struct byte_range_set {
     bool parse_suffix_byte_range_spec(byte_range& range, std::string_view spec);
 
     void build_multipart_header(response& res);
-    void send_range_response(const connection_ptr& conn, request& req, response& res);
+    void send_range_response(request& req, response& res);
 };
 
 // Content-Range = "Content-Range" ":" content-range-spec
@@ -809,22 +836,8 @@ static std::string content_range(std::string_view resp, off_t filesize)
     return range_spec;
 }
 
-static bool map_file_range(std::string& buf, int fd, byte_range& range)
-{
-    off_t offset = util::page_aligned(range.first_byte_pos);
-    off_t diff = range.first_byte_pos - offset;
-    size_t len = range.length();
-    char *start = reinterpret_cast<char*>(mmap(nullptr, len + diff, PROT_READ, MAP_SHARED, fd, offset));
-    if (start == MAP_FAILED) return false;
-    buf.append(start + diff, len).append(CRLF);
-    munmap(start, len + diff);
-    return true;
-}
-
-static const int BufferedSize = 1024 * 256;
-
 // Range: bytes=0-100,-100\r\n
-void HttpServer::handle_range_request(const connection_ptr& conn, request& req, response& res)
+void HttpServer::handle_range_request(request& req, response& res)
 {
     byte_range_set range_set;
 
@@ -835,23 +848,24 @@ void HttpServer::handle_range_request(const connection_ptr& conn, request& req, 
     if (range_set.filesize == 0) {
         res.set_status_code(Ok);
         res.add_header("Content-Type", range_set.mime_type);
-        conn->send(res.str());
+        res.add_header("Content-Length", "0");
+        res.send();
         return;
     }
 
     StatusCode code = range_set.parse_byte_ranges(req);
     switch (code) {
     case Ok:
-        send_file(conn, req, res);
+        send_file(req, res);
         return;
     case RequestedRangeNotSatisfiable:
         res.set_status_code(RequestedRangeNotSatisfiable);
         res.add_header("Content-Range", content_range("*", range_set.filesize));
-        conn->send(res.str());
-        conn->close();
+        res.send();
+        res.conn->close();
         return;
     case PartialContent:
-        range_set.send_range_response(conn, req, res);
+        range_set.send_range_response(req, res);
         break;
     default:
         abort();
@@ -951,7 +965,7 @@ void byte_range_set::build_multipart_header(response& res)
     res.add_header("Content-Length", std::to_string(len));
 }
 
-void byte_range_set::send_range_response(const connection_ptr& conn, request& req, response& res)
+void byte_range_set::send_range_response(request& req, response& res)
 {
     std::string buf;
     int fd = open(req.path().c_str(), O_RDONLY);
@@ -962,16 +976,15 @@ void byte_range_set::send_range_response(const connection_ptr& conn, request& re
         auto& range = ranges.back();
         res.add_header("Content-Type", mime_type);
         res.add_header("Content-Range", content_range(range.to_str(), filesize));
-        if (!map_file_range(res.content, fd, range)) {
-            res.headers.clear();
-            res.set_status_code(InternalServerError);
-        }
-        conn->send(res.str());
-        goto end;
+        res.add_header("Content-Length", std::to_string(range.length()));
+        res.send();
+        res.conn->send_file(fd, range.first_byte_pos, range.length());
+        res.conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
+        return;
     }
 
     build_multipart_header(res);
-    conn->send(res.str());
+    res.send();
 
     // Build and send each entity part in sequence.
     for (auto& range : ranges) {
@@ -979,35 +992,28 @@ void byte_range_set::send_range_response(const connection_ptr& conn, request& re
         format_header(buf, "Content-Type", mime_type);
         format_header(buf, "Content-Range", content_range(range.to_str(), filesize));
         buf.append(CRLF);
-        if (!map_file_range(buf, fd, range)) {
-            res.set_status_code(InternalServerError);
-            conn->send(res.str());
-            goto end;
-        }
-        if (buf.size() >= BufferedSize) {
-            conn->send(buf);
-            buf.clear();
-        }
+        res.conn->send(buf);
+        buf.clear();
+        res.conn->send_file(fd, range.first_byte_pos, range.length());
+        buf.append(CRLF);
     }
     buf.append("--").append(boundary).append("--").append(CRLF);
-    conn->send(buf);
-end:
-    close(fd);
+    res.conn->send(buf);
+    res.conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
 }
 
 const char *err_page(StatusCode code)
 {
     static thread_local char buf[1024];
-    snprintf(buf, sizeof(buf),
-            "<html>\n\
-            <head><title>%s %s</title></head>\n\
-            <body>\n\
-            <center><h1>%s %s</h1></center>\n\
-            <hr><center>ange-server</center>\n\
-            </body>\n\
-            </html>",
-            std::to_string(code).c_str(), to_str(code),
-            std::to_string(code).c_str(), to_str(code));
+    static const char *fmt =
+        "<html>\n"
+        "<head><title>%d %s</title></head>\n"
+        "<body>\n"
+        "<center><h1>%d %s</h1></center>\n"
+        "<hr><center>ange-server</center>\n"
+        "</body>\n"
+        "</html>";
+    snprintf(buf, sizeof(buf), fmt, code, to_str(code), code, to_str(code));
     return buf;
 }
 
@@ -1067,7 +1073,9 @@ HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
     : server(loop, listen_addr)
 {
     server.set_connection_handler([](const connection_ptr& conn){
-            conn->set_context(context());
+            context ctx;
+            ctx.response.conn = conn.get();
+            conn->set_context(std::move(ctx));
             });
     server.set_message_handler([this](const connection_ptr& conn, buffer& buf){
             this->message_handler(conn, buf);
@@ -1100,6 +1108,15 @@ HttpServer& HttpServer::Get(std::string_view path, const ServerHandler handler)
 HttpServer& HttpServer::Post(std::string_view path, const ServerHandler handler)
 {
     router[POST].emplace(path, std::move(handler));
+    return *this;
+}
+
+HttpServer& HttpServer::File(std::string_view path, const FileHandler handler)
+{
+    std::string file(base_dir);
+    file += path;
+    if (path == "/") file += "index.html";
+    file_table.emplace(file, std::move(handler));
     return *this;
 }
 
