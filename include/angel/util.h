@@ -25,9 +25,6 @@ int64_t get_cur_time_us();
 int get_ncpus();
 void set_thread_affinity(pthread_t tid, int cpu_number);
 
-std::string base64_encode(std::string_view data);
-std::string base64_decode(std::string_view data);
-
 // check ipv4 addr format
 bool check_ip(std::string_view ipv4_addr);
 

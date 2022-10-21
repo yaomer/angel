@@ -8,6 +8,7 @@
 #include <angel/client.h>
 #include <angel/util.h>
 #include <angel/sockops.h>
+#include <angel/base64.h>
 #include <angel/logger.h>
 
 namespace angel {
@@ -154,14 +155,15 @@ void send_task::auth()
 
 void send_task::do_auth(std::string_view arg)
 {
-    auto res = util::base64_decode(arg);
+    static base64 base64;
+    auto res = base64.decode(arg);
 
     if (strcasecmp(res.c_str(), "username:") == 0) {
-        auto s = util::base64_encode(username);
+        auto s = base64.encode(username);
         cli->conn()->send(s.append("\r\n"));
         log_debug("(smtplib) C: %s", s.c_str());
     } else if (strcasecmp(res.c_str(), "password:") == 0) {
-        auto s = util::base64_encode(password);
+        auto s = base64.encode(password);
         cli->conn()->send(s.append("\r\n"));
         log_debug("(smtplib) C: %s", s.c_str());
     }

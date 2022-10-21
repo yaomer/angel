@@ -1,11 +1,9 @@
-#include <string>
+#include <angel/base64.h>
 
 namespace angel {
-namespace util {
 
-static const char *indexs = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-//
 // 首先我们以3-byte为一个分组，每次取6-bit进行计算，这刚好可以表示为4个base64字符。
 //
 // 如果要编码的字节数不能被3整除，我们就在后面补足0，以便其能够被3整除，
@@ -25,60 +23,71 @@ static const char *indexs = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 // +------------+-------------+-------------+------------+
 //
 
-#define APPEND(i) res.push_back(indexs[i])
+static const int max_line_limit = 76;
 
-std::string base64_encode(std::string_view data)
+static const char *CRLF = "\r\n";
+
+std::string base64::encode(std::string_view data)
 {
     std::string res;
     unsigned char a, b, c;
-    unsigned char i1, i2, i3, i4;
+    unsigned char r[4];
 
     size_t len = data.size();
     res.reserve(len);
 
-    size_t i = 0;
-    while (true) {
-        if (i + 3 > len) break;
+    size_t j = 0;
+    for (size_t i = 0; i + 3 <= len; i += 3) {
         a = data[i];
         b = data[i + 1];
         c = data[i + 2];
-        i1 = a >> 2;
-        i2 = ((a & 0x03) << 4) | (b >> 4);
-        i3 = ((b & 0x0F) << 2) | (c >> 6);
-        i4 = (c & 0x3F);
-        APPEND(i1);
-        APPEND(i2);
-        APPEND(i3);
-        APPEND(i4);
-        i += 3;
+        r[0] = alphabet[a >> 2];
+        r[1] = alphabet[((a & 0x03) << 4) | (b >> 4)];
+        r[2] = alphabet[((b & 0x0F) << 2) | (c >> 6)];
+        r[3] = alphabet[( c & 0x3F)];
+        res.append((const char*)r, 4);
+        if (mime) {
+            j += 4;
+            if (j == max_line_limit) {
+                res.append(CRLF);
+                j = 0;
+            }
+        }
     }
     switch (len % 3) {
     case 1:
         a = data[len - 1];
-        i1 = a >> 2;
-        i2 = ((a & 0x03) << 4);
-        APPEND(i1);
-        APPEND(i2);
+        r[0] = alphabet[a >> 2];
+        r[1] = alphabet[((a & 0x03) << 4)];
+        res.append((const char*)r, 2);
         res.append("==");
+        j += 2;
         break;
     case 2:
         a = data[len - 2];
         b = data[len - 1];
-        i1 = a >> 2;
-        i2 = ((a & 0x03) << 4) | (b >> 4);
-        i3 = ((b & 0x0F) << 2);
-        APPEND(i1);
-        APPEND(i2);
-        APPEND(i3);
+        r[0] = alphabet[a >> 2];
+        r[1] = alphabet[((a & 0x03) << 4) | (b >> 4)];
+        r[2] = alphabet[((b & 0x0F) << 2)];
+        res.append((const char*)r, 3);
         res.append("=");
+        j += 3;
         break;
     }
+    if (mime) {
+        if (j > 0) res.append(CRLF);
+    }
+    mime = false;
     return res;
 }
 
-#undef APPEND
+std::string base64::encode_mime(std::string_view data)
+{
+    mime = true;
+    return encode(data);
+}
 
-static constexpr unsigned char mapchars[128] = {
+static constexpr unsigned char mapchars[256] = {
     0,      0,      0,      0,      0,      0,      0,      0, //  1
     0,      0,      0,      0,      0,      0,      0,      0, //  2
     0,      0,      0,      0,      0,      0,      0,      0, //  3
@@ -103,26 +112,24 @@ static constexpr unsigned char mapchars[128] = {
     c = mapchars[(unsigned char)(c3)]; \
     d = mapchars[(unsigned char)(c4)];
 
-#define APPEND(c) res.push_back(c)
-
-std::string base64_decode(std::string_view data)
+std::string base64::decode(std::string_view data)
 {
     std::string res;
+    unsigned char a, b, c, d;
+    unsigned char r[3];
+
     size_t len = data.size();
     assert(len > 0 && len % 4 == 0);
     res.reserve(len * 0.75);
-    unsigned char a, b, c, d;
+
     size_t i = 0;
-    while (true) {
-        if (i + 4 > len - 4) break;
+    while (i + 4 <= len - 4) {
         MAP4CHAR(a, b, c, d, data[i], data[i + 1], data[i + 2], data[i + 3])
         // 00xx xxxx 00xx xxxx 00xx xxxx 00xx xxxx
-        a = (a << 2) | (b >> 4);
-        b = (b << 4) | (c >> 2);
-        c = (c << 6) | (d);
-        APPEND(a);
-        APPEND(b);
-        APPEND(c);
+        r[0] = (a << 2) | (b >> 4);
+        r[1] = (b << 4) | (c >> 2);
+        r[2] = (c << 6) | (d);
+        res.append((const char*)r, 3);
         i += 4;
     }
 
@@ -130,18 +137,14 @@ std::string base64_decode(std::string_view data)
     // xx==: 00xx xxxx 00xx 0000
     // xxx=: 00xx xxxx 00xx xxxx 00xx xx00
     // xxxx: 00xx xxxx 00xx xxxx 00xx xxxx 00xx xxxx
-    a = (a << 2) | (b >> 4);
-    APPEND(a);
+    res.push_back((a << 2) | (b >> 4));
     if (data[i + 2] != '=') {
-        b = (b << 4) | (c >> 2);
-        APPEND(b);
+        res.push_back((b << 4) | (c >> 2));
         if (data[i + 3] != '=') {
-            c = (c << 6) | (d);
-            APPEND(c);
+            res.push_back((c << 6) | (d));
         }
     }
     return res;
 }
 
-}
 }

@@ -12,7 +12,7 @@
 #include <angel/sockops.h>
 #include <angel/util.h>
 #include <angel/sha1.h>
-#include <angel/logger.h>
+#include <angel/base64.h>
 
 namespace angel {
 
@@ -157,11 +157,12 @@ int WebSocketContext::handshake(buffer& buf, size_t crlf)
 void WebSocketContext::sec_websocket_accept(std::string_view key)
 {
     static sha1 sha1;
+    static base64 base64;
     static const char *guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
     std::string sec_key(key);
     sha1.update(sec_key + guid);
-    SecWebSocketAccept = util::base64_encode(sha1.digest());
+    SecWebSocketAccept = base64.encode(sha1.digest());
 }
 
 // Server:
@@ -422,13 +423,11 @@ void WebSocketContext::send_fragment(std::string_view fragment, bool final_fragm
     }
 }
 
-void WebSocketContext::send_file(const std::string& path)
+bool WebSocketContext::send_file(const std::string& path)
 {
     int fd = open(path.c_str(), O_RDONLY);
-    if (fd < 0) {
-        log_error("can't open %s: %s", path.c_str(), util::strerrno());
-        return;
-    }
+    if (fd < 0) return false;
+
     off_t filesize = util::get_file_size(fd);
     // 1 0 0 0 0 0 0 0 | (1 or 2)
     encode(filesize, 0x80 | opcode(is_binary_type));
@@ -436,6 +435,7 @@ void WebSocketContext::send_file(const std::string& path)
     conn->send_file(fd, 0, filesize);
     conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
     encoded_buffer.clear();
+    return true;
 }
 
 }

@@ -34,8 +34,8 @@ public:
     void send(std::string_view message);
     // Send a fragment, must end with send_fragment(,true).
     void send_fragment(std::string_view fragment, bool final_fragment = false);
-    // Async send a file.
-    void send_file(const std::string& path);
+    // Async send a file, return false if can't open path.
+    bool send_file(const std::string& path);
     // 1) Indicates the received message type.
     // 2) It is set by the user to indicate the type of sent message.
     bool is_binary_type; // binary or text

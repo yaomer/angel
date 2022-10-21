@@ -1,6 +1,7 @@
 #include <angel/mime.h>
 
 #include <angel/util.h>
+#include <angel/base64.h>
 
 namespace angel {
 namespace mime {
@@ -63,20 +64,8 @@ std::string encoder::encode_QP(std::string_view data)
 
 std::string encoder::encode_base64(std::string_view data)
 {
-    std::string res;
-    auto base64_data = util::base64_encode(data);
-    size_t n = base64_data.size();
-    size_t pos = 0;
-    while (pos + max_line_limit <= n) {
-        res.append(base64_data.data() + pos, max_line_limit);
-        res.append(CRLF);
-        pos += max_line_limit;
-    }
-    if (pos < n) {
-        res.append(base64_data.data() + pos, n - pos);
-        res.append(CRLF);
-    }
-    return res;
+    static thread_local base64 base64;
+    return base64.encode_mime(data);
 }
 
 static bool decode_ascii(std::string_view data)
