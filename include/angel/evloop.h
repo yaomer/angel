@@ -20,12 +20,12 @@ typedef std::function<void()> timer_callback_t;
 class signaler_t;
 typedef std::function<void()> signaler_handler_t;
 
+typedef std::function<void()> functor;
+typedef std::shared_ptr<channel> channel_ptr;
+
 // The event loop, the core of the recator mode.
 class evloop {
 public:
-    typedef std::function<void()> functor;
-    typedef std::shared_ptr<channel> channel_ptr;
-
     evloop();
     ~evloop();
     evloop(const evloop&) = delete;

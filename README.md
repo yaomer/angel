@@ -29,6 +29,11 @@ gcc >= 7.0 / clang >= 4.0
 #include <angel/evloop_thread.h>
 #include <iostream>
 ```
+然后在编译时链接至`angel`
+```
+$ clang++ -std=c++17 test.cc -langel
+```
+
 #### 定时器的使用
 ```cpp
 int main(void)
@@ -73,6 +78,10 @@ int main(void)
     loop.run();
 }
 ```
+我们有两种方法可用于处理标准输入：
+1. 使用双线程，主线程阻塞等待键盘输入，另起一个线程负责监听服务端响应。
+2. 只用单线程，使用channel将标准输入响应事件注册入evloop中，同时监听标准输入和服务端响应。
+
 ```cpp
 int main(void)
 {
@@ -84,7 +93,7 @@ int main(void)
             buf.retrieve_all();
             });
     client.start();
-    // 主线程监听键盘输入
+    // 主线程阻塞等待键盘输入
     char buf[1024];
     while (::fgets(buf, sizeof(buf), stdin)) {
         buf[strlen(buf) - 1] = '\0';
@@ -95,6 +104,34 @@ int main(void)
             break;
         }
     }
+}
+```
+```cpp
+int main()
+{
+    angel::evloop loop;
+    angel::client client(&loop, angel::inet_addr("127.0.0.1:8000"));
+    client.set_message_handler([](const angel::connection_ptr& conn, angel::buffer& buf){
+            std::cout << buf.c_str() << "\n";
+            buf.retrieve_all();
+            });
+    client.start();
+
+    char buf[1024];
+    angel::channel_ptr chl(new angel::channel(&loop));
+    chl->set_fd(0); // 标准输入
+    chl->set_read_handler([&buf, &client, &loop]{
+            fgets(buf, sizeof(buf), stdin); // 每次读取一行
+            if (client.is_connected()) {
+                client.conn()->send(buf);
+            } else {
+                std::cout << "disconnect with server\n";
+                loop.quit();
+            }
+            });
+    loop.add_channel(chl);
+
+    loop.run();
 }
 ```
 #### 将服务器多线程化
@@ -148,6 +185,23 @@ int main(void)
             conn->send(">bye bye<\n");
             });
     server.start();
+    loop.run();
+}
+```
+#### 客户端连接超时处理
+```cpp
+int main(void)
+{
+    angel::evloop loop;
+    angel::client client(&loop, angel::inet_addr("1.2.3.4:80"));
+    client.set_connection_timeout_handler(6000, [&loop]{
+            std::cout << "connection timeout\n";
+            loop.quit();
+            });
+    client.set_connection_handler([](const angel::connection_ptr& conn){
+            std::cout << "connection success\n";
+            });
+    client.start();
     loop.run();
 }
 ```
