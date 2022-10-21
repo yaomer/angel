@@ -27,16 +27,13 @@ enum State {
     INIT, EHLO, AUTH, MAIL, RCPT, DATA, QUIT, CLOSE
 };
 
-// The reason why we need to inherit `enable_shared_from_this` is
-// because there are timed events with deferred execution.
-struct send_task : public std::enable_shared_from_this<send_task> {
+struct send_task {
     size_t id;
     std::string host;
     int port;
     std::queue<std::string> try_addrs;
     std::unique_ptr<client> cli;
     int state = INIT;
-    size_t timer_id = 0;
     size_t rcpt_index = 0;
     bool need_auth = false;
     std::string username;
@@ -48,7 +45,6 @@ struct send_task : public std::enable_shared_from_this<send_task> {
     smtp *smtp;
 
     void start();
-    void set_try_addrs();
     void set_result(bool is_ok, std::string_view err = {});
     void send_mail(const connection_ptr& conn, buffer& buf);
     // Command Execution Sequence
@@ -81,30 +77,31 @@ result_future smtp::send_mail(std::string_view host, int port,
     task->mail_data = data;
     task->smtp      = this;
 
-    task->set_try_addrs();
-
     auto f = task->res_promise.get_future();
     {
         std::lock_guard<std::mutex> lk(task_map_mutex);
         task_map.emplace(task->id, task);
     }
-    task->start();
+
+    auto addr_list = resolver->get_addr_list(host, 1000 * 10);
+    for (auto& addr : addr_list) {
+        task->try_addrs.emplace(std::move(addr));
+    }
+    if (task->try_addrs.empty()) {
+        auto err = util::concat("dns resolve timeout for ", host);
+        log_error("(smtplib) %s", err.c_str());
+        task->set_result(false, err);
+    } else {
+        task->start();
+    }
 
     return f;
-}
-
-void send_task::set_try_addrs()
-{
-    auto addr_list = smtp->resolver->get_addr_list(host);
-    for (auto& addr : addr_list) {
-        try_addrs.emplace(std::move(addr));
-    }
 }
 
 void send_task::start()
 {
     if (try_addrs.empty()) {
-        std::string err = "No " + host + " address available";
+        auto err = util::concat("No ", host, " address available");
         log_error("(smtplib) %s", err.c_str());
         set_result(false, err);
         return;
@@ -118,22 +115,17 @@ void send_task::start()
     cli->set_message_handler([this](const connection_ptr& conn, buffer& buf){
             this->send_mail(conn, buf);
             });
-    cli->start();
-
-    // If can't connect to the addr after 30s, try another addr
-    timer_id = smtp->sender.get_loop()->run_after(1000 * 30, [task = shared_from_this()]{
-            if (task->cli->is_connected()) return;
-            log_warn("(smtplib) can't connect to (%s), try another...", task->cli->get_peer_addr().to_host());
-            task->start();
+    // If can't connect to the addr after 10s, try another addr
+    cli->set_connection_timeout_handler(1000 * 10, [this]{
+            if (cli->is_connected()) return;
+            log_warn("(smtplib) can't connect to (%s), try another...", cli->get_peer_addr().to_host());
+            start();
             });
+    cli->start();
 }
 
 void send_task::set_result(bool is_ok, std::string_view err)
 {
-    if (timer_id > 0) {
-        smtp->sender.get_loop()->cancel_timer(timer_id);
-    }
-
     result res;
     res.is_ok = is_ok;
     res.err = err;
