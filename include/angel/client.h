@@ -28,7 +28,8 @@ public:
     client& operator=(const client&) = delete;
 
     void start();
-    void restart(inet_addr);
+    void restart();
+    void restart(inet_addr peer_addr);
     bool is_connected();
     const connection_ptr& conn() const { return cli_conn; }
     inet_addr get_peer_addr() { return peer_addr; }
@@ -44,6 +45,8 @@ public:
 private:
     void new_connection(int fd);
     void close_connection(const connection_ptr&);
+    void add_connection_timeout_timer();
+    void cancel_connection_timeout_timer();
 
     evloop *loop;
     client_options ops;
@@ -56,6 +59,7 @@ private:
     close_handler_t close_handler;
     connection_timeout_handler_t connection_timeout_handler;
     high_water_mark_handler_t high_water_mark_handler;
+    size_t connection_timeout_timer_id;
     int connection_timeout; // ms
     size_t high_water_mark;
 };

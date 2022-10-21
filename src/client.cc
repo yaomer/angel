@@ -8,6 +8,7 @@ namespace angel {
 
 client::client(evloop *loop, inet_addr peer_addr, client_options ops)
     : loop(loop), ops(ops), peer_addr(peer_addr),
+    connection_timeout_timer_id(0),
     high_water_mark(0)
 {
 }
@@ -32,6 +33,7 @@ void client::new_connection(int fd)
     loop->run_in_loop([conn = cli_conn]{
             conn->establish();
             });
+    cancel_connection_timeout_timer();
 }
 
 void client::close_connection(const connection_ptr& conn)
@@ -43,18 +45,34 @@ void client::close_connection(const connection_ptr& conn)
     loop->remove_channel(conn->get_channel());
     // should close(fd) after remove_channel()
     loop->run_in_loop([conn = cli_conn]() mutable { conn.reset(); });
+    cancel_connection_timeout_timer();
     if (ops.is_quit_loop) loop->quit();
+}
+
+void client::add_connection_timeout_timer()
+{
+    if (connection_timeout_handler) {
+        connection_timeout_timer_id = loop->run_after(connection_timeout, [this]{
+                if (this->is_connected()) return;
+                // Avoid the context in which it is executing is changed,
+                // when call set_connection_timeout_handler() in connection_timeout_handler()
+                auto handler = this->connection_timeout_handler;
+                handler();
+                });
+    }
+}
+
+void client::cancel_connection_timeout_timer()
+{
+    if (connection_timeout_timer_id > 0) {
+        loop->cancel_timer(connection_timeout_timer_id);
+        connection_timeout_timer_id = 0;
+    }
 }
 
 void client::start()
 {
-    if (connection_timeout_handler) {
-        loop->run_after(connection_timeout, [this]{
-                if (this->is_connected()) return;
-                this->connection_timeout_handler();
-                });
-    }
-
+    add_connection_timeout_timer();
     auto handler = [this](int fd){ this->new_connection(fd); };
     connector.reset(new connector_t(loop, peer_addr, handler,
                                     ops.retry_interval_ms,
@@ -62,11 +80,16 @@ void client::start()
     connector->connect();
 }
 
+void client::restart()
+{
+    close_connection(cli_conn);
+    start();
+}
+
 void client::restart(inet_addr peer_addr)
 {
     this->peer_addr = peer_addr;
-    close_connection(cli_conn);
-    start();
+    restart();
 }
 
 bool client::is_connected()
