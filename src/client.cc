@@ -17,11 +17,6 @@ client::~client()
     close_connection(cli_conn);
 }
 
-bool client::is_connected()
-{
-    return connector->is_connected() && cli_conn;
-}
-
 void client::new_connection(int fd)
 {
     log_info("client(fd=%d) connected to host (%s)", fd, peer_addr.to_host());
@@ -39,8 +34,27 @@ void client::new_connection(int fd)
             });
 }
 
+void client::close_connection(const connection_ptr& conn)
+{
+    if (!conn) return;
+    if (conn->is_closed()) return;
+    if (close_handler) close_handler(conn);
+    conn->set_state(connection::state::closed);
+    loop->remove_channel(conn->get_channel());
+    // should close(fd) after remove_channel()
+    loop->run_in_loop([conn = cli_conn]() mutable { conn.reset(); });
+    if (ops.is_quit_loop) loop->quit();
+}
+
 void client::start()
 {
+    if (connection_timeout_handler) {
+        loop->run_after(connection_timeout, [this]{
+                if (this->is_connected()) return;
+                this->connection_timeout_handler();
+                });
+    }
+
     auto handler = [this](int fd){ this->new_connection(fd); };
     connector.reset(new connector_t(loop, peer_addr, handler,
                                     ops.retry_interval_ms,
@@ -55,33 +69,53 @@ void client::restart(inet_addr peer_addr)
     start();
 }
 
-void client::close_connection(const connection_ptr& conn)
+bool client::is_connected()
 {
-    if (!conn) return;
-    if (conn->is_closed()) return;
-    if (close_handler) close_handler(conn);
-    conn->set_state(connection::state::closed);
-    loop->remove_channel(conn->get_channel());
-    // should close(fd) after remove_channel()
-    loop->run_in_loop([conn = cli_conn]() mutable { conn.reset(); });
-    if (ops.is_quit_loop) loop->quit();
+    return connector->is_connected() && cli_conn;
+}
+
+void client::set_connection_handler(connection_handler_t handler)
+{
+    connection_handler = std::move(handler);
+}
+
+void client::set_message_handler(message_handler_t handler)
+{
+    message_handler = std::move(handler);
+}
+
+void client::set_close_handler(close_handler_t handler)
+{
+    close_handler = std::move(handler);
+}
+
+void client::set_connection_timeout_handler(int timeout_ms, connection_timeout_handler_t handler)
+{
+    if (timeout_ms <= 0) return;
+    connection_timeout = timeout_ms;
+    connection_timeout_handler = std::move(handler);
+}
+
+void client::set_high_water_mark_handler(size_t size, high_water_mark_handler_t handler)
+{
+    high_water_mark = size;
+    high_water_mark_handler = std::move(handler);
 }
 
 void client::start_task_threads(size_t thread_nums, enum thread_pool::policy policy)
 {
-    if (thread_nums > 0)
+    if (thread_nums > 0) {
         task_thread_pool.reset(new thread_pool(policy, thread_nums));
-    else
+    } else {
         task_thread_pool.reset(new thread_pool(policy));
+    }
 }
 
 void client::executor(const task_callback_t task)
 {
-    if (!task_thread_pool) {
-        log_error("task_thread_pool is null");
-        return;
+    if (task_thread_pool) {
+        task_thread_pool->executor(task);
     }
-    task_thread_pool->executor(task);
 }
 
 }

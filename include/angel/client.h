@@ -20,6 +20,8 @@ struct client_options {
 
 class client {
 public:
+    typedef std::function<void()> connection_timeout_handler_t;
+
     client(evloop *, inet_addr, client_options ops = client_options());
     ~client();
     client(const client&) = delete;
@@ -30,17 +32,11 @@ public:
     bool is_connected();
     const connection_ptr& conn() const { return cli_conn; }
     inet_addr get_peer_addr() { return peer_addr; }
-    void set_connection_handler(const connection_handler_t handler)
-    { connection_handler = std::move(handler); }
-    void set_message_handler(const message_handler_t handler)
-    { message_handler = std::move(handler); }
-    void set_close_handler(const close_handler_t handler)
-    { close_handler = std::move(handler); }
-    void set_high_water_mark_handler(size_t size, const high_water_mark_handler_t handler)
-    {
-        high_water_mark = size;
-        high_water_mark_handler = std::move(handler);
-    }
+    void set_connection_handler(connection_handler_t handler);
+    void set_message_handler(message_handler_t handler);
+    void set_close_handler(close_handler_t handler);
+    void set_connection_timeout_handler(int timeout_ms, connection_timeout_handler_t handler);
+    void set_high_water_mark_handler(size_t size, high_water_mark_handler_t handler);
     // select by angel if thread_nums = 0
     void start_task_threads(size_t thread_nums = 0,
                             enum thread_pool::policy policy = thread_pool::policy::fixed);
@@ -51,14 +47,16 @@ private:
 
     evloop *loop;
     client_options ops;
+    inet_addr peer_addr;
     std::unique_ptr<connector_t> connector;
     std::shared_ptr<connection> cli_conn;
     std::unique_ptr<thread_pool> task_thread_pool;
     connection_handler_t connection_handler;
     message_handler_t message_handler;
     close_handler_t close_handler;
+    connection_timeout_handler_t connection_timeout_handler;
     high_water_mark_handler_t high_water_mark_handler;
-    inet_addr peer_addr;
+    int connection_timeout; // ms
     size_t high_water_mark;
 };
 
