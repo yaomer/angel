@@ -178,6 +178,31 @@ std::string join(const std::string& delimiter, const Container& c)
     return oss.str();
 }
 
+inline std::string catviews(std::initializer_list<std::string_view> views)
+{
+    std::string buf;
+
+    size_t size = 0;
+    for (const auto& s : views) {
+        size += s.size();
+    }
+
+    buf.resize(size);
+    char *after = buf.data();
+    for (const auto& s : views) {
+        memcpy(after, s.data(), s.size());
+        after += s.size();
+    }
+    return buf;
+}
+
+// Convenient fast concat const char*
+template <typename... Args>
+inline std::string concat(std::string_view s, Args... args)
+{
+    return catviews({s, args...});
+}
+
 #define UNUSED(x) ((void)(x))
 
 }
