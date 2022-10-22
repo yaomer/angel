@@ -11,6 +11,11 @@
 namespace angel {
 namespace httplib {
 
+enum Version {
+    HTTP_VERSION_1_0, // HTTP/1.0
+    HTTP_VERSION_1_1, // HTTP/1.1
+};
+
 enum Method {
     OPTIONS,
     GET,
@@ -102,7 +107,7 @@ class request {
 public:
     Method method() const { return req_method; }
     const std::string& path() const { return abs_path; }
-    const std::string& version() const { return http_version; }
+    Version version() const { return http_version; }
     const std::string& body() const { return message_body; }
     const Params& params() const { return req_params; }
     const Headers& headers() const { return req_headers; }
@@ -119,7 +124,7 @@ private:
 
     Method req_method;
     std::string abs_path;
-    std::string http_version;
+    Version http_version;
     std::string message_body;
     size_t length;
     bool chunked = false;
@@ -184,6 +189,8 @@ public:
     void set_base_dir(std::string_view dir);
     // Set parallel threads for request
     void set_parallel(unsigned n);
+    // Set idle time for http connection
+    void set_idle(int secs);
     // Set how to generate file etag
     // 1) default: file mtime "-" file size
     // 2) sha1: file sha1 digest "-" file size
@@ -218,6 +225,7 @@ private:
     std::unordered_map<Method, Table> router;
     std::unordered_map<std::string, FileHandler> file_table;
     std::string base_dir;
+    int idle_time;
     bool generate_file_etag_by_sha1 = false;
 };
 

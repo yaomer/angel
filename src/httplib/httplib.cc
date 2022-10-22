@@ -83,8 +83,10 @@ StatusCode request::parse_line(buffer& buf)
     // Parse HTTP-Version
     if (res[2].size() != 8 || !util::starts_with(res[2], "HTTP/"))
         return BadRequest;
-    if (util::ends_with(res[2], "1.0") || util::ends_with(res[2], "1.1")) {
-        http_version = res[2];
+    if (util::ends_with(res[2], "1.1")) {
+        http_version = HTTP_VERSION_1_1;
+    } else if (util::ends_with(res[2], "1.0")) {
+        http_version = HTTP_VERSION_1_0;
     } else if (util::ends_with(res[2], "2.0")) {
         return HttpVersionNotSupported;
     } else {
@@ -230,7 +232,6 @@ void request::clear()
 {
     state = ParseLine;
     abs_path.clear();
-    http_version.clear();
     message_body.clear();
     req_params.clear();
     req_headers.clear();
@@ -452,7 +453,10 @@ void HttpServer::process_request(const connection_ptr& conn, request& req, respo
 bool HttpServer::keepalive(request& req)
 {
     auto it = req.headers().find("Connection");
-    if (it == req.headers().end()) return false;
+    if (it == req.headers().end()) {
+        // HTTP/1.1 Keep-Alive by default
+        return req.version() == HTTP_VERSION_1_1;
+    }
     return util::equal_case(it->second, "keep-alive");
 }
 
@@ -1072,10 +1076,11 @@ const char *to_str(StatusCode code)
 HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
     : server(loop, listen_addr)
 {
-    server.set_connection_handler([](const connection_ptr& conn){
+    server.set_connection_handler([this](const connection_ptr& conn){
             context ctx;
             ctx.response.conn = conn.get();
             conn->set_context(std::move(ctx));
+            conn->set_ttl(this->idle_time * 1000);
             });
     server.set_message_handler([this](const connection_ptr& conn, buffer& buf){
             this->message_handler(conn, buf);
@@ -1092,6 +1097,12 @@ void HttpServer::set_parallel(unsigned n)
 {
     if (n == 0) return;
     server.start_io_threads(n);
+}
+
+void HttpServer::set_idle(int secs)
+{
+    if (secs <= 0) return;
+    idle_time = secs;
 }
 
 void HttpServer::generate_file_etag_by(std::string_view way)
@@ -1123,6 +1134,7 @@ HttpServer& HttpServer::File(std::string_view path, const FileHandler handler)
 void HttpServer::start()
 {
     set_base_dir(".");
+    set_idle(30); // 30s by default
     server.set_nodelay(true);
     server.set_keepalive(true);
     server.start();
