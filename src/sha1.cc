@@ -49,6 +49,59 @@ static void padding(std::string& buf, const char *endptr, size_t size)
 // Rotate Left Shift
 #define rls(x, n) ((x << n) | (x >> (32 - n)))
 
+#define round1(i, k) \
+    f = (b & c) ^ (~b & d); \
+    w[i] = (chunk[4 * i + 0] & 0xff) << 24 | \
+           (chunk[4 * i + 1] & 0xff) << 16 | \
+           (chunk[4 * i + 2] & 0xff) << 8 | \
+           (chunk[4 * i + 3] & 0xff); \
+    t = rls(a, 5) + f + e + k + w[i]; \
+    e = d; \
+    d = c; \
+    c = rls(b, 30); \
+    b = a; \
+    a = t;
+
+#define round2(i, k) \
+    f = (b & c) ^ (~b & d); \
+    w[i] = rls((w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]), 1); \
+    t = rls(a, 5) + f + e + k + w[i]; \
+    e = d; \
+    d = c; \
+    c = rls(b, 30); \
+    b = a; \
+    a = t;
+
+#define round3(i, k) \
+    f = b ^ c ^ d; \
+    w[i] = rls((w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]), 1); \
+    t = rls(a, 5) + f + e + k + w[i]; \
+    e = d; \
+    d = c; \
+    c = rls(b, 30); \
+    b = a; \
+    a = t;
+
+#define round4(i, k) \
+    f = (b & c) ^ (b & d) ^ (c & d); \
+    w[i] = rls((w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]), 1); \
+    t = rls(a, 5) + f + e + k + w[i]; \
+    e = d; \
+    d = c; \
+    c = rls(b, 30); \
+    b = a; \
+    a = t;
+
+#define round5(i, k) \
+    f = b ^ c ^ d; \
+    w[i] = rls((w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]), 1); \
+    t = rls(a, 5) + f + e + k + w[i]; \
+    e = d; \
+    d = c; \
+    c = rls(b, 30); \
+    b = a; \
+    a = t;
+
 static void __chunk_cal(const char *chunk, uint32_t h[5])
 {
     uint32_t a = h[0];
@@ -56,39 +109,89 @@ static void __chunk_cal(const char *chunk, uint32_t h[5])
     uint32_t c = h[2];
     uint32_t d = h[3];
     uint32_t e = h[4];
-    uint32_t f, k, t;
+    uint32_t f, t;
     uint32_t w[80];
 
-    for (int i = 0; i < 80; i++) {
-        if (i >= 0 && i <= 19) {
-            f = (b & c) ^ (~b & d);
-            k = 0x5A827999;
-        } else if (i >= 20 && i <= 39) {
-            f = b ^ c ^ d;
-            k = 0x6ED9EBA1;
-        } else if (i >= 40 && i <= 59) {
-            f = (b & c) ^ (b & d) ^ (c & d);
-            k = 0x8F1BBCDC;
-        } else if (i >= 60 && i <= 79) {
-            f = b ^ c ^ d;
-            k = 0xCA62C1D6;
-        }
-        if (i <= 15) {
-            // Convert chunk[4] to a Word(32-bits)
-            w[i] = (chunk[4 * i + 0] & 0xff) << 24 |
-                   (chunk[4 * i + 1] & 0xff) << 16 |
-                   (chunk[4 * i + 2] & 0xff) << 8 |
-                   (chunk[4 * i + 3] & 0xff);
-        } else {
-            w[i] = rls((w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]), 1);
-        }
-        t = rls(a, 5) + f + e + k + w[i];
-        e = d;
-        d = c;
-        c = rls(b, 30);
-        b = a;
-        a = t;
-    }
+    round1(0,  0x5A827999)
+    round1(1,  0x5A827999)
+    round1(2,  0x5A827999)
+    round1(3,  0x5A827999)
+    round1(4,  0x5A827999)
+    round1(5,  0x5A827999)
+    round1(6,  0x5A827999)
+    round1(7,  0x5A827999)
+    round1(8,  0x5A827999)
+    round1(9,  0x5A827999)
+    round1(10, 0x5A827999)
+    round1(11, 0x5A827999)
+    round1(12, 0x5A827999)
+    round1(13, 0x5A827999)
+    round1(14, 0x5A827999)
+    round1(15, 0x5A827999)
+    round2(16, 0x5A827999)
+    round2(17, 0x5A827999)
+    round2(18, 0x5A827999)
+    round2(19, 0x5A827999)
+    round3(20, 0x6ED9EBA1)
+    round3(21, 0x6ED9EBA1)
+    round3(22, 0x6ED9EBA1)
+    round3(23, 0x6ED9EBA1)
+    round3(24, 0x6ED9EBA1)
+    round3(25, 0x6ED9EBA1)
+    round3(26, 0x6ED9EBA1)
+    round3(27, 0x6ED9EBA1)
+    round3(28, 0x6ED9EBA1)
+    round3(29, 0x6ED9EBA1)
+    round3(30, 0x6ED9EBA1)
+    round3(31, 0x6ED9EBA1)
+    round3(32, 0x6ED9EBA1)
+    round3(33, 0x6ED9EBA1)
+    round3(34, 0x6ED9EBA1)
+    round3(35, 0x6ED9EBA1)
+    round3(36, 0x6ED9EBA1)
+    round3(37, 0x6ED9EBA1)
+    round3(38, 0x6ED9EBA1)
+    round3(39, 0x6ED9EBA1)
+    round4(40, 0x8F1BBCDC)
+    round4(41, 0x8F1BBCDC)
+    round4(42, 0x8F1BBCDC)
+    round4(43, 0x8F1BBCDC)
+    round4(44, 0x8F1BBCDC)
+    round4(45, 0x8F1BBCDC)
+    round4(46, 0x8F1BBCDC)
+    round4(47, 0x8F1BBCDC)
+    round4(48, 0x8F1BBCDC)
+    round4(49, 0x8F1BBCDC)
+    round4(50, 0x8F1BBCDC)
+    round4(51, 0x8F1BBCDC)
+    round4(52, 0x8F1BBCDC)
+    round4(53, 0x8F1BBCDC)
+    round4(54, 0x8F1BBCDC)
+    round4(55, 0x8F1BBCDC)
+    round4(56, 0x8F1BBCDC)
+    round4(57, 0x8F1BBCDC)
+    round4(58, 0x8F1BBCDC)
+    round4(59, 0x8F1BBCDC)
+    round5(60, 0xCA62C1D6)
+    round5(61, 0xCA62C1D6)
+    round5(62, 0xCA62C1D6)
+    round5(63, 0xCA62C1D6)
+    round5(64, 0xCA62C1D6)
+    round5(65, 0xCA62C1D6)
+    round5(66, 0xCA62C1D6)
+    round5(67, 0xCA62C1D6)
+    round5(68, 0xCA62C1D6)
+    round5(69, 0xCA62C1D6)
+    round5(70, 0xCA62C1D6)
+    round5(71, 0xCA62C1D6)
+    round5(72, 0xCA62C1D6)
+    round5(73, 0xCA62C1D6)
+    round5(74, 0xCA62C1D6)
+    round5(75, 0xCA62C1D6)
+    round5(76, 0xCA62C1D6)
+    round5(77, 0xCA62C1D6)
+    round5(78, 0xCA62C1D6)
+    round5(79, 0xCA62C1D6)
 
     h[0] += a;
     h[1] += b;
@@ -202,23 +305,24 @@ std::string sha1::digest()
 
 std::string sha1::hex_digest()
 {
-    std::string buf;
     static const char *tohex = "0123456789ABCDEF";
 
+    std::string hexs;
+    hexs.resize(40);
+
     final_cal();
-    buf.reserve(40);
     for (int i = 0; i < 5; i++) {
-        buf.push_back(tohex[(h[i] >> 4 * 7) & 0x0f]);
-        buf.push_back(tohex[(h[i] >> 4 * 6) & 0x0f]);
-        buf.push_back(tohex[(h[i] >> 4 * 5) & 0x0f]);
-        buf.push_back(tohex[(h[i] >> 4 * 4) & 0x0f]);
-        buf.push_back(tohex[(h[i] >> 4 * 3) & 0x0f]);
-        buf.push_back(tohex[(h[i] >> 4 * 2) & 0x0f]);
-        buf.push_back(tohex[(h[i] >> 4 * 1) & 0x0f]);
-        buf.push_back(tohex[(h[i] >> 4 * 0) & 0x0f]);
+        hexs[0 + i * 8] = (tohex[(h[i] >> 4 * 7) & 0x0f]);
+        hexs[1 + i * 8] = (tohex[(h[i] >> 4 * 6) & 0x0f]);
+        hexs[2 + i * 8] = (tohex[(h[i] >> 4 * 5) & 0x0f]);
+        hexs[3 + i * 8] = (tohex[(h[i] >> 4 * 4) & 0x0f]);
+        hexs[4 + i * 8] = (tohex[(h[i] >> 4 * 3) & 0x0f]);
+        hexs[5 + i * 8] = (tohex[(h[i] >> 4 * 2) & 0x0f]);
+        hexs[6 + i * 8] = (tohex[(h[i] >> 4 * 1) & 0x0f]);
+        hexs[7 + i * 8] = (tohex[(h[i] >> 4 * 0) & 0x0f]);
     }
     init();
-    return buf;
+    return hexs;
 }
 
 }
