@@ -129,6 +129,13 @@ inline bool ends_with_case(std::string_view s, std::string_view suffix)
            strncasecmp(s.data() + s.size() - suffix.size(), suffix.data(), suffix.size()) == 0;
 }
 
+inline const char *search(std::string_view s, std::string_view pattern)
+{
+    const char *end = s.data() + s.size();
+    const char *p = std::search(s.data(), end, pattern.data(), pattern.data() + pattern.size());
+    return p == end ? nullptr : p;
+}
+
 // if c == ','
 // for [a,b,c,d] return [a][b][c][d]
 inline std::vector<std::string_view> split(std::string_view s, int c)

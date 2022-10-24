@@ -4,8 +4,13 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <mutex>
+#include <future>
 
 #include <angel/server.h>
+#include <angel/client.h>
+#include <angel/evloop_thread.h>
+#include <angel/resolver.h>
 #include <angel/util.h>
 
 namespace angel {
@@ -17,14 +22,7 @@ enum Version {
 };
 
 enum Method {
-    OPTIONS,
-    GET,
-    HEAD,
-    POST,
-    PUT,
-    DELETE,
-    TRACE,
-    CONNECT,
+    OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT,
 };
 
 enum StatusCode {
@@ -76,12 +74,6 @@ enum StatusCode {
 
 const char *to_str(StatusCode code);
 
-enum ParseState {
-    ParseLine,
-    ParseHeader,
-    ParseBody,
-};
-
 struct field {
     field(const char *s) : val(s) {  }
     field(std::string_view s) : val(s) {  }
@@ -103,39 +95,69 @@ struct field_hash {
 typedef std::unordered_map<std::string, std::string> Params;
 typedef std::unordered_map<field, std::string, field_hash> Headers;
 
-class request {
-public:
-    Method method() const { return req_method; }
-    const std::string& path() const { return abs_path; }
-    Version version() const { return http_version; }
-    const std::string& body() const { return message_body; }
-    const Params& params() const { return req_params; }
-    const Headers& headers() const { return req_headers; }
-private:
-    StatusCode parse_line(buffer& buf);
+enum ParseState {
+    ParseLine,
+    ParseHeader,
+    ParseBody,
+};
+
+// HTTP Message base class
+struct message {
+    Headers headers;
+    std::string body;
+    size_t length;
+    bool chunked = false;
+    ssize_t chunk_size = -1;
     StatusCode parse_header(buffer& buf);
     StatusCode parse_body_length();
     StatusCode parse_body(buffer& buf);
     StatusCode parse_body_by_content_length(buffer& buf);
     StatusCode parse_body_by_chunked(buffer& buf);
     void clear();
+};
 
-    int state = ParseLine;
+struct uri {
+    // Encode characters other than "-_.~", letters and numbers.
+    static std::string encode(std::string_view uri);
+    static bool decode(std::string_view uri, std::string& res);
+    static bool parse_params(const char *first, const char *last, Params& params);
+
+    bool parse(std::string_view uri);
+    void clear();
+    std::string scheme;
+    std::string host;
+    int port;
+    std::string path;
+    Params params;
+    std::string fragment;
+};
+
+//====================================================
+//=================== HttpServer =====================
+//====================================================
+
+class request : private message {
+public:
+    Method method() const { return req_method; }
+    const std::string& path() const { return abs_path; }
+    Version version() const { return http_version; }
+    const Params& params() const { return query_params; }
+    const Headers& headers() const { return message::headers; }
+    const std::string& body() const { return message::body; }
+private:
+    StatusCode parse_line(buffer& buf);
+    void clear();
+
+    ParseState state = ParseLine;
 
     Method req_method;
     std::string abs_path;
     Version http_version;
-    std::string message_body;
-    size_t length;
-    bool chunked = false;
-    ssize_t chunk_size = -1;
+    Params query_params;
     bool has_file;
     off_t filesize;
     std::string last_modified;
     std::string etag;
-
-    Params req_params;
-    Headers req_headers;
     friend class HttpServer;
 };
 
@@ -227,6 +249,103 @@ private:
     std::string base_dir;
     int idle_time;
     bool generate_file_etag_by_sha1 = false;
+};
+
+//====================================================
+//=================== HttpClient =====================
+//====================================================
+
+class http_request {
+public:
+    // Convenient chain call
+    http_request& set_url(std::string_view url);
+    http_request& set_params(const Params& params);
+    http_request& set_headers(const Headers& headers);
+    http_request& set_body(std::string_view body);
+    http_request& set_resolve_timeout(int ms);
+    http_request& set_connection_timeout(int ms);
+    http_request& set_request_timeout(int ms);
+    http_request& Get();
+    http_request& Post();
+private:
+    std::string& str();
+    uri uri;
+    bool invalid_url = true;
+    Headers headers;
+    std::string body;
+    std::string buf;
+    int resolve_timeout = 1000 * 10;
+    int connection_timeout = 1000 * 10;
+    int request_timeout = 1000 * 10;
+    std::string method;
+    friend class HttpClient;
+};
+
+class http_response : private message {
+public:
+    std::string err;
+    Version http_version;
+    int status_code;
+    std::string status_message;
+    const std::string& body() { return message::body; }
+private:
+    StatusCode parse_line(buffer&);
+
+    ParseState state = ParseLine;
+
+    friend class HttpClient;
+};
+
+typedef std::future<http_response> response_future;
+
+struct http_connection_pool;
+
+struct http_connection {
+    http_connection_pool *pool;
+    std::unique_ptr<angel::client> client;
+    std::promise<http_response> response_promise;
+    http_response response;
+    bool create; // The newly created connection
+    bool leased; // Indicates the connection state
+};
+
+struct http_connection_pool {
+    std::vector<std::string> addrs;
+    std::vector<std::unique_ptr<http_connection>> avail;
+    std::vector<std::unique_ptr<http_connection>> leased;
+    bool pending; // Have a request pending ?
+    std::mutex pending_mutex;
+    std::condition_variable pending_cv;
+    // Unlocked
+    void lease_connection();
+    void release_connection(http_connection*);
+    http_connection *create_connection();
+    void remove_connection(http_connection*);
+    void wakeup();
+    int active_conns();
+};
+
+class HttpClient {
+public:
+    HttpClient();
+    ~HttpClient();
+    void set_max_conns_per_route(int conns);
+    response_future send(http_request&);
+private:
+    http_connection_pool *create_connection_pool(http_request&);
+    void add_connection(http_connection_pool*, http_request&);
+    void remove_connection(http_connection *);
+    std::pair<http_connection_pool*, http_connection*> get_connection(http_request&);
+    void put_connection(http_connection *);
+
+    void receive(http_connection*, buffer&);
+
+    evloop_thread sender;
+    dns::resolver *resolver;
+    // <host:port, pool>
+    std::unordered_map<std::string, std::unique_ptr<http_connection_pool>> router;
+    std::mutex router_mutex;
+    int max_conns_per_route = 10;
 };
 
 }

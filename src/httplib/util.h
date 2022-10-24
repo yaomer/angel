@@ -6,10 +6,6 @@
 namespace angel {
 namespace httplib {
 
-// Encode characters other than "-_.~", letters and numbers.
-std::string uri_encode(std::string_view uri);
-bool uri_decode(std::string_view uri, std::string& res);
-
 // Wed, 15 Nov 1995 06:25:24 GMT
 std::string format_date();
 // Check rfc1123-date
@@ -26,7 +22,6 @@ bool weak_etag_equal(std::string_view etag1, std::string_view etag2);
 std::string generate_file_etag(int64_t last_modified_time, off_t filesize);
 std::string generate_file_etag(const std::string& path, off_t filesize);
 std::string generate_etag(std::string_view data);
-
 
 }
 }

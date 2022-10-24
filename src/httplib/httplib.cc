@@ -14,11 +14,7 @@ static const char SP    = ' ';
 static const char *CRLF = "\r\n";
 static const char *SEP  = ": "; // field <SEP> value
 
-static const int uri_max_len = 1024 * 1024;
-
 static mime::mimetypes mimetypes;
-
-static const char *err_page(StatusCode code);
 
 static const char *get_mime_type(const std::string& path)
 {
@@ -26,79 +22,24 @@ static const char *get_mime_type(const std::string& path)
     return mime_type ? mime_type : "application/octet-stream";
 }
 
-static const std::unordered_map<std::string_view, Method> methods = {
-    { "OPTIONS",    OPTIONS },
-    { "GET",        GET },
-    { "HEAD",       HEAD },
-    { "POST",       POST },
-    { "PUT",        PUT },
-    { "DELETE",     DELETE },
-    { "TRACE",      TRACE },
-    { "CONNECT",    CONNECT },
-};
+// HTTP-message = Request | Response
+//
+// Request and Response messages use the generic message format of
+// RFC 822 for transferring entities (the payload of the message).
+//
+// generic-message = start-line
+//                 *(message-header CRLF)
+//                 CRLF
+//                 [ message-body ]
+// start-line    = Request-Line | Status-Line
 
-// Return Code for parse request:
+// Return Code for parsing:
 // Ok: parse complete
 // Continue: data not enough
 // Other: there is an error occurs.
 
-// Request-Line = Method <SP> Request-URI <SP> HTTP-Version <CRLF>
-StatusCode request::parse_line(buffer& buf)
-{
-    int crlf = buf.find_crlf();
-    if (crlf < 0) return Continue;
-
-    if (crlf > uri_max_len) {
-        return RequestUriTooLong;
-    }
-
-    auto res = util::split({buf.peek(), (size_t)crlf}, SP);
-    if (res.size() != 3) return BadRequest;
-
-    // Parse Method
-    auto it = methods.find(res[0]);
-    if (it == methods.end()) return BadRequest;
-    req_method = it->second;
-
-    // Parse Request-URI
-    const char *p = res[1].data();
-    const char *end = p + res[1].size();
-
-    const char *sep = std::find(p, end, '?');
-    if (!uri_decode({p, (size_t)(sep - p)}, abs_path)) return BadRequest;
-
-    if (sep != end) { // have parameters
-        auto args = util::split({sep + 1, (size_t)(end - sep - 1)}, '&');
-        for (auto& arg : args) {
-            sep = std::find(arg.begin(), arg.end(), '=');
-            if (sep == arg.end()) return BadRequest;
-            std::string_view key(arg.begin(), (size_t)(sep - arg.begin()));
-            std::string_view value(sep + 1, (size_t)(arg.end() - sep - 1));
-            std::string decoded_key, decoded_value;
-            if (!uri_decode(key, decoded_key) || !uri_decode(value, decoded_value)) return BadRequest;
-            req_params.emplace(std::move(decoded_key), std::move(decoded_value));
-        }
-    }
-
-    // Parse HTTP-Version
-    if (res[2].size() != 8 || !util::starts_with(res[2], "HTTP/"))
-        return BadRequest;
-    if (util::ends_with(res[2], "1.1")) {
-        http_version = HTTP_VERSION_1_1;
-    } else if (util::ends_with(res[2], "1.0")) {
-        http_version = HTTP_VERSION_1_0;
-    } else if (util::ends_with(res[2], "2.0")) {
-        return HttpVersionNotSupported;
-    } else {
-        return BadRequest;
-    }
-
-    buf.retrieve(crlf + 2);
-    return Ok;
-}
-
 // message-header = field-name ":" [ field-value ]
-StatusCode request::parse_header(buffer& buf)
+StatusCode message::parse_header(buffer& buf)
 {
     while (buf.readable() > 0) {
         int crlf = buf.find_crlf();
@@ -116,7 +57,7 @@ StatusCode request::parse_header(buffer& buf)
         std::string_view value(util::trim({buf.peek() + pos + 1, (size_t)(crlf - pos - 1)}));
         // Ignore header with null value.
         if (!value.empty()) {
-            req_headers.emplace(field, value);
+            headers.emplace(field, value);
         }
 
         buf.retrieve(crlf + 2);
@@ -124,20 +65,20 @@ StatusCode request::parse_header(buffer& buf)
     return Continue;
 }
 
-StatusCode request::parse_body_length()
+StatusCode message::parse_body_length()
 {
     // The transfer-length of that body is determined by
     // prefer use Transfer-Encoding header field.
-    auto it = headers().find("Transfer-Encoding");
-    if (it != headers().end()) {
+    auto it = headers.find("Transfer-Encoding");
+    if (it != headers.end()) {
         if (it->second == "chunked") {
             chunked = true;
             return Ok;
         }
     }
 
-    it = headers().find("Content-Length");
-    if (it == headers().end()) return Continue;
+    it = headers.find("Content-Length");
+    if (it == headers.end()) return Continue;
 
     auto r = util::svtoll(it->second);
     if (r.value_or(-1) < 0) return BadRequest;
@@ -146,19 +87,19 @@ StatusCode request::parse_body_length()
     return length > 0 ? Ok : Continue;
 }
 
-StatusCode request::parse_body(buffer& buf)
+StatusCode message::parse_body(buffer& buf)
 {
     return chunked ? parse_body_by_chunked(buf) : parse_body_by_content_length(buf);
 }
 
-StatusCode request::parse_body_by_content_length(buffer& buf)
+StatusCode message::parse_body_by_content_length(buffer& buf)
 {
     if (buf.readable() >= length) {
-        message_body.append(buf.peek(), length);
+        body.append(buf.peek(), length);
         buf.retrieve(length);
         return Ok;
     } else { // Not Enough
-        message_body.append(buf.peek(), buf.readable());
+        body.append(buf.peek(), buf.readable());
         length -= buf.readable();
         buf.retrieve_all();
         return Continue;
@@ -188,7 +129,7 @@ static ssize_t from_hex_str(const std::string& str)
     }
 }
 
-StatusCode request::parse_body_by_chunked(buffer& buf)
+StatusCode message::parse_body_by_chunked(buffer& buf)
 {
     while (buf.readable() > 0) {
         // Parse chunk-size <CRLF>
@@ -213,13 +154,13 @@ StatusCode request::parse_body_by_chunked(buffer& buf)
         // chunk-data <CRLF>
         if (buf.readable() > chunk_size) {
             if (buf.readable() < chunk_size + 2) return Continue;
-            message_body.append(buf.peek(), chunk_size);
+            body.append(buf.peek(), chunk_size);
             buf.retrieve(chunk_size);
             if (!buf.starts_with(CRLF)) return BadRequest;
             buf.retrieve(2);
             chunk_size = -1;
         } else { // Not Enough
-            message_body.append(buf.peek(), buf.readable());
+            body.append(buf.peek(), buf.readable());
             chunk_size -= buf.readable();
             buf.retrieve_all();
             return Continue;
@@ -228,13 +169,200 @@ StatusCode request::parse_body_by_chunked(buffer& buf)
     return Continue;
 }
 
+void message::clear()
+{
+    headers.clear();
+    body.clear();
+}
+
+//=================================================
+//===================== Uri =======================
+//=================================================
+
+static constexpr const char *hexchars = "0123456789ABCDEF";
+
+std::string uri::encode(std::string_view uri)
+{
+    std::string res;
+    size_t n = uri.size();
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = uri[i];
+        if (!isalnum(c) && !strchr("-_.~", c)) {
+            res.push_back('%');
+            res.push_back(hexchars[c >> 4]);
+            res.push_back(hexchars[c & 0x0f]);
+        } else {
+            res.push_back(c);
+        }
+    }
+    return res;
+}
+
+static char from_hex(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    else if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    else return -1;
+}
+
+bool uri::decode(std::string_view uri, std::string& res)
+{
+    size_t n = uri.size();
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = uri[i];
+        if (c == '%') {
+            char c1 = from_hex(uri[++i]);
+            char c2 = from_hex(uri[++i]);
+            if (c1 == -1 || c2 == -1) return false;
+            res.push_back(((unsigned char)c1 << 4) | c2);
+        } else {
+            res.push_back(c);
+        }
+    }
+    return true;
+}
+
+// ?k1=v1&k2=v2&k3=v3
+bool uri::parse_params(const char *first, const char *last, Params& params)
+{
+    auto args = util::split({first, (size_t)(last - first)}, '&');
+    for (auto& arg : args) {
+        auto sep = std::find(arg.begin(), arg.end(), '=');
+        if (sep == arg.end()) return false;
+        std::string_view key(arg.begin(), (size_t)(sep - arg.begin()));
+        std::string_view value(sep + 1, (size_t)(arg.end() - sep - 1));
+        std::string decoded_key, decoded_value;
+        if (!decode(key, decoded_key) || !decode(value, decoded_value)) return false;
+        params.emplace(std::move(decoded_key), std::move(decoded_value));
+    }
+    return true;
+}
+
+bool uri::parse(std::string_view uri)
+{
+    clear();
+
+    const char *p = uri.data();
+    const char *end = uri.data() + uri.size();
+
+    auto sep = util::search(uri, "://");
+    if (!sep) return false;
+    scheme.assign(p, sep);
+    p = sep + 3;
+
+    sep = std::find(p, end, ':');
+    if (sep != end) { // http://host:port/
+        host.assign(p, sep);
+        p = sep + 1;
+        sep = std::find(p, end, '/');
+        port = util::svtoi({p, (size_t)(sep - p)}).value_or(-1);
+        if (port <= 0) return false;
+    } else { // http://host/, the default port is 80
+        sep = std::find(p, end, '/');
+        host.assign(p, sep);
+    }
+    // http://host => http://host/
+    if (sep == end) {
+        path = "/";
+        return true;
+    }
+    p = sep;
+    sep = std::find(p, end, '?');
+    if (!decode({p, (size_t)(sep - p)}, path)) return false;
+
+    auto frag = std::find(p, end, '#');
+
+    if (sep != end) { // have parameters
+        if (!parse_params(sep + 1, frag, params)) return false;
+    }
+
+    if (frag != end) { // have #fragment
+        fragment.assign(frag + 1, end);
+    }
+
+    return true;
+}
+
+void uri::clear()
+{
+    scheme.clear();
+    host.clear();
+    port = 80;
+    path.clear();
+    params.clear();
+    fragment.clear();
+}
+
+//====================================================
+//=================== HttpServer =====================
+//====================================================
+
+static const int UriMaxLength = 1024 * 1024;
+
+static const char *err_page(StatusCode code);
+
+static const std::unordered_map<std::string_view, Method> methods = {
+    { "OPTIONS",    OPTIONS },
+    { "GET",        GET },
+    { "HEAD",       HEAD },
+    { "POST",       POST },
+    { "PUT",        PUT },
+    { "DELETE",     DELETE },
+    { "TRACE",      TRACE },
+    { "CONNECT",    CONNECT },
+};
+
+// Request-Line = Method <SP> Request-URI <SP> HTTP-Version <CRLF>
+StatusCode request::parse_line(buffer& buf)
+{
+    int crlf = buf.find_crlf();
+    if (crlf < 0) return Continue;
+
+    if (crlf > UriMaxLength) {
+        return RequestUriTooLong;
+    }
+
+    auto res = util::split({buf.peek(), (size_t)crlf}, SP);
+    if (res.size() != 3) return BadRequest;
+
+    // Parse Method
+    auto it = methods.find(res[0]);
+    if (it == methods.end()) return BadRequest;
+    req_method = it->second;
+
+    // Parse Request-URI
+    const char *p = res[1].data();
+    const char *end = p + res[1].size();
+
+    const char *sep = std::find(p, end, '?');
+    if (!uri::decode({p, (size_t)(sep - p)}, abs_path)) return BadRequest;
+
+    if (sep != end) { // have parameters
+        end = std::find(p, end, '#'); // ignore #fragment
+        if (!uri::parse_params(sep + 1, end, query_params)) return BadRequest;
+    }
+
+    // Parse HTTP-Version
+    if (res[2] == "HTTP/1.1") {
+        http_version = HTTP_VERSION_1_1;
+    } else if (res[2] == "HTTP/1.0") {
+        http_version = HTTP_VERSION_1_0;
+    } else if (res[2] == "HTTP/2.0") {
+        return HttpVersionNotSupported;
+    } else {
+        return BadRequest;
+    }
+
+    buf.retrieve(crlf + 2);
+    return Ok;
+}
+
 void request::clear()
 {
     state = ParseLine;
     abs_path.clear();
-    message_body.clear();
-    req_params.clear();
-    req_headers.clear();
+    query_params.clear();
+    message::clear();
 }
 
 void response::set_status_code(StatusCode code)
@@ -340,9 +468,6 @@ void response::send_err()
     add_header("Content-Type", "text/html");
     send(err_page(status_code));
 }
-
-//==============================================
-//==============================================
 
 void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
 {
@@ -684,7 +809,7 @@ ConditionCode HttpServer::if_range(request& req, response& res)
         }
     }
     // Perform it as if the Range header were not present.
-    req.req_headers.erase("Range");
+    req.message::headers.erase("Range");
     return Successful;
 }
 
@@ -755,7 +880,7 @@ void HttpServer::update_file(request& req, response& res)
         res.send_err();
         return;
     }
-    bool rc = util::write_file(fd, req.message_body.data(), req.message_body.size());
+    bool rc = util::write_file(fd, req.body().data(), req.body().size());
     if (!rc) {
         res.set_status_code(InternalServerError);
         res.send_err();
@@ -1069,10 +1194,6 @@ const char *to_str(StatusCode code)
     return it != code_map.end() ? it->second : nullptr;
 }
 
-//==============================================
-//================ HttpServer ==================
-//==============================================
-
 HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
     : server(loop, listen_addr)
 {
@@ -1085,6 +1206,8 @@ HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
     server.set_message_handler([this](const connection_ptr& conn, buffer& buf){
             this->message_handler(conn, buf);
             });
+    set_base_dir(".");
+    set_idle(30); // 30s by default
 }
 
 void HttpServer::set_base_dir(std::string_view dir)
@@ -1133,11 +1256,421 @@ HttpServer& HttpServer::File(std::string_view path, const FileHandler handler)
 
 void HttpServer::start()
 {
-    set_base_dir(".");
-    set_idle(30); // 30s by default
     server.set_nodelay(true);
     server.set_keepalive(true);
     server.start();
+}
+
+//====================================================
+//=================== HttpClient =====================
+//====================================================
+
+http_request& http_request::set_url(std::string_view url)
+{
+    invalid_url = !uri.parse(url);
+    return *this;
+}
+
+http_request& http_request::set_params(const Params& params)
+{
+    uri.params = params;
+    return *this;
+}
+
+http_request& http_request::set_headers(const Headers& headers)
+{
+    this->headers = headers;
+    return *this;
+}
+
+http_request& http_request::set_body(std::string_view body)
+{
+    this->body = body;
+    return *this;
+}
+
+http_request& http_request::set_resolve_timeout(int ms)
+{
+    resolve_timeout = ms;
+    return *this;
+}
+
+http_request& http_request::set_connection_timeout(int ms)
+{
+    connection_timeout = ms;
+    return *this;
+}
+
+http_request& http_request::set_request_timeout(int ms)
+{
+    request_timeout = ms;
+    return *this;
+}
+
+http_request& http_request::Get()
+{
+    method = "GET";
+    return *this;
+}
+
+http_request& http_request::Post()
+{
+    method = "POST";
+    return *this;
+}
+
+std::string& http_request::str()
+{
+    buf.clear();
+
+    buf.append(method).append(1, SP);
+
+    buf.append(uri.path);
+    if (!uri.params.empty()) {
+        buf.append("?");
+    }
+    for (auto& [k, v] : uri.params) {
+        buf.append(uri.encode(k)).append("=").append(uri.encode(v)).append("&");
+    }
+    if (!uri.params.empty()) {
+        buf.back() = SP;
+    } else {
+        buf.append(1, SP);
+    }
+
+    buf.append("HTTP/1.1").append(CRLF);
+
+    headers["Host"] = uri.host;
+    for (auto& [field, value] : headers)
+        format_header(buf, field.val, value);
+
+    buf.append(CRLF);
+
+    return buf;
+}
+
+// Status-Line = HTTP-Version <SP> Status-Code <SP> Reason-Phrase <CRLF>
+StatusCode http_response::parse_line(buffer& buf)
+{
+    int crlf = buf.find_crlf();
+    if (crlf < 0) return Continue;
+
+    auto p = buf.peek();
+    auto end = buf.peek() + crlf;
+
+    auto sp = std::find(p, end, SP);
+    std::string_view version(p, (size_t)(sp - p));
+
+    if (version == "HTTP/1.1") {
+        http_version = HTTP_VERSION_1_1;
+    } else if (version == "HTTP/1.0") {
+        http_version = HTTP_VERSION_1_0;
+    } else {
+        return BadRequest;
+    }
+
+    p = sp + 1;
+    sp = std::find(p, end, SP);
+
+    status_code = util::svtoi({p, (size_t)(sp - p)}).value_or(0);
+    if (status_code <= 0) return BadRequest;
+
+    p = sp + 1;
+    status_message.assign(p, end - p);
+
+    buf.retrieve(crlf + 2);
+    return Ok;
+}
+
+HttpClient::HttpClient()
+{
+    resolver = dns::resolver::get_resolver();
+    sender.wait_loop();
+}
+
+HttpClient::~HttpClient()
+{
+    router.clear();
+    sender.quit();
+}
+
+void HttpClient::set_max_conns_per_route(int conns)
+{
+    if (conns <= 0) return;
+    max_conns_per_route = conns;
+}
+
+http_connection_pool *HttpClient::create_connection_pool(http_request& request)
+{
+    auto *pool = new http_connection_pool();
+
+    pool->addrs = resolver->get_addr_list(request.uri.host, request.resolve_timeout);
+    pool->pending = false;
+
+    if (pool->addrs.empty()) {
+        delete pool;
+        return nullptr;
+    } else {
+        return pool;
+    }
+}
+
+http_connection *http_connection_pool::create_connection()
+{
+    auto *http_conn = new http_connection();
+
+    http_conn->pool = this;
+    http_conn->leased = true;
+
+    leased.emplace_back(http_conn);
+
+    return http_conn;
+}
+
+void http_connection_pool::lease_connection()
+{
+    leased.emplace_back(std::move(avail.back()));
+    avail.pop_back();
+
+    std::promise<http_response> response_promise;
+    leased.back()->response_promise.swap(response_promise);
+    leased.back()->leased = true;
+}
+
+void http_connection_pool::release_connection(http_connection *http_conn)
+{
+    assert(http_conn->leased);
+    for (auto& conn : leased) {
+        if (conn.get() == http_conn) {
+            http_conn->leased = false;
+            std::swap(conn, leased.back());
+            avail.emplace_back(std::move(leased.back()));
+            leased.pop_back();
+            return;
+        }
+    }
+}
+
+void http_connection_pool::remove_connection(http_connection *http_conn)
+{
+    auto& conn_list = http_conn->leased ? leased : avail;
+
+    for (auto& conn : conn_list) {
+        if (conn.get() == http_conn) {
+            std::swap(conn, conn_list.back());
+            conn_list.pop_back();
+            return;
+        }
+    }
+}
+
+void http_connection_pool::wakeup()
+{
+    std::lock_guard<std::mutex> lk(pending_mutex);
+
+    if (pending) {
+        pending = false;
+        pending_cv.notify_one();
+    }
+}
+
+int http_connection_pool::active_conns()
+{
+    return leased.size() + avail.size();
+}
+
+// Add a new http connection to pool.
+void HttpClient::add_connection(http_connection_pool *pool, http_request& request)
+{
+    auto *http_conn = pool->create_connection();
+
+    inet_addr peer_addr(pool->addrs[0], request.uri.port);
+    http_conn->client.reset(new angel::client(sender.get_loop(), peer_addr));
+    http_conn->create = true;
+
+    auto *client = http_conn->client.get();
+    client->set_connection_timeout_handler(request.connection_timeout, [this, http_conn](){
+            http_response res;
+            res.err = "Connection Timeout";
+            http_conn->response_promise.set_value(std::move(res));
+            this->remove_connection(http_conn);
+            });
+    client->set_connection_handler([str = std::move(request.str())](const connection_ptr& conn){
+            // TODO: Set request timeout timer
+            conn->send(str);
+            });
+    client->set_message_handler([this, http_conn](const connection_ptr& conn, buffer& buf){
+            this->receive(http_conn, buf);
+            });
+    client->set_close_handler([this, http_conn](const connection_ptr& conn){
+            this->remove_connection(http_conn);
+            });
+}
+
+// Ok, <nullptr, ptr>
+// Resolve Timeout, <nullptr, nullptr>
+// Pending, <ptr, nullptr>
+std::pair<http_connection_pool*, http_connection*> HttpClient::get_connection(http_request& request)
+{
+    http_connection_pool *pool;
+    std::lock_guard<std::mutex> lk(router_mutex);
+
+    auto route = util::concat(request.uri.host, ":", std::to_string(request.uri.port));
+
+    auto it = router.find(route);
+    if (it != router.end()) {
+        pool = it->second.get();
+    } else {
+        // Create a new http connection pool for route.
+        pool = create_connection_pool(request);
+        if (pool) {
+            router.emplace(route, pool);
+        } else {
+            return { nullptr, nullptr };
+        }
+    }
+
+    if (!pool->avail.empty()) {
+        pool->lease_connection();
+    } else {
+        if (pool->active_conns() < max_conns_per_route) {
+            add_connection(pool, request);
+        } else {
+            return { pool, nullptr };
+        }
+    }
+
+    return { nullptr, pool->leased.back().get() };
+}
+
+void HttpClient::put_connection(http_connection *http_conn)
+{
+    std::lock_guard<std::mutex> lk(router_mutex);
+
+    http_conn->pool->release_connection(http_conn);
+}
+
+void HttpClient::remove_connection(http_connection *http_conn)
+{
+    std::lock_guard<std::mutex> lk(router_mutex);
+
+    http_conn->pool->remove_connection(http_conn);
+}
+
+static response_future err_future(std::string_view err)
+{
+    std::promise<http_response> p;
+    auto f = p.get_future();
+
+    http_response res;
+    res.err = err;
+    p.set_value(std::move(res));
+
+    return f;
+}
+
+response_future HttpClient::send(http_request& request)
+{
+    if (request.invalid_url || request.method.empty()) {
+        return err_future("Invalid Request");
+    }
+
+retry:
+    auto [pool, http_conn] = get_connection(request);
+
+    if (!pool && !http_conn) {
+        return err_future("Dns Resolve Timeout or No Available Addr");
+    }
+
+    // There is no connection available at the moment.
+    if (pool && !http_conn) {
+        std::unique_lock<std::mutex> lk(pool->pending_mutex);
+        pool->pending = true;
+        while (pool->pending) {
+            pool->pending_cv.wait(lk); // TODO: Set wait time
+        }
+        goto retry;
+    }
+
+    auto f = http_conn->response_promise.get_future();
+
+    // Request will be sent in connection_handler() for newly created connection.
+    if (http_conn->create) {
+        http_conn->create = false;
+        http_conn->client->start();
+    } else {
+        if (http_conn->client->is_connected()) {
+            http_conn->client->conn()->send(request.str());
+        }
+    }
+
+    return f;
+}
+
+void HttpClient::receive(http_connection *http_conn, buffer& buf)
+{
+    // The http connection is idle, ignoring all received messages.
+    if (!http_conn->leased) {
+        buf.retrieve_all();
+        return;
+    }
+    // Parse Response, similar to HttpServer.
+    StatusCode code;
+    auto& res = http_conn->response;
+    while (buf.readable() > 0) {
+        switch (res.state) {
+        case ParseLine:
+            switch (code = res.parse_line(buf)) {
+            case Ok:
+                res.state = ParseHeader;
+                break;
+            case Continue:
+                return;
+            default:
+                goto err;
+            }
+            break;
+        case ParseHeader:
+            switch (code = res.parse_header(buf)) {
+            case Ok:
+                switch (code = res.parse_body_length()) {
+                case Ok:
+                    res.state = ParseBody;
+                    break;
+                case Continue:
+                    goto end;
+                default:
+                    goto err;
+                }
+                break;
+            case Continue:
+                return;
+            default:
+                goto err;
+            }
+            break;
+        case ParseBody:
+            switch (code = res.parse_body(buf)) {
+            case Ok:
+                goto end;
+            case Continue:
+                return;
+            default:
+                goto err;
+            }
+            break;
+        }
+    }
+    return;
+err:
+    res.err = "Invalid Response";
+end:
+    http_conn->response_promise.set_value(std::move(res));
+    http_conn->response.state = ParseLine;
+    put_connection(http_conn);
+
+    // Try to wakeup pending requests.
+    http_conn->pool->wakeup();
 }
 
 }
