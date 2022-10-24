@@ -265,6 +265,7 @@ public:
     http_request& set_resolve_timeout(int ms);
     http_request& set_connection_timeout(int ms);
     http_request& set_request_timeout(int ms);
+    http_request& set_pending_timeout(int ms);
     http_request& Get();
     http_request& Post();
 private:
@@ -277,13 +278,26 @@ private:
     int resolve_timeout = 1000 * 10;
     int connection_timeout = 1000 * 10;
     int request_timeout = 1000 * 10;
+    int pending_timeout = 1000 * 10;
     std::string method;
     friend class HttpClient;
 };
 
+enum class ErrorCode {
+    None,
+    InvalidRequest,
+    InvalidResponse,
+    ResolveTimeoutOrNoAvailableAddr,
+    ConnectionTimeout,
+    RequestTimeout,
+    PendingTimeout,
+    ConnectionResetByPeer,
+};
+
 class http_response : private message {
 public:
-    std::string err;
+    ErrorCode err_code = ErrorCode::None;
+    const char *err_str(); // map err_code to string
     Version http_version;
     int status_code;
     std::string status_message;
@@ -307,6 +321,10 @@ struct http_connection {
     http_response response;
     bool create; // The newly created connection
     bool leased; // Indicates the connection state
+    bool removing;
+    size_t request_timeout_timer_id;
+
+    void err_notify(ErrorCode err_code);
 };
 
 struct http_connection_pool {
@@ -318,9 +336,10 @@ struct http_connection_pool {
     std::condition_variable pending_cv;
     // Unlocked
     void lease_connection();
-    void release_connection(http_connection*);
+    void release_connection(http_connection *http_conn);
     http_connection *create_connection();
-    void remove_connection(http_connection*);
+    void remove_connection(http_connection *http_conn);
+    bool wait_for(int pending_timeout);
     void wakeup();
     int active_conns();
 };
@@ -330,15 +349,19 @@ public:
     HttpClient();
     ~HttpClient();
     void set_max_conns_per_route(int conns);
-    response_future send(http_request&);
+    response_future send(http_request& request);
 private:
-    http_connection_pool *create_connection_pool(http_request&);
-    void add_connection(http_connection_pool*, http_request&);
-    void remove_connection(http_connection *);
-    std::pair<http_connection_pool*, http_connection*> get_connection(http_request&);
-    void put_connection(http_connection *);
+    http_connection_pool *create_connection_pool(http_request& request);
+    void add_connection(http_connection_pool *http_conn, http_request& request);
+    void remove_connection(http_connection *http_conn);
+    void put_connection(http_connection *http_conn);
 
-    void receive(http_connection*, buffer&);
+    void connection_timeout_handler(http_connection *http_conn);
+    void set_request_timeout_timer(http_connection *http_conn, int request_timeout);
+    void cancel_request_timeout_timer(http_connection *http_conn);
+    void receive(http_connection *http_conn, buffer& buf);
+    void send(http_connection *http_conn, http_request& request);
+    void connection_reset_by_peer(http_connection *http_conn);
 
     evloop_thread sender;
     dns::resolver *resolver;

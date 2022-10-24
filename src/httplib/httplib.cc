@@ -1291,19 +1291,25 @@ http_request& http_request::set_body(std::string_view body)
 
 http_request& http_request::set_resolve_timeout(int ms)
 {
-    resolve_timeout = ms;
+    if (ms > 0) resolve_timeout = ms;
     return *this;
 }
 
 http_request& http_request::set_connection_timeout(int ms)
 {
-    connection_timeout = ms;
+    if (ms > 0) connection_timeout = ms;
     return *this;
 }
 
 http_request& http_request::set_request_timeout(int ms)
 {
-    request_timeout = ms;
+    if (ms > 0) request_timeout = ms;
+    return *this;
+}
+
+http_request& http_request::set_pending_timeout(int ms)
+{
+    if (ms > 0) pending_timeout = ms;
     return *this;
 }
 
@@ -1420,7 +1426,9 @@ http_connection *http_connection_pool::create_connection()
     auto *http_conn = new http_connection();
 
     http_conn->pool = this;
+    http_conn->create = true;
     http_conn->leased = true;
+    http_conn->removing = false;
 
     leased.emplace_back(http_conn);
 
@@ -1453,15 +1461,33 @@ void http_connection_pool::release_connection(http_connection *http_conn)
 
 void http_connection_pool::remove_connection(http_connection *http_conn)
 {
+    assert(!http_conn->removing);
+    http_conn->removing = true;
+
     auto& conn_list = http_conn->leased ? leased : avail;
 
     for (auto& conn : conn_list) {
         if (conn.get() == http_conn) {
+            // destruct http_conn -> ~client() -> remove_connection()
             std::swap(conn, conn_list.back());
             conn_list.pop_back();
             return;
         }
     }
+}
+
+bool http_connection_pool::wait_for(int pending_timeout)
+{
+    auto start = util::get_cur_time_ms();
+    std::unique_lock<std::mutex> lk(pending_mutex);
+    pending = true;
+    while (pending) {
+        pending_cv.wait_for(lk, std::chrono::milliseconds(pending_timeout));
+        if (util::get_cur_time_ms() - start >= pending_timeout) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void http_connection_pool::wakeup()
@@ -1479,68 +1505,85 @@ int http_connection_pool::active_conns()
     return leased.size() + avail.size();
 }
 
+void http_connection::err_notify(ErrorCode err_code)
+{
+    response.err_code = err_code;
+    response_promise.set_value(std::move(response));
+    response.err_code = ErrorCode::None;
+}
+
+void HttpClient::send(http_connection *http_conn, http_request& request)
+{
+    assert(http_conn->client->is_connected());
+    http_conn->client->conn()->send(request.str());
+    set_request_timeout_timer(http_conn, request.request_timeout);
+}
+
 // Add a new http connection to pool.
 void HttpClient::add_connection(http_connection_pool *pool, http_request& request)
 {
     auto *http_conn = pool->create_connection();
 
+    // TODO: If failure, try other addrs
     inet_addr peer_addr(pool->addrs[0], request.uri.port);
     http_conn->client.reset(new angel::client(sender.get_loop(), peer_addr));
-    http_conn->create = true;
 
     auto *client = http_conn->client.get();
     client->set_connection_timeout_handler(request.connection_timeout, [this, http_conn](){
-            http_response res;
-            res.err = "Connection Timeout";
-            http_conn->response_promise.set_value(std::move(res));
-            this->remove_connection(http_conn);
+            this->connection_timeout_handler(http_conn);
             });
-    client->set_connection_handler([str = std::move(request.str())](const connection_ptr& conn){
-            // TODO: Set request timeout timer
-            conn->send(str);
+    client->set_connection_handler(
+            [this, http_conn, request = request](const connection_ptr& conn) mutable {
+            this->send(http_conn, request);
             });
     client->set_message_handler([this, http_conn](const connection_ptr& conn, buffer& buf){
             this->receive(http_conn, buf);
             });
     client->set_close_handler([this, http_conn](const connection_ptr& conn){
-            this->remove_connection(http_conn);
+            this->connection_reset_by_peer(http_conn);
             });
 }
 
-// Ok, <nullptr, ptr>
-// Resolve Timeout, <nullptr, nullptr>
-// Pending, <ptr, nullptr>
-std::pair<http_connection_pool*, http_connection*> HttpClient::get_connection(http_request& request)
+void HttpClient::connection_timeout_handler(http_connection *http_conn)
 {
-    http_connection_pool *pool;
-    std::lock_guard<std::mutex> lk(router_mutex);
+    assert(http_conn->leased);
+    http_conn->err_notify(ErrorCode::ConnectionTimeout);
+    remove_connection(http_conn);
+}
 
-    auto route = util::concat(request.uri.host, ":", std::to_string(request.uri.port));
+void HttpClient::set_request_timeout_timer(http_connection *http_conn, int request_timeout)
+{
+    printf("request_timeout %d ms\n", request_timeout);
+    http_conn->request_timeout_timer_id = sender.get_loop()->run_after(request_timeout,
+            [this, http_conn]{
+            http_conn->err_notify(ErrorCode::RequestTimeout);
+            remove_connection(http_conn);
+            });
+}
 
-    auto it = router.find(route);
-    if (it != router.end()) {
-        pool = it->second.get();
-    } else {
-        // Create a new http connection pool for route.
-        pool = create_connection_pool(request);
-        if (pool) {
-            router.emplace(route, pool);
-        } else {
-            return { nullptr, nullptr };
-        }
+void HttpClient::cancel_request_timeout_timer(http_connection *http_conn)
+{
+    if (http_conn->request_timeout_timer_id > 0) {
+        sender.get_loop()->cancel_timer(http_conn->request_timeout_timer_id);
+        http_conn->request_timeout_timer_id = 0;
     }
+}
 
-    if (!pool->avail.empty()) {
-        pool->lease_connection();
-    } else {
-        if (pool->active_conns() < max_conns_per_route) {
-            add_connection(pool, request);
-        } else {
-            return { pool, nullptr };
-        }
+void HttpClient::connection_reset_by_peer(http_connection *http_conn)
+{
+    // To avoid calling remove_connection() repeatedly,
+    // it can only be called when the server closes the connection,
+    // because the http client will call remove_connection() externally.
+    if (http_conn->removing) return;
+
+    // If the connection is being leased, we need to notify the requester.
+    if (http_conn->leased) {
+        http_conn->err_notify(ErrorCode::ConnectionResetByPeer);
+        // We must cancel request timeout timer before remove_connection(),
+        // otherwise http_conn will become a hanging pointer.
+        this->cancel_request_timeout_timer(http_conn);
     }
-
-    return { nullptr, pool->leased.back().get() };
+    this->remove_connection(http_conn);
 }
 
 void HttpClient::put_connection(http_connection *http_conn)
@@ -1557,13 +1600,13 @@ void HttpClient::remove_connection(http_connection *http_conn)
     http_conn->pool->remove_connection(http_conn);
 }
 
-static response_future err_future(std::string_view err)
+static response_future err_future(ErrorCode err_code)
 {
     std::promise<http_response> p;
     auto f = p.get_future();
 
     http_response res;
-    res.err = err;
+    res.err_code = err_code;
     p.set_value(std::move(res));
 
     return f;
@@ -1572,25 +1615,43 @@ static response_future err_future(std::string_view err)
 response_future HttpClient::send(http_request& request)
 {
     if (request.invalid_url || request.method.empty()) {
-        return err_future("Invalid Request");
+        return err_future(ErrorCode::InvalidRequest);
     }
 
+    http_connection_pool *pool;
+    auto route = util::concat(request.uri.host, ":", std::to_string(request.uri.port));
 retry:
-    auto [pool, http_conn] = get_connection(request);
+    // We hold the router_mutex during the whole process.
+    router_mutex.lock();
 
-    if (!pool && !http_conn) {
-        return err_future("Dns Resolve Timeout or No Available Addr");
-    }
-
-    // There is no connection available at the moment.
-    if (pool && !http_conn) {
-        std::unique_lock<std::mutex> lk(pool->pending_mutex);
-        pool->pending = true;
-        while (pool->pending) {
-            pool->pending_cv.wait(lk); // TODO: Set wait time
+    auto it = router.find(route);
+    // Create a new http connection pool for route.
+    if (it == router.end()) {
+        if (!(pool = create_connection_pool(request))) {
+            router_mutex.unlock();
+            return err_future(ErrorCode::ResolveTimeoutOrNoAvailableAddr);
         }
-        goto retry;
+        router.emplace(route, pool);
+    } else {
+        pool = it->second.get();
     }
+
+    if (pool->avail.empty()) {
+        if (pool->active_conns() < max_conns_per_route) {
+            add_connection(pool, request);
+        } else {
+            // There is no connection available at the moment.
+            router_mutex.unlock();
+            if (!pool->wait_for(request.pending_timeout)) {
+                return err_future(ErrorCode::PendingTimeout);
+            }
+            goto retry;
+        }
+    } else {
+        pool->lease_connection();
+    }
+
+    auto *http_conn = pool->leased.back().get();
 
     auto f = http_conn->response_promise.get_future();
 
@@ -1599,10 +1660,10 @@ retry:
         http_conn->create = false;
         http_conn->client->start();
     } else {
-        if (http_conn->client->is_connected()) {
-            http_conn->client->conn()->send(request.str());
-        }
+        send(http_conn, request);
     }
+
+    router_mutex.unlock();
 
     return f;
 }
@@ -1663,14 +1724,29 @@ void HttpClient::receive(http_connection *http_conn, buffer& buf)
     }
     return;
 err:
-    res.err = "Invalid Response";
+    res.err_code = ErrorCode::InvalidResponse;
 end:
     http_conn->response_promise.set_value(std::move(res));
     http_conn->response.state = ParseLine;
     put_connection(http_conn);
 
+    cancel_request_timeout_timer(http_conn);
     // Try to wakeup pending requests.
     http_conn->pool->wakeup();
+}
+
+const char *http_response::err_str()
+{
+    switch (err_code) {
+    case ErrorCode::InvalidRequest: return "Invalid Request";
+    case ErrorCode::InvalidResponse: return "Invalid Response";
+    case ErrorCode::ResolveTimeoutOrNoAvailableAddr: return "Resolve Timeout Or No Available Addr";
+    case ErrorCode::ConnectionTimeout: return "Connection Timeout";
+    case ErrorCode::RequestTimeout: return "Request Timeout";
+    case ErrorCode::PendingTimeout: return "Pending Timeout";
+    case ErrorCode::ConnectionResetByPeer: return "Connection Reset By Peer";
+    case ErrorCode::None: return "None";
+    }
 }
 
 }
