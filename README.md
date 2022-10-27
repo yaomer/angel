@@ -20,6 +20,12 @@ CMake >= 3.1
 gcc >= 7.0 / clang >= 4.0
 ```
 然后进入到你安装的angel的主目录中，运行build.sh即可完成编译，注意该脚本需要将生成的静态库libangel.a和头文件写入到系统目录，所以可能需要root权限。
+```
+$ ./build.sh --install-prefix=path # 库文件的安装路径，默认为/usr/local 
+$ ./build.sh --with-ssl            # 带有SSL支持，需要你预先安装好OpenSSL
+$ ./build.sh --release             # 编译生成Release版本
+$ ./build.sh --debug               # 编译生成Debug版本
+```
 
 ### 用法
 下面程序示例需要包含以下头文件：

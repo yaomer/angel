@@ -11,13 +11,19 @@ CHECK_FUNCTION_EXISTS (epoll_wait ANGEL_HAVE_EPOLL)
 CHECK_FUNCTION_EXISTS (kqueue ANGEL_HAVE_KQUEUE)
 CHECK_FUNCTION_EXISTS (select ANGEL_HAVE_SELECT)
 
+option (ANGEL_USE_OPENSSL "Build angel with SSL" OFF)
+
+if (ANGEL_USE_OPENSSL)
+    find_package (OpenSSL)
+endif()
+
 set (SRC_DIR "${PROJECT_SOURCE_DIR}/src")
 
 include_directories (${PROJECT_SOURCE_DIR}/include)
 
 configure_file (
     "${SRC_DIR}/config.h.in"
-    "${SRC_DIR}/config.h"
+    "${PROJECT_SOURCE_DIR}/include/angel/config.h"
 )
 
 set (SRC_FILES 
@@ -55,6 +61,10 @@ if (ANGEL_HAVE_SELECT)
     list(APPEND SRC_FILES ${SRC_DIR}/select.cc)
 endif()
 
+if (ANGEL_USE_OPENSSL)
+    list(APPEND SRC_FILES ${SRC_DIR}/ssl_handshake.cc)
+endif()
+
 list(APPEND SRC_FILES ${SRC_DIR}/dns/resolver.cc)
 
 list(APPEND SRC_FILES ${SRC_DIR}/websocket/ws-server.cc)
@@ -74,6 +84,10 @@ list(APPEND SRC_FILES
 )
 
 add_library (angel STATIC ${SRC_FILES})
+
+if (ANGEL_USE_OPENSSL)
+    target_link_libraries(angel ssl crypto)
+endif()
 
 install(TARGETS angel
     LIBRARY DESTINATION lib
