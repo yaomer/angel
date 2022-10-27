@@ -39,6 +39,7 @@ public:
     bool is_reading() { return filter & Read; }
     bool is_writing() { return filter & Write; }
     void enable_read();
+    void disable_read();
     void enable_write();
     void disable_write();
     void disable_all();

@@ -1,4 +1,4 @@
-#include "config.h"
+#include <angel/config.h>
 
 #ifdef ANGEL_HAVE_EPOLL
 

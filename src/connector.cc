@@ -46,7 +46,7 @@ void connector_t::connect()
     int ret = sockops::connect(sockfd, &peer_addr.addr());
     connect_channel->set_fd(sockfd);
     loop->add_channel(connect_channel);
-    log_info("connect(fd=%d) -> host (%s)", sockfd, peer_addr.to_host());
+    log_info("(fd=%d) connect -> host (%s)", sockfd, peer_addr.to_host());
     if (ret == 0) {
         // Usually if the server and client are on the same host,
         // the connection will be established immediately.
@@ -60,7 +60,7 @@ void connector_t::connect()
 
 void connector_t::connecting()
 {
-    log_debug("connector(fd=%d) is connecting", sockfd);
+    log_debug("(fd=%d) connecting...", sockfd);
     auto check_handler = [this]{ this->check(); };
     connect_channel->set_read_handler(check_handler);
     connect_channel->set_write_handler(check_handler);
@@ -70,11 +70,10 @@ void connector_t::connecting()
 void connector_t::connected()
 {
     if (has_connected) return;
-    log_debug("connector(fd=%d) is connected", sockfd);
     loop->remove_channel(connect_channel);
     connect_channel.reset();
-    new_connection_handler(sockfd);
     has_connected = true;
+    new_connection_handler(sockfd);
 }
 
 // Using poll to judge the status of sockfd on Mac OS
@@ -91,8 +90,7 @@ void connector_t::check()
     if (wait_retry) return;
     int err = sockops::get_socket_error(sockfd);
     if (err) {
-        log_error("connect(fd=%d): %s, try to reconnect after %d ms",
-                  sockfd, util::strerr(err), retry_interval);
+        log_error("connect(fd=%d): %s", sockfd, util::strerr(err));
         retry();
         return;
     }
@@ -102,6 +100,7 @@ void connector_t::check()
 void connector_t::retry()
 {
     loop->remove_channel(connect_channel);
+    log_error("try to reconnect -> (%s) after %d ms", peer_addr.to_host(), retry_interval);
     retry_timer_id = loop->run_after(retry_interval, [this]{ this->connect(); });
     wait_retry = true;
     close(sockfd);

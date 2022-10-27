@@ -2,3 +2,4 @@
 #cmakedefine ANGEL_HAVE_EPOLL
 #cmakedefine ANGEL_HAVE_KQUEUE
 #cmakedefine ANGEL_HAVE_SELECT
+#cmakedefine ANGEL_USE_OPENSSL

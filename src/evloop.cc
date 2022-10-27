@@ -3,8 +3,8 @@
 #include <angel/socket.h>
 #include <angel/sockops.h>
 #include <angel/logger.h>
+#include <angel/config.h>
 
-#include "config.h"
 #include "poller.h"
 #include "timer.h"
 #include "signaler.h"
@@ -75,8 +75,12 @@ void evloop::remove_channel(const channel_ptr& chl)
 void evloop::add_channel_in_loop(const channel_ptr& chl)
 {
     chl->enable_read();
-    channel_map.emplace(chl->fd(), chl);
-    log_debug("Add channel(fd=%d) to loop", chl->fd());
+    auto it = channel_map.emplace(chl->fd(), chl);
+    if (it.second) {
+        log_debug("Add channel(fd=%d) to loop", chl->fd());
+    } else {
+        log_warn("channel(fd=%d) has already exists", chl->fd());
+    }
 }
 
 void evloop::remove_channel_in_loop(const channel_ptr& chl)
@@ -133,17 +137,17 @@ void evloop::wakeup()
     uint64_t one = 1;
     ssize_t n = write(wake_fd[1], &one, sizeof(one));
     if (n != sizeof(one)) {
-        log_error("write %zd bytes instead of %zu", n, sizeof(one));
-    } else
-        log_debug("wake up the io-loop by fd=%d", wake_fd[1]);
+        log_error("Write (%zd) bytes instead of (%zu)", n, sizeof(one));
+    }
 }
 
 void evloop::handle_read()
 {
     uint64_t one;
     ssize_t n = read(wake_fd[0], &one, sizeof(one));
-    if (n != sizeof(one))
-        log_error("read %zd bytes instead of %zu", n, sizeof(one));
+    if (n != sizeof(one)) {
+        log_error("Read (%zd) bytes instead of (%zu)", n, sizeof(one));
+    }
 }
 
 bool evloop::is_io_loop_thread()

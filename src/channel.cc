@@ -26,6 +26,15 @@ void channel::enable_read()
     }
 }
 
+void channel::disable_read()
+{
+    if (is_reading()) {
+        filter &= ~Read;
+        loop->poller->remove(evfd, Read);
+        log_debug("channel(fd=%d) disable <Read>", evfd);
+    }
+}
+
 void channel::enable_write()
 {
     if (!is_writing()) {

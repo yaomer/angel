@@ -45,7 +45,6 @@ void timer_t::add_timer_in_loop(timer_task_t *task, size_t id)
     auto it = std::shared_ptr<timer_task_t>(task);
     timer_set.emplace(it);
     timer_map.emplace(id, it);
-    log_debug("timer(id=%zu) has been added to the Timer", id);
 }
 
 // Cancel a timer task is O(log n)
