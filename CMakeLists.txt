@@ -62,7 +62,10 @@ if (ANGEL_HAVE_SELECT)
 endif()
 
 if (ANGEL_USE_OPENSSL)
-    list(APPEND SRC_FILES ${SRC_DIR}/ssl_handshake.cc)
+    list(APPEND SRC_FILES
+        ${SRC_DIR}/ssl_handshake.cc
+        ${SRC_DIR}/ssl_filter.cc
+    )
 endif()
 
 list(APPEND SRC_FILES ${SRC_DIR}/dns/resolver.cc)
