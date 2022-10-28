@@ -77,6 +77,11 @@ void client::start()
     connector->connect();
 }
 
+void client::send(std::string_view data)
+{
+    cli_conn->send(data);
+}
+
 void client::restart()
 {
     close_connection(cli_conn);

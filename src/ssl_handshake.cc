@@ -47,7 +47,7 @@ void ssl_handshake::handshake(int fd)
     if (rc == 1) {
         log_info("(fd=%d) SSL handshake successful", fd);
         loop->remove_channel(channel);
-        if (onestablish) onestablish(ctx, ssl);
+        if (onestablish) onestablish(ssl);
         else shutdown();
         return;
     }

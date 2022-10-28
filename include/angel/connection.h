@@ -34,7 +34,7 @@ typedef std::function<void(const connection_ptr&)> send_complete_handler_t;
 // A higher-level encapsulation than channel,
 // and manage TCP (or UDP) connections exclusively.
 //
-class connection : std::enable_shared_from_this<connection> {
+class connection : public std::enable_shared_from_this<connection> {
 public:
     enum class state {
         connecting,

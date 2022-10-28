@@ -20,7 +20,7 @@ public:
     void start_client_handshake(int fd);
     void start_server_handshake(int fd);
     void shutdown();
-    std::function<void(SSL_CTX*, SSL*)> onestablish;
+    std::function<void(SSL*)> onestablish;
     std::function<void()> onfailed;
 private:
     void start_handshake(int fd);

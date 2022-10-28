@@ -65,6 +65,7 @@ if (ANGEL_USE_OPENSSL)
     list(APPEND SRC_FILES
         ${SRC_DIR}/ssl_handshake.cc
         ${SRC_DIR}/ssl_filter.cc
+        ${SRC_DIR}/ssl_client.cc
     )
 endif()
 

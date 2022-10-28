@@ -23,11 +23,14 @@ public:
     typedef std::function<void()> connection_timeout_handler_t;
 
     client(evloop *, inet_addr, client_options ops = client_options());
-    ~client();
+    virtual ~client();
     client(const client&) = delete;
     client& operator=(const client&) = delete;
 
-    void start();
+    virtual void start();
+    // When using ssl_client, you must use send() instead of conn()->send().
+    virtual void send(std::string_view data);
+
     void restart();
     void restart(inet_addr peer_addr);
     bool is_connected();
@@ -62,6 +65,7 @@ private:
     size_t connection_timeout_timer_id;
     int connection_timeout; // ms
     size_t high_water_mark;
+    friend class ssl_client;
 };
 
 }

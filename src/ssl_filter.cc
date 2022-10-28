@@ -23,7 +23,7 @@ void ssl_filter::decrypt(buffer *input)
 {
     // Give the encrypted data read from the network to openssl for decryption.
     if (input->readable() > 0) {
-        // Writes to memory	BIOs will always succeed if memory is available:
+        // Writes to memory BIOs will always succeed if memory is available:
         // that is their size can grow indefinitely.
         int n = BIO_write(rbio, input->peek(), input->readable());
         if (n > 0) input->retrieve(n);
