@@ -22,7 +22,6 @@ void client::new_connection(int fd)
 {
     log_info("client(fd=%d) connected to host (%s)", fd, peer_addr.to_host());
     cli_conn = connection_ptr(new connection(1, loop, fd));
-    cli_conn->set_state(connection::state::connected);
     cli_conn->set_connection_handler(connection_handler);
     cli_conn->set_message_handler(message_handler);
     cli_conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
@@ -30,9 +29,7 @@ void client::new_connection(int fd)
             this->close_connection(conn);
             if (this->ops.is_reconnect) this->start();
             });
-    loop->run_in_loop([conn = cli_conn]{
-            conn->establish();
-            });
+    loop->run_in_loop([conn = cli_conn]{ conn->establish(); });
     cancel_connection_timeout_timer();
 }
 
@@ -42,7 +39,7 @@ void client::close_connection(const connection_ptr& conn)
     if (conn->is_closed()) return;
     if (close_handler) close_handler(conn);
     conn->set_state(connection::state::closed);
-    loop->remove_channel(conn->get_channel());
+    loop->remove_channel(conn->channel);
     // should close(fd) after remove_channel()
     loop->run_in_loop([conn = cli_conn]() mutable { conn.reset(); });
     cancel_connection_timeout_timer();
@@ -73,10 +70,10 @@ void client::cancel_connection_timeout_timer()
 void client::start()
 {
     add_connection_timeout_timer();
-    auto handler = [this](int fd){ this->new_connection(fd); };
-    connector.reset(new connector_t(loop, peer_addr, handler,
-                                    ops.retry_interval_ms,
-                                    ops.protocol));
+    connector.reset(new connector_t(loop, peer_addr));
+    connector->new_connection_handler = [this](int fd){ this->new_connection(fd); };
+    connector->retry_interval = ops.retry_interval_ms;
+    connector->protocol = ops.protocol;
     connector->connect();
 }
 

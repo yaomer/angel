@@ -55,7 +55,7 @@ void server::remove_connection(const connection_ptr& conn)
 {
     if (close_handler) close_handler(conn);
     conn->set_state(connection::state::closed);
-    conn->get_loop()->remove_channel(conn->get_channel());
+    conn->get_loop()->remove_channel(conn->channel);
     // We have to remove a connection in the io loop thread
     // to prevent multiple threads from concurrently modifying the connection_map.
     loop->run_in_loop([this, id = conn->id()]{

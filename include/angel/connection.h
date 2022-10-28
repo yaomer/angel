@@ -34,7 +34,7 @@ typedef std::function<void(const connection_ptr&)> send_complete_handler_t;
 // A higher-level encapsulation than channel,
 // and manage TCP (or UDP) connections exclusively.
 //
-class connection : public std::enable_shared_from_this<connection> {
+class connection : std::enable_shared_from_this<connection> {
 public:
     enum class state {
         connecting,
@@ -50,7 +50,6 @@ public:
 
     size_t id() const { return conn_id; }
     evloop *get_loop() { return loop; }
-    std::shared_ptr<channel>& get_channel() { return channel; }
     inet_addr& get_local_addr() { return local_addr; }
     inet_addr& get_peer_addr() { return peer_addr; }
     bool is_connected() { return conn_state == state::connected; }
@@ -86,13 +85,9 @@ public:
     // Or after send(), you can also do something with it.
     void set_send_complete_handler(const send_complete_handler_t handler);
 
-    // Invoked by server and client only,
-    // users should not call them directly.
-
-    // Called by server or client after the connection is successfully established.
-    // Used to register channel into evloop.
-    void establish();
-    void set_state(state state) { conn_state = state; }
+    // Generally, they are only invoked by server and client,
+    // and can not be called directly, unless you want to override
+    // the handler set by server or client.
     void set_connection_handler(const connection_handler_t handler)
     { connection_handler = std::move(handler); }
     void set_message_handler(const message_handler_t handler)
@@ -152,6 +147,14 @@ private:
     close_handler_t close_handler;
     high_water_mark_handler_t high_water_mark_handler;
     size_t high_water_mark;
+
+    // Called by server or client after the connection is successfully established.
+    // Used to register channel into evloop.
+    void establish();
+    void set_state(state state) { conn_state = state; }
+
+    friend class server;
+    friend class client;
 };
 
 }

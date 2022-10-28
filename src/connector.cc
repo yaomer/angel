@@ -10,20 +10,14 @@
 
 namespace angel {
 
-connector_t::connector_t(evloop *loop, inet_addr peer_addr,
-                         const new_connection_handler_t handler,
-                         int64_t retry_interval_ms,
-                         std::string_view protocol)
+connector_t::connector_t(evloop *loop, inet_addr peer_addr)
     : loop(loop),
     peer_addr(peer_addr),
     connect_channel(new channel(loop)),
-    new_connection_handler(handler),
     has_connected(false),
     retry_timer_id(0),
     wait_retry(false),
-    sockfd(-1),
-    retry_interval(retry_interval_ms),
-    protocol(protocol)
+    sockfd(-1)
 {
 }
 
@@ -70,6 +64,9 @@ void connector_t::connecting()
 void connector_t::connected()
 {
     if (has_connected) return;
+    if (wait_retry) {
+        loop->cancel_timer(retry_timer_id);
+    }
     loop->remove_channel(connect_channel);
     connect_channel.reset();
     has_connected = true;

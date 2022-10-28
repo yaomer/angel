@@ -6,7 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 #include <angel/channel.h>
 
@@ -61,7 +61,7 @@ private:
     std::unique_ptr<poller> poller;
     std::unique_ptr<timer_t> timer;
     std::unique_ptr<signaler_t> signaler;
-    std::map<int, std::shared_ptr<channel>> channel_map;
+    std::unordered_map<int, std::shared_ptr<channel>> channel_map;
     std::vector<std::shared_ptr<channel>> active_channels;
     std::atomic_bool is_quit;
     std::thread::id cur_tid;

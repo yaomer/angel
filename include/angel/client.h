@@ -13,7 +13,7 @@ class connector_t;
 
 struct client_options {
     bool is_reconnect = false; // Whether to try to reconnect after disconnecting from the peer
-    int64_t retry_interval_ms = 3000; // Retry interval after connect() fails
+    int retry_interval_ms = 3000; // Retry interval after connect() fails
     bool is_quit_loop = false; // Whether to quit loop after the connection is closed
     std::string protocol = "tcp"; // "tcp" or "udp"
 };
