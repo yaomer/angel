@@ -16,11 +16,30 @@ ssl_client::~ssl_client()
     close_connection();
 }
 
+namespace {
+    struct ssl_ctx_free {
+        void operator()(SSL_CTX *ctx) {
+            SSL_CTX_free(ctx);
+        }
+    };
+}
+
+// Just create a SSL_CTX for all clients of each thread.
+SSL_CTX *ssl_client::get_ssl_ctx()
+{
+    static thread_local std::unique_ptr<SSL_CTX, ssl_ctx_free> ctx;
+    if (!ctx) {
+        SSL_library_init();
+        ctx.reset(SSL_CTX_new(SSLv23_client_method()));
+    }
+    return ctx.get();
+}
+
 // At this time, the TCP connection has been established,
 // we try to complete SSL handshake.
 void ssl_client::new_connection(int fd)
 {
-    sh.reset(new ssl_handshake(loop));
+    sh.reset(new ssl_handshake(loop, get_ssl_ctx()));
     sh->start_client_handshake(fd);
     sh->onestablish = [this, fd](SSL *ssl){ this->establish(ssl, fd); };
     sh->onfailed = [this]{ close_connection(); };

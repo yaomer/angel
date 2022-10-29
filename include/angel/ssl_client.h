@@ -17,6 +17,7 @@ public:
     void restart(inet_addr peer_addr) override;
     void send(std::string_view data) override;
 private:
+    static SSL_CTX *get_ssl_ctx();
     void new_connection(int fd);
     void establish(SSL *ssl, int fd);
     void close_connection();

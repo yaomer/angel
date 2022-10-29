@@ -11,7 +11,7 @@ namespace angel {
 
 class ssl_handshake {
 public:
-    explicit ssl_handshake(evloop *loop);
+    explicit ssl_handshake(evloop *loop, SSL_CTX *ctx);
     ~ssl_handshake();
     ssl_handshake(const ssl_handshake&) = delete;
     ssl_handshake& operator=(const ssl_handshake&) = delete;

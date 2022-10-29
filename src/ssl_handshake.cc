@@ -4,8 +4,8 @@
 
 namespace angel {
 
-ssl_handshake::ssl_handshake(evloop *loop)
-    : loop(loop), ctx(nullptr), ssl(nullptr)
+ssl_handshake::ssl_handshake(evloop *loop, SSL_CTX *ctx)
+    : loop(loop), ctx(ctx), ssl(nullptr)
 {
 }
 
@@ -16,8 +16,6 @@ ssl_handshake::~ssl_handshake()
 
 void ssl_handshake::start_client_handshake(int fd)
 {
-    SSL_library_init();
-    ctx = SSL_CTX_new(SSLv23_client_method());
     ssl = SSL_new(ctx);
     SSL_set_connect_state(ssl);
     start_handshake(fd);
@@ -25,8 +23,6 @@ void ssl_handshake::start_client_handshake(int fd)
 
 void ssl_handshake::start_server_handshake(int fd)
 {
-    SSL_library_init();
-    ctx = SSL_CTX_new(SSLv23_server_method());
     ssl = SSL_new(ctx);
     SSL_set_accept_state(ssl);
     start_handshake(fd);
@@ -101,10 +97,6 @@ void ssl_handshake::shutdown()
         SSL_shutdown(ssl);
         SSL_free(ssl);
         ssl = nullptr;
-    }
-    if (ctx) {
-        SSL_CTX_free(ctx);
-        ctx = nullptr;
     }
 }
 
