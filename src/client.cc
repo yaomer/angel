@@ -15,7 +15,7 @@ client::client(evloop *loop, inet_addr peer_addr, client_options ops)
 
 client::~client()
 {
-    close_connection(cli_conn);
+    close_connection();
 }
 
 void client::new_connection(int fd)
@@ -26,22 +26,32 @@ void client::new_connection(int fd)
     cli_conn->set_message_handler(message_handler);
     cli_conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     cli_conn->set_close_handler([this](const connection_ptr& conn){
-            this->close_connection(conn);
+            this->close_connection();
             if (this->ops.is_reconnect) this->start();
             });
+    establish();
+}
+
+void client::establish()
+{
     loop->run_in_loop([conn = cli_conn]{ conn->establish(); });
     cancel_connection_timeout_timer();
 }
 
-void client::close_connection(const connection_ptr& conn)
+void client::close_connection()
 {
-    if (!conn) return;
-    if (conn->is_closed()) return;
-    if (close_handler) close_handler(conn);
-    conn->set_state(connection::state::closed);
-    loop->remove_channel(conn->channel);
+    close_connection(nullptr);
+}
+
+void client::close_connection(functor f)
+{
+    if (!cli_conn) return;
+    if (cli_conn->is_closed()) return;
+    if (close_handler) close_handler(cli_conn);
+    cli_conn->set_state(connection::state::closed);
+    loop->remove_channel(cli_conn->channel);
     // should close(fd) after remove_channel()
-    loop->run_in_loop([conn = cli_conn]() mutable { conn.reset(); });
+    loop->run_in_loop([conn = cli_conn, f = std::move(f)](){ if(f) f(); });
     cancel_connection_timeout_timer();
     if (ops.is_quit_loop) loop->quit();
 }
@@ -84,7 +94,7 @@ void client::send(std::string_view data)
 
 void client::restart()
 {
-    close_connection(cli_conn);
+    close_connection();
     start();
 }
 

@@ -12,6 +12,7 @@ namespace angel {
 class ssl_handshake {
 public:
     explicit ssl_handshake(evloop *loop);
+    ~ssl_handshake();
     ssl_handshake(const ssl_handshake&) = delete;
     ssl_handshake& operator=(const ssl_handshake&) = delete;
     // fd should be set nonblock,

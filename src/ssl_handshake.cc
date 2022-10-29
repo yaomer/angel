@@ -9,6 +9,11 @@ ssl_handshake::ssl_handshake(evloop *loop)
 {
 }
 
+ssl_handshake::~ssl_handshake()
+{
+    shutdown();
+}
+
 void ssl_handshake::start_client_handshake(int fd)
 {
     SSL_library_init();
@@ -92,10 +97,15 @@ void ssl_handshake::handshake(int fd)
 void ssl_handshake::shutdown()
 {
     if (ssl) {
+        log_info("Close SSL connection");
         SSL_shutdown(ssl);
         SSL_free(ssl);
+        ssl = nullptr;
     }
-    if (ctx) SSL_CTX_free(ctx);
+    if (ctx) {
+        SSL_CTX_free(ctx);
+        ctx = nullptr;
+    }
 }
 
 }

@@ -28,11 +28,11 @@ public:
     client& operator=(const client&) = delete;
 
     virtual void start();
+    virtual void restart();
+    virtual void restart(inet_addr peer_addr);
     // When using ssl_client, you must use send() instead of conn()->send().
     virtual void send(std::string_view data);
 
-    void restart();
-    void restart(inet_addr peer_addr);
     bool is_connected();
     const connection_ptr& conn() const { return cli_conn; }
     inet_addr get_peer_addr() { return peer_addr; }
@@ -47,7 +47,9 @@ public:
     void executor(const task_callback_t task);
 private:
     void new_connection(int fd);
-    void close_connection(const connection_ptr&);
+    void establish();
+    void close_connection();
+    void close_connection(functor f);
     void add_connection_timeout_timer();
     void cancel_connection_timeout_timer();
 
