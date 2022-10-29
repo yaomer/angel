@@ -302,6 +302,7 @@ public:
     int status_code;
     std::string status_message;
     const std::string& body() { return message::body; }
+    const Headers& headers() { return message::headers; }
 private:
     StatusCode parse_line(buffer&);
 

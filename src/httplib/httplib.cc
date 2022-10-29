@@ -4,6 +4,11 @@
 #include <fcntl.h>
 
 #include <angel/mime.h>
+#include <angel/config.h>
+
+#if defined (ANGEL_USE_OPENSSL)
+#include <angel/ssl_client.h>
+#endif
 
 #include "util.h"
 
@@ -257,9 +262,11 @@ bool uri::parse(std::string_view uri)
         sep = std::find(p, end, '/');
         port = util::svtoi({p, (size_t)(sep - p)}).value_or(-1);
         if (port <= 0) return false;
-    } else { // http://host/, the default port is 80
+    } else { // http://host/
         sep = std::find(p, end, '/');
         host.assign(p, sep);
+        if (scheme == "http") port = 80;
+        else if (scheme == "https") port = 443;
     }
     // http://host => http://host/
     if (sep == end) {
@@ -1514,8 +1521,9 @@ void http_connection::err_notify(ErrorCode err_code)
 
 void HttpClient::send(http_connection *http_conn, http_request& request)
 {
-    assert(http_conn->client->is_connected());
-    http_conn->client->conn()->send(request.str());
+    auto& cli = http_conn->client;
+    assert(cli->is_connected());
+    cli->send(request.str());
     set_request_timeout_timer(http_conn, request.request_timeout);
 }
 
@@ -1526,9 +1534,19 @@ void HttpClient::add_connection(http_connection_pool *pool, http_request& reques
 
     // TODO: If failure, try other addrs
     inet_addr peer_addr(pool->addrs[0], request.uri.port);
-    http_conn->client.reset(new angel::client(sender.get_loop(), peer_addr));
 
-    auto *client = http_conn->client.get();
+#if defined (ANGEL_USE_OPENSSL)
+    if (request.uri.port == 443) {
+        http_conn->client.reset(new angel::ssl_client(sender.get_loop(), peer_addr));
+    } else {
+        http_conn->client.reset(new angel::client(sender.get_loop(), peer_addr));
+    }
+#else
+    http_conn->client.reset(new angel::client(sender.get_loop(), peer_addr));
+#endif
+
+    auto& client = http_conn->client;
+
     client->set_connection_timeout_handler(request.connection_timeout, [this, http_conn](){
             this->connection_timeout_handler(http_conn);
             });
@@ -1553,7 +1571,6 @@ void HttpClient::connection_timeout_handler(http_connection *http_conn)
 
 void HttpClient::set_request_timeout_timer(http_connection *http_conn, int request_timeout)
 {
-    printf("request_timeout %d ms\n", request_timeout);
     http_conn->request_timeout_timer_id = sender.get_loop()->run_after(request_timeout,
             [this, http_conn]{
             http_conn->err_notify(ErrorCode::RequestTimeout);
