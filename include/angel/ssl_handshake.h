@@ -21,7 +21,8 @@ public:
     void start_client_handshake(int fd);
     void start_server_handshake(int fd);
     void shutdown();
-    std::function<void(SSL*)> onestablish;
+    SSL *get_ssl() { return ssl; }
+    std::function<void()> onestablish;
     std::function<void()> onfailed;
 private:
     void start_handshake(int fd);

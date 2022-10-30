@@ -10,18 +10,18 @@
 
 namespace angel {
 
-listener_t::listener_t(evloop *loop, inet_addr listen_addr,
-                       const new_connection_handler_t handler)
+listener_t::listener_t(evloop *loop, inet_addr listen_addr)
     : loop(loop),
     listen_channel(new channel(loop)),
     listen_socket(sockops::socket()),
     listen_addr(listen_addr),
-    new_connection_handler(handler),
     idle_fd(::open("/dev/null", O_RDONLY | O_CLOEXEC))
 {
 }
 
-listener_t::~listener_t() = default;
+listener_t::~listener_t()
+{
+}
 
 void listener_t::listen()
 {

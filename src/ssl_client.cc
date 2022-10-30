@@ -41,15 +41,15 @@ void ssl_client::new_connection(int fd)
 {
     sh.reset(new ssl_handshake(loop, get_ssl_ctx()));
     sh->start_client_handshake(fd);
-    sh->onestablish = [this, fd](SSL *ssl){ this->establish(ssl, fd); };
+    sh->onestablish = [this, fd]{ this->establish(fd); };
     sh->onfailed = [this]{ close_connection(); };
 }
 
-void ssl_client::establish(SSL *ssl, int fd)
+void ssl_client::establish(int fd)
 {
     log_info("SSL client(fd=%d) connected to host (%s)", fd, peer_addr.to_host());
 
-    sf.reset(new ssl_filter(ssl, &decrypted, &encrypted));
+    sf.reset(new ssl_filter(sh->get_ssl(), &decrypted, &encrypted));
 
     cli_conn = connection_ptr(new connection(1, loop, fd));
     cli_conn->set_connection_handler(connection_handler);
@@ -70,7 +70,15 @@ void ssl_client::establish(SSL *ssl, int fd)
 
 void ssl_client::close_connection()
 {
-    client::close_connection([sh = sh]{ sh->shutdown(); });
+    if (!cli_conn) return;
+    if (cli_conn->is_closed()) return;
+    if (close_handler) close_handler(cli_conn);
+    cli_conn->set_state(connection::state::closed);
+    loop->remove_channel(cli_conn->channel);
+    // Close SSL connection and underlying TCP connection after remove_channel()
+    loop->run_in_loop([sh = sh, conn = cli_conn](){ sh->shutdown(); });
+    cancel_connection_timeout_timer();
+    if (ops.is_quit_loop) loop->quit();
 }
 
 void ssl_client::start()

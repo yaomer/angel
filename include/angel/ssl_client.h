@@ -19,7 +19,7 @@ public:
 private:
     static SSL_CTX *get_ssl_ctx();
     void new_connection(int fd);
-    void establish(SSL *ssl, int fd);
+    void establish(int fd);
     void close_connection();
     std::shared_ptr<ssl_handshake> sh;
     std::unique_ptr<ssl_filter> sf;

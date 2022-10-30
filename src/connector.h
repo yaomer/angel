@@ -15,6 +15,7 @@ class connector_t {
 public:
     connector_t(evloop *, inet_addr);
     ~connector_t();
+
     connector_t(const connector_t&) = delete;
     connector_t& operator=(const connector_t&) = delete;
 

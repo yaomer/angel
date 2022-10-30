@@ -13,6 +13,8 @@ class ssl_filter {
 public:
     ssl_filter(SSL *ssl, buffer *decrypted, buffer *encrypted);
     ~ssl_filter();
+    ssl_filter(const ssl_filter&) = delete;
+    ssl_filter& operator=(const ssl_filter&) = delete;
     // Call after read from the network.
     // The decrypted data is stored in buffer `decrypted`.
     void decrypt(buffer *input);

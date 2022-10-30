@@ -1,7 +1,7 @@
 #ifndef _ANGEL_SERVER_H
 #define _ANGEL_SERVER_H
 
-#include <map>
+#include <unordered_map>
 #include <functional>
 #include <memory>
 
@@ -26,6 +26,7 @@ public:
 
     explicit server(evloop *, inet_addr);
     ~server();
+
     server(const server&) = delete;
     server& operator=(const server&) = delete;
 
@@ -68,21 +69,23 @@ public:
         high_water_mark_handler = std::move(handler);
     }
 
-    void start();
+    virtual void start();
     void quit();
 
     static void daemon();
 private:
     void new_connection(int fd);
     void remove_connection(const connection_ptr& conn);
+    void establish(const connection_ptr& conn);
     evloop* get_next_loop();
+    void handle_signals();
     void clean_up();
 
     evloop *loop;
     std::unique_ptr<listener_t> listener;
     std::unique_ptr<evloop_thread_pool> io_thread_pool;
     std::unique_ptr<thread_pool> task_thread_pool;
-    std::map<size_t, connection_ptr> connection_map;
+    std::unordered_map<size_t, connection_ptr> connection_map;
     size_t conn_id;
     connection_handler_t connection_handler;
     message_handler_t message_handler;
@@ -91,6 +94,7 @@ private:
     signaler_handler_t exit_handler;
     size_t high_water_mark;
     // bool is_set_cpu_affinity;
+    friend class ssl_server;
 };
 
 }

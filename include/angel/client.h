@@ -24,6 +24,7 @@ public:
 
     client(evloop *, inet_addr, client_options ops = client_options());
     virtual ~client();
+
     client(const client&) = delete;
     client& operator=(const client&) = delete;
 
@@ -49,7 +50,6 @@ private:
     void new_connection(int fd);
     void establish();
     void close_connection();
-    void close_connection(functor f);
     void add_connection_timeout_timer();
     void cancel_connection_timeout_timer();
 

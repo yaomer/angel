@@ -11,8 +11,7 @@ namespace angel {
 
 server::server(evloop *loop, inet_addr listen_addr)
     : loop(loop),
-    listener(new listener_t(
-                loop, listen_addr, [this](int fd){ this->new_connection(fd); })),
+    listener(new listener_t(loop, listen_addr)),
     conn_id(1),
     high_water_mark(0)
 {
@@ -20,7 +19,9 @@ server::server(evloop *loop, inet_addr listen_addr)
         // util::set_thread_affinity(pthread_self(), 0);
 }
 
-server::~server() = default;
+server::~server()
+{
+}
 
 inet_addr& server::listen_addr()
 {
@@ -47,8 +48,13 @@ void server::new_connection(int fd)
     conn->set_close_handler([this](const connection_ptr& conn){
             this->remove_connection(conn);
             });
-    connection_map.emplace(id, conn);
-    io_loop->run_in_loop([conn]{ conn->establish(); });
+    establish(conn);
+}
+
+void server::establish(const connection_ptr& conn)
+{
+    connection_map.emplace(conn->id(), conn);
+    conn->get_loop()->run_in_loop([conn]{ conn->establish(); });
 }
 
 void server::remove_connection(const connection_ptr& conn)
@@ -95,27 +101,27 @@ void server::for_each(const for_each_functor_t functor)
 
 void server::start_io_threads(size_t thread_nums)
 {
-    if (thread_nums > 0)
+    if (thread_nums > 0) {
         io_thread_pool.reset(new evloop_thread_pool(thread_nums));
-    else
+    } else {
         io_thread_pool.reset(new evloop_thread_pool());
+    }
 }
 
 void server::start_task_threads(size_t thread_nums, enum thread_pool::policy policy)
 {
-    if (thread_nums > 0)
+    if (thread_nums > 0) {
         task_thread_pool.reset(new thread_pool(policy, thread_nums));
-    else
+    } else {
         task_thread_pool.reset(new thread_pool(policy));
+    }
 }
 
 void server::executor(const task_callback_t task)
 {
-    if (!task_thread_pool) {
-        log_error("task_thread_pool is null");
-        return;
+    if (task_thread_pool) {
+        task_thread_pool->executor(task);
     }
-    task_thread_pool->executor(task);
 }
 
 void server::clean_up()
@@ -152,14 +158,20 @@ void server::set_keepalive_probes(int probes)
     listener->keepalive_probes = probes;
 }
 
-void server::start()
+void server::handle_signals()
 {
-    log_info("Server (%s) is running", listener->addr().to_host());
     // The SIGPIPE signal must be ignored, otherwise sending a message
     // to a closed connection will cause the server to exit unexpectedly.
     add_signal(SIGPIPE, nullptr);
     add_signal(SIGINT, [this]{ this->clean_up(); });
     add_signal(SIGTERM, [this]{ this->clean_up(); });
+}
+
+void server::start()
+{
+    handle_signals();
+    log_info("Server (%s) is running", listener->addr().to_host());
+    listener->new_connection_handler = [this](int fd){ this->new_connection(fd); };
     listener->listen();
 }
 

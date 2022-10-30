@@ -15,8 +15,7 @@ class evloop;
 
 class listener_t {
 public:
-    typedef std::function<void(int)> new_connection_handler_t;
-    listener_t(evloop *, inet_addr, const new_connection_handler_t);
+    listener_t(evloop *, inet_addr);
     ~listener_t();
 
     listener_t(const listener_t&) = delete;
@@ -32,6 +31,8 @@ public:
     int keepalive_idle   = 0; // 0 will be ignored
     int keepalive_intvl  = 0; // 0 will be ignored
     int keepalive_probes = 0; // 0 will be ignored
+    typedef std::function<void(int)> new_connection_handler_t;
+    new_connection_handler_t new_connection_handler;
 private:
     void handle_accept();
 
@@ -39,7 +40,6 @@ private:
     std::shared_ptr<channel> listen_channel;
     socket listen_socket;
     inet_addr listen_addr;
-    new_connection_handler_t new_connection_handler;
     int idle_fd;
 };
 }

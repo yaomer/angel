@@ -45,6 +45,7 @@ public:
 
     connection(size_t id, evloop *loop, int sockfd);
     ~connection();
+
     connection(const connection&) = delete;
     connection& operator=(const connection&) = delete;
 
@@ -155,6 +156,8 @@ private:
 
     friend class server;
     friend class client;
+    friend class ssl_server;
+    friend class ssl_client;
 };
 
 }

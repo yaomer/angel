@@ -48,7 +48,8 @@ void ssl_handshake::handshake(int fd)
     if (rc == 1) {
         log_info("(fd=%d) SSL handshake successful", fd);
         loop->remove_channel(channel);
-        if (onestablish) onestablish(ssl);
+        channel.reset();
+        if (onestablish) onestablish();
         else shutdown();
         return;
     }
@@ -77,6 +78,7 @@ void ssl_handshake::handshake(int fd)
         ERR_error_string(err, buf);
         log_error("(fd=%d) SSL handshake failed: %s", fd, buf);
         loop->remove_channel(channel);
+        channel.reset();
         if (onfailed) onfailed();
         else shutdown();
     }
