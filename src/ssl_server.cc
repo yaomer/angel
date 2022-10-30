@@ -1,6 +1,8 @@
 #include <angel/ssl_server.h>
 
-#include "listener.h"
+#include <angel/logger.h>
+
+#include "ssl_connection.h"
 
 namespace angel {
 
@@ -13,102 +15,92 @@ ssl_server::~ssl_server()
 {
 }
 
+connection_ptr ssl_server::create_connection(int fd)
+{
+    size_t id = conn_id++;
+    evloop *io_loop = get_next_loop();
+    auto it = shmap.find(fd);
+    assert(it != shmap.end());
+    auto *sh = it->second.release();
+    shmap.erase(it);
+    return std::make_shared<ssl_connection>(id, io_loop, fd, sh);
+}
+
+void ssl_server::new_connection(int fd)
+{
+    auto *sh = new ssl_handshake(loop, get_ssl_ctx());
+    shmap.emplace(fd, sh);
+    sh->start_server_handshake(fd);
+    sh->onestablish = [this, fd]{ server::new_connection(fd); };
+    sh->onfailed = [this, fd]{ shmap.erase(fd); close(fd); };
+}
+
 namespace {
     struct ssl_ctx_free {
         void operator()(SSL_CTX *ctx) {
             SSL_CTX_free(ctx);
         }
     };
-}
 
-static std::string certificate;
-static std::string certificate_key;
+    static std::string cipher_list;
+    static std::string cert_file;
+    static std::string key_passwd;
+    static std::string key_file;
+}
 
 SSL_CTX *ssl_server::get_ssl_ctx()
 {
+    int rc;
     static thread_local std::unique_ptr<SSL_CTX, ssl_ctx_free> ctx;
     if (!ctx) {
         SSL_library_init();
         ctx.reset(SSL_CTX_new(SSLv23_server_method()));
-        int rc = SSL_CTX_use_certificate_chain_file(ctx.get(), certificate.c_str());
-        assert(rc == 1);
-        rc = SSL_CTX_use_PrivateKey_file(ctx.get(), certificate_key.c_str(), SSL_FILETYPE_PEM);
-        assert(rc == 1);
+
+        if (!cipher_list.empty()) {
+            rc = SSL_CTX_set_cipher_list(ctx.get(), cipher_list.c_str());
+            if (rc != 1) {
+                log_fatal("SSL_CTX_set_cipher_list(%s) failed", cipher_list.c_str());
+            }
+        }
+
+        rc = SSL_CTX_use_certificate_file(ctx.get(), cert_file.c_str(), SSL_FILETYPE_PEM);
+        if (rc != 1) {
+            log_fatal("SSL_CTX_use_certificate_file(%s) failed", cert_file.c_str());
+        }
+
+        SSL_CTX_set_default_passwd_cb_userdata(ctx.get(), (void*)key_passwd.c_str());
+
+        rc = SSL_CTX_use_PrivateKey_file(ctx.get(), key_file.c_str(), SSL_FILETYPE_PEM);
+        if (rc != 1) {
+            log_fatal("SSL_CTX_use_PrivateKey_file(%s) failed", key_file.c_str());
+        }
+
+        rc = SSL_CTX_check_private_key(ctx.get());
+        if (rc != 1) {
+            log_fatal("SSL_CTX_check_private_key failed");
+        }
     }
     return ctx.get();
 }
 
-void ssl_server::new_connection(int fd)
+void ssl_server::set_cipher_list(const char *your_cipher_list)
 {
-    ssl *ssl = new struct ssl();
-
-    ssl->sh.reset(new ssl_handshake(loop, get_ssl_ctx()));
-    ssl->sh->start_server_handshake(fd);
-    ssl->sh->onestablish = [this, ssl, fd]{ this->establish(ssl, fd); };
-    ssl->sh->onfailed = [ssl, fd]{ delete ssl; close(fd); };
+    cipher_list = your_cipher_list;
 }
 
-void ssl_server::establish(ssl *ssl, int fd)
+void ssl_server::set_certificate_file(const char *your_cert_file)
 {
-    size_t id = conn_id++;
-
-    ssl->sf.reset(new ssl_filter(ssl->sh->get_ssl(), &ssl->decrypted, &ssl->encrypted));
-    ssl_map.emplace(id, ssl);
-
-    evloop *io_loop = server::get_next_loop();
-    connection_ptr conn(new connection(id, io_loop, fd));
-    conn->set_connection_handler(connection_handler);
-    conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
-
-    if (message_handler) {
-        conn->set_message_handler([this](const connection_ptr& conn, buffer& buf){
-                auto& ssl = ssl_map[conn->id()];
-                ssl->sf->decrypt(&buf);
-                message_handler(conn, ssl->decrypted);
-                });
-    }
-    conn->set_close_handler([this](const connection_ptr& conn){
-            this->remove_connection(conn);
-            });
-    server::establish(conn);
+    cert_file = your_cert_file;
 }
 
-void ssl_server::remove_connection(const connection_ptr& conn)
+void ssl_server::set_private_key_passwd(const char *your_key_passwd)
 {
-    if (close_handler) close_handler(conn);
-    conn->set_state(connection::state::closed);
-    conn->get_loop()->remove_channel(conn->channel);
-    loop->run_in_loop([this, id = conn->id()]{
-            this->ssl_map.erase(id);
-            this->connection_map.erase(id);
-            });
+    key_passwd = your_key_passwd;
 }
 
-void ssl_server::set_certificate(const char *path)
+void ssl_server::set_private_key_file(const char *your_key_file)
 {
-    certificate = path;
-}
-
-void ssl_server::set_certificate_key(const char *path)
-{
-    certificate_key = path;
-}
-
-void ssl_server::start()
-{
-    server::handle_signals();
-    log_info("SSL Server (%s) is running", listener->addr().to_host());
-    listener->new_connection_handler = [this](int fd){ this->new_connection(fd); };
-    listener->listen();
-}
-
-void ssl_server::send(const connection_ptr& conn, std::string_view data)
-{
-    auto& ssl = ssl_map[conn->id()];
-    ssl->output.append(data);
-    ssl->sf->encrypt(&ssl->output);
-    conn->send(ssl->encrypted.peek(), ssl->encrypted.readable());
-    ssl->encrypted.retrieve_all();
+    key_file = your_key_file;
 }
 
 }

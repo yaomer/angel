@@ -74,7 +74,8 @@ public:
 
     static void daemon();
 private:
-    void new_connection(int fd);
+    virtual connection_ptr create_connection(int fd);
+    virtual void new_connection(int fd);
     void remove_connection(const connection_ptr& conn);
     void establish(const connection_ptr& conn);
     evloop* get_next_loop();

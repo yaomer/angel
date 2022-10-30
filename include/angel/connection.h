@@ -44,7 +44,7 @@ public:
     };
 
     connection(size_t id, evloop *loop, int sockfd);
-    ~connection();
+    virtual ~connection();
 
     connection(const connection&) = delete;
     connection& operator=(const connection&) = delete;
@@ -73,10 +73,10 @@ public:
     void close() { handle_close(false); }
 
     // thread-safe
-    void send(std::string_view s);
-    void send(const char *s, size_t len);
-    void send(const void *v, size_t len);
-    void format_send(const char *fmt, ...);
+    virtual void send(std::string_view s);
+    virtual void send(const char *s, size_t len);
+    virtual void send(const void *v, size_t len);
+    virtual void format_send(const char *fmt, ...);
     // send_file() async-sends the specified file by zero copy.
     void send_file(int fd, off_t offset, off_t count);
     // If you want to close fd after sending the file, you can do that.
@@ -91,7 +91,7 @@ public:
     // the handler set by server or client.
     void set_connection_handler(const connection_handler_t handler)
     { connection_handler = std::move(handler); }
-    void set_message_handler(const message_handler_t handler)
+    virtual void set_message_handler(const message_handler_t handler)
     { message_handler = std::move(handler); }
     void set_close_handler(const close_handler_t handler)
     { close_handler = std::move(handler); }
@@ -108,7 +108,8 @@ private:
     void force_close_connection() { handle_close(true); }
     void send_in_loop(const char *data, size_t len);
     void send_file_in_loop(int fd, off_t offset, off_t count);
-    void update_ttl_timer_if_needed();
+    void set_ttl_timer();
+    void update_ttl_timer();
     const char *get_state_str();
 
     ssize_t write(const char *data, size_t len);
@@ -156,8 +157,6 @@ private:
 
     friend class server;
     friend class client;
-    friend class ssl_server;
-    friend class ssl_client;
 };
 
 }

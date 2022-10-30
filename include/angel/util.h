@@ -207,6 +207,13 @@ inline std::string concat(std::string_view s, Args... args)
     return catviews({s, args...});
 }
 
+struct format_result {
+    char *buf;
+    int len;
+    bool alloced;
+};
+format_result format(const char *fmt, va_list ap);
+
 #define UNUSED(x) ((void)(x))
 
 }

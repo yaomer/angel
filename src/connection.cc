@@ -66,7 +66,7 @@ void connection::handle_read()
     } else {
         handle_error();
     }
-    update_ttl_timer_if_needed();
+    update_ttl_timer();
 }
 
 // Whenever the registered sockfd is writable,
@@ -261,7 +261,7 @@ void connection::send(const char *s, size_t len)
                 this->send_in_loop(message.data(), message.size());
                 });
     }
-    update_ttl_timer_if_needed();
+    update_ttl_timer();
 }
 
 void connection::send(std::string_view s)
@@ -274,28 +274,14 @@ void connection::send(const void *v, size_t len)
     send(reinterpret_cast<const char*>(v), len);
 }
 
-static thread_local char format_send_buf[65536];
-
 void connection::format_send(const char *fmt, ...)
 {
-    va_list ap, ap1;
+    va_list ap;
     va_start(ap, fmt);
-    // Get the length of the formatted string.
-    va_copy(ap1, ap);
-    int len = vsnprintf(nullptr, 0, fmt, ap1);
-    va_end(ap1);
-    char *buf;
-    bool is_alloced = false;
-    if (len < sizeof(format_send_buf)) {
-        buf = format_send_buf;
-    } else {
-        buf = new char[len + 1];
-        is_alloced = true;
-    }
-    vsnprintf(buf, len + 1, fmt, ap);
+    auto res = format(fmt, ap);
     va_end(ap);
-    send(buf, len);
-    if (is_alloced) delete []buf;
+    send(res.buf, res.len);
+    if (res.alloced) delete []res.buf;
 }
 
 void connection::send_file(int fd, off_t offset, off_t count)
@@ -303,7 +289,7 @@ void connection::send_file(int fd, off_t offset, off_t count)
     loop->run_in_loop([this, fd, offset, count]{
             this->send_file_in_loop(fd, offset, count);
             });
-    update_ttl_timer_if_needed();
+    update_ttl_timer();
 }
 
 void connection::set_ttl(int64_t ms)
@@ -311,15 +297,18 @@ void connection::set_ttl(int64_t ms)
     if (ms <= 0) return;
     ttl_ms = ms;
     if (ttl_timer_id > 0) loop->cancel_timer(ttl_timer_id);
-    ttl_timer_id = loop->run_after(ttl_ms, [conn = shared_from_this()]{
-            conn->close();
-            });
+    set_ttl_timer();
 }
 
-void connection::update_ttl_timer_if_needed()
+void connection::update_ttl_timer()
 {
     if (ttl_timer_id == 0) return;
     loop->cancel_timer(ttl_timer_id);
+    set_ttl_timer();
+}
+
+void connection::set_ttl_timer()
+{
     ttl_timer_id = loop->run_after(ttl_ms, [conn = shared_from_this()]{
             conn->close();
             });

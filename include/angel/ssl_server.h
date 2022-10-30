@@ -4,7 +4,6 @@
 #include <angel/server.h>
 
 #include <angel/ssl_handshake.h>
-#include <angel/ssl_filter.h>
 
 namespace angel {
 
@@ -13,23 +12,15 @@ public:
     explicit ssl_server(evloop *, inet_addr);
     ~ssl_server();
 
-    void start() override;
-    void set_certificate(const char *path);
-    void set_certificate_key(const char *path);
-    void send(const connection_ptr& conn, std::string_view data);
+    void set_cipher_list(const char *cipher_list);
+    void set_certificate_file(const char *cert_file);
+    void set_private_key_passwd(const char *key_passwd);
+    void set_private_key_file(const char *key_file);
 private:
-    struct ssl {
-        std::unique_ptr<ssl_handshake> sh;
-        std::unique_ptr<ssl_filter> sf;
-        buffer output;
-        buffer decrypted;
-        buffer encrypted;
-    };
-    void establish(ssl *ssl, int fd);
-    void new_connection(int fd);
-    void remove_connection(const connection_ptr& conn);
+    connection_ptr create_connection(int fd) override;
+    void new_connection(int fd) override;
     static SSL_CTX *get_ssl_ctx();
-    std::unordered_map<size_t, std::shared_ptr<ssl>> ssl_map;
+    std::unordered_map<int, std::unique_ptr<ssl_handshake>> shmap;
 };
 
 }

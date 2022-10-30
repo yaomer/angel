@@ -243,5 +243,29 @@ void daemon()
         close(fd);
 }
 
+static thread_local char format_send_buf[65536];
+
+format_result format(const char *fmt, va_list ap)
+{
+    format_result res;
+
+    // Get the length of the formatted string.
+    va_list ap1;
+    va_copy(ap1, ap);
+    int len = vsnprintf(nullptr, 0, fmt, ap1);
+    va_end(ap1);
+
+    if (len + 1 < sizeof(format_send_buf)) {
+        res.buf = format_send_buf;
+        res.alloced = false;
+    } else {
+        res.buf = new char[len + 1];
+        res.alloced = true;
+    }
+    vsnprintf(res.buf, len + 1, fmt, ap);
+    res.len = len;
+    return res;
+}
+
 }
 }

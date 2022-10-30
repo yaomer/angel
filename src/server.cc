@@ -37,22 +37,22 @@ evloop *server::get_next_loop()
     }
 }
 
-void server::new_connection(int fd)
+connection_ptr server::create_connection(int fd)
 {
     size_t id = conn_id++;
     evloop *io_loop = get_next_loop();
-    connection_ptr conn(new connection(id, io_loop, fd));
+    return std::make_shared<connection>(id, io_loop, fd);
+}
+
+void server::new_connection(int fd)
+{
+    connection_ptr conn(create_connection(fd));
     conn->set_connection_handler(connection_handler);
     conn->set_message_handler(message_handler);
     conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     conn->set_close_handler([this](const connection_ptr& conn){
             this->remove_connection(conn);
             });
-    establish(conn);
-}
-
-void server::establish(const connection_ptr& conn)
-{
     connection_map.emplace(conn->id(), conn);
     conn->get_loop()->run_in_loop([conn]{ conn->establish(); });
 }

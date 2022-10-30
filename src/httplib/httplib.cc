@@ -1523,7 +1523,7 @@ void HttpClient::send(http_connection *http_conn, http_request& request)
 {
     auto& cli = http_conn->client;
     assert(cli->is_connected());
-    cli->send(request.str());
+    cli->conn()->send(request.str());
     set_request_timeout_timer(http_conn, request.request_timeout);
 }
 
