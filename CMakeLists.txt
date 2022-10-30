@@ -63,11 +63,11 @@ endif()
 
 if (ANGEL_USE_OPENSSL)
     list(APPEND SRC_FILES
-        ${SRC_DIR}/ssl_handshake.cc
-        ${SRC_DIR}/ssl_filter.cc
-        ${SRC_DIR}/ssl_connection.cc
-        ${SRC_DIR}/ssl_client.cc
-        ${SRC_DIR}/ssl_server.cc
+        ${SRC_DIR}/ssl/ssl_handshake.cc
+        ${SRC_DIR}/ssl/ssl_filter.cc
+        ${SRC_DIR}/ssl/ssl_connection.cc
+        ${SRC_DIR}/ssl/ssl_client.cc
+        ${SRC_DIR}/ssl/ssl_server.cc
     )
 endif()
 
