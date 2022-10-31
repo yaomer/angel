@@ -12,18 +12,13 @@ class ssl_connection : public connection {
 public:
     ssl_connection(size_t id, evloop *loop, int sockfd, ssl_handshake *sh);
     ~ssl_connection();
-
-    void set_message_handler(const message_handler_t handler) override;
-    void send(std::string_view s) override;
-    void send(const char *s, size_t len) override;
-    void send(const void *v, size_t len) override;
-    void format_send(const char *fmt, ...) override;
 private:
+    void handle_message() override;
+    ssize_t write(const char *data, size_t len) override;
+    ssize_t sendfile(int fd, off_t offset, off_t count) override;
     std::shared_ptr<ssl_handshake> sh;
     std::unique_ptr<ssl_filter> sf;
-    buffer output;
     buffer decrypted;
-    buffer encrypted;
 };
 
 }

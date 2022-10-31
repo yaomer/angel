@@ -56,9 +56,9 @@ void connection::handle_read()
     log_debug("Read (%zd) bytes from connection(id=%d, fd=%d)", n, conn_id, channel->fd());
     if (n > 0) {
         if (message_handler) {
-            message_handler(shared_from_this(), input_buf);
+            handle_message();
         } else {
-            // If the user does not set a message handler, discard all read data
+            // If the user does not set a message handler, discard all read data.
             input_buf.retrieve_all();
         }
     } else if (n == 0) {
@@ -67,6 +67,11 @@ void connection::handle_read()
         handle_error();
     }
     update_ttl_timer();
+}
+
+void connection::handle_message()
+{
+    message_handler(shared_from_this(), input_buf);
 }
 
 // Whenever the registered sockfd is writable,

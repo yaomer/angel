@@ -95,7 +95,7 @@ void ssl_handshake::handshake(int fd)
 void ssl_handshake::shutdown()
 {
     if (ssl) {
-        log_info("Close SSL connection");
+        log_info("(fd=%d) Close SSL connection", SSL_get_wfd(ssl));
         SSL_shutdown(ssl);
         SSL_free(ssl);
         ssl = nullptr;

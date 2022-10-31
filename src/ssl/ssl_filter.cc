@@ -7,10 +7,15 @@ namespace angel {
 ssl_filter::ssl_filter(SSL *ssl, buffer *decrypted, buffer *encrypted)
     : ssl(ssl), decrypted(decrypted), encrypted(encrypted)
 {
-    rbio = BIO_new(BIO_s_mem());
-    wbio = BIO_new(BIO_s_mem());
-
-    SSL_set_bio(ssl, rbio, wbio);
+    rbio = wbio = nullptr;
+    if (decrypted) {
+        rbio = BIO_new(BIO_s_mem());
+        SSL_set0_rbio(ssl, rbio);
+    }
+    if (encrypted) {
+        wbio = BIO_new(BIO_s_mem());
+        SSL_set0_wbio(ssl, wbio);
+    }
 }
 
 ssl_filter::~ssl_filter()

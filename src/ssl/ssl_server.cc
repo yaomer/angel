@@ -53,8 +53,8 @@ SSL_CTX *ssl_server::get_ssl_ctx()
     int rc;
     static thread_local std::unique_ptr<SSL_CTX, ssl_ctx_free> ctx;
     if (!ctx) {
-        SSL_library_init();
-        ctx.reset(SSL_CTX_new(SSLv23_server_method()));
+        OPENSSL_init();
+        ctx.reset(SSL_CTX_new(TLS_server_method()));
 
         if (!cipher_list.empty()) {
             rc = SSL_CTX_set_cipher_list(ctx.get(), cipher_list.c_str());

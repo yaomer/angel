@@ -1,12 +1,15 @@
 #include "ssl_connection.h"
 
+#include <sys/mman.h>
+
 #include <angel/util.h>
+#include <angel/logger.h>
 
 namespace angel {
 
 ssl_connection::ssl_connection(size_t id, evloop *loop, int sockfd, ssl_handshake *sh)
     : connection(id, loop, sockfd), sh(sh),
-    sf(new ssl_filter(sh->get_ssl(), &decrypted, &encrypted))
+    sf(new ssl_filter(sh->get_ssl(), &decrypted, nullptr))
 {
 }
 
@@ -14,42 +17,48 @@ ssl_connection::~ssl_connection()
 {
 }
 
-void ssl_connection::set_message_handler(const message_handler_t handler)
+void ssl_connection::handle_message()
 {
-    if (!handler) return;
-    connection::set_message_handler([this, message_handler = std::move(handler)]
-            (const connection_ptr& conn, buffer& buf){
-            this->sf->decrypt(&buf);
-            message_handler(conn, decrypted);
-            });
+    sf->decrypt(&input_buf);
+    message_handler(shared_from_this(), decrypted);
 }
 
-void ssl_connection::send(const char *s, size_t len)
+ssize_t ssl_connection::write(const char *data, size_t len)
 {
-    output.append(s, len);
-    sf->encrypt(&output);
-    connection::send(encrypted.peek(), encrypted.readable());
-    encrypted.retrieve_all();
+    SSL *ssl = sh->get_ssl();
+    int n = SSL_write(ssl, data, len);
+    log_debug("SSL_write (%d) bytes to connection(id=%d, fd=%d)", n, conn_id, channel->fd());
+    if (n <= 0) {
+        int err = SSL_get_error(ssl, n);
+        if (err == SSL_ERROR_WANT_READ) {
+            return -1;
+        } else if (err == SSL_ERROR_WANT_WRITE) {
+            return -1;
+        } else {
+            char buf[256];
+            ERR_error_string(err, buf);
+            log_error("connection(id=%d, fd=%d): openssl: %s", conn_id, channel->fd(), buf);
+            force_close_connection();
+            return -2;
+        }
+    }
+    return n;
 }
 
-void ssl_connection::send(std::string_view s)
-{
-    send(s.data(), s.size());
-}
+static const off_t ChunkSize = 1024 * 32;
 
-void ssl_connection::send(const void *v, size_t len)
+// SSL_sendfile() is available only when ktls(Kernel TLS) is enabled.
+// Here we fallback to mmap()/write().
+ssize_t ssl_connection::sendfile(int fd, off_t offset, off_t count)
 {
-    send(reinterpret_cast<const char*>(v), len);
-}
+    off_t fix_off = util::page_aligned(offset);
+    off_t diff  = offset - fix_off;
+    off_t size  = std::min(ChunkSize, count) + diff;
+    char *start = (char*)mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, fix_off);
 
-void ssl_connection::format_send(const char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    auto res = util::format(fmt, ap);
-    va_end(ap);
-    send(res.buf, res.len);
-    if (res.alloced) delete []res.buf;
+    int n = write(start + diff, size - diff);
+    munmap(start, size);
+    return n;
 }
 
 }

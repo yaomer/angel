@@ -26,8 +26,8 @@ SSL_CTX *ssl_client::get_ssl_ctx()
 {
     static thread_local std::unique_ptr<SSL_CTX, ssl_ctx_free> ctx;
     if (!ctx) {
-        SSL_library_init();
-        ctx.reset(SSL_CTX_new(SSLv23_client_method()));
+        OPENSSL_init();
+        ctx.reset(SSL_CTX_new(TLS_client_method()));
     }
     return ctx.get();
 }

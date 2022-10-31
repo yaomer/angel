@@ -11,10 +11,12 @@ namespace angel {
 
 class ssl_handshake {
 public:
-    explicit ssl_handshake(evloop *loop, SSL_CTX *ctx);
+    ssl_handshake(evloop *loop, SSL_CTX *ctx);
     ~ssl_handshake();
+
     ssl_handshake(const ssl_handshake&) = delete;
     ssl_handshake& operator=(const ssl_handshake&) = delete;
+
     // fd should be set nonblock,
     // and the underlying tcp connection should have been successfully established,
     // then try to establish a TLS/SSL connection on it.
@@ -22,6 +24,7 @@ public:
     void start_server_handshake(int fd);
     void shutdown();
     SSL *get_ssl() { return ssl; }
+
     std::function<void()> onestablish;
     std::function<void()> onfailed;
 private:

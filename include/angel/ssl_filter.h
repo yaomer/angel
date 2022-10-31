@@ -11,10 +11,14 @@ namespace angel {
 
 class ssl_filter {
 public:
+    // If `encrypted` is nullptr, the filter will only be used for decryption.
+    // If `decrypted` is nullptr, the filter will only be used for encryption.
     ssl_filter(SSL *ssl, buffer *decrypted, buffer *encrypted);
     ~ssl_filter();
+
     ssl_filter(const ssl_filter&) = delete;
     ssl_filter& operator=(const ssl_filter&) = delete;
+
     // Call after read from the network.
     // The decrypted data is stored in buffer `decrypted`.
     void decrypt(buffer *input);
