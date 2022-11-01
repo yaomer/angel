@@ -3,13 +3,13 @@
 
 #include <sys/event.h>
 
-#include "poller.h"
+#include "dispatcher.h"
 
 namespace angel {
 
 class evloop;
 
-class kqueue_base_t : public poller {
+class kqueue_base_t : public dispatcher {
 public:
     kqueue_base_t();
     ~kqueue_base_t();

@@ -12,7 +12,7 @@
 
 namespace angel {
 
-class poller;
+class dispatcher;
 
 class timer_t;
 typedef std::function<void()> timer_callback_t;
@@ -58,7 +58,7 @@ private:
     void remove_channel_in_loop(const channel_ptr& chl);
     void do_functors();
 
-    std::unique_ptr<poller> poller;
+    std::unique_ptr<dispatcher> dispatcher;
     std::unique_ptr<timer_t> timer;
     std::unique_ptr<signaler_t> signaler;
     std::unordered_map<int, std::shared_ptr<channel>> channel_map;

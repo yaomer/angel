@@ -5,7 +5,7 @@
 #include <angel/logger.h>
 #include <angel/config.h>
 
-#include "poller.h"
+#include "dispatcher.h"
 #include "timer.h"
 #include "signaler.h"
 
@@ -34,13 +34,13 @@ evloop::evloop()
     cur_tid(std::this_thread::get_id())
 {
 #if defined (ANGEL_HAVE_EPOLL)
-    poller.reset(new epoll_base_t);
+    dispatcher.reset(new epoll_base_t);
 #elif defined (ANGEL_HAVE_KQUEUE)
-    poller.reset(new kqueue_base_t);
+    dispatcher.reset(new kqueue_base_t);
 #elif defined (ANGEL_HAVE_POLL)
-    poller.reset(new poll_base_t);
+    dispatcher.reset(new poll_base_t);
 #elif defined (ANGEL_HAVE_SELECT)
-    poller.reset(new select_base_t);
+    dispatcher.reset(new select_base_t);
 #else
     log_fatal("No supported I/O multiplexing");
 #endif
@@ -49,7 +49,7 @@ evloop::evloop()
     } else {
         this_thread_loop = this;
     }
-    log_info("Use I/O multiplexing (%s)", poller->name());
+    log_info("Use I/O multiplexing (%s)", dispatcher->name());
     sockops::socketpair(wake_fd);
     std::lock_guard<std::mutex> mlock(_SYNC_SIG_INIT_LOCK);
     if (!__signaler_ptr) {
@@ -96,7 +96,7 @@ void evloop::run()
     if (signaler) signaler->start();
     while (!is_quit) {
         int64_t timeout = timer->timeout();
-        int nevents = poller->wait(this, timeout);
+        int nevents = dispatcher->wait(this, timeout);
         if (nevents > 0) {
             for (auto& channel : active_channels) {
                 channel->handle_event();

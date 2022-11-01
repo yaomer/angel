@@ -1,5 +1,5 @@
-#ifndef _ANGEL_POLLER_H
-#define _ANGEL_POLLER_H
+#ifndef __ANGEL_DISPATCHER_H
+#define __ANGEL_DISPATCHER_H
 
 #include <string>
 #include <vector>
@@ -10,23 +10,23 @@ class evloop;
 
 // Encapsulate the underlying I/O multiplexing to provide
 // a unified interface for the upper layer.
-class poller {
+class dispatcher {
 public:
-    virtual ~poller() {  };
+    virtual ~dispatcher() {  };
     virtual int wait(evloop *loop, int64_t timeout) = 0;
     // Add interesting events to fd.
-    // If fd does not exist, it will be registered in poller.
+    // If fd does not exist, it will be registered in dispatcher.
     virtual void add(int fd, int events) = 0;
     // Remove events from monitered events for fd.
-    // If fd has no events of interest, remove itself from poller.
+    // If fd has no events of interest, remove itself from dispatcher.
     virtual void remove(int fd, int events) = 0;
 
-    void set_name(const char *name) { poller_name = name; }
-    const char *name() { return poller_name.c_str(); }
+    void set_name(const char *name) { dispatcher_name = name; }
+    const char *name() { return dispatcher_name.c_str(); }
 
     static const int EVLIST_INIT_SIZE = 64;
 private:
-    std::string poller_name;
+    std::string dispatcher_name;
 };
 
 template <typename T>
@@ -38,4 +38,4 @@ inline void resize_if(int fd, std::vector<T>& vec)
 
 }
 
-#endif // _ANGEL_POLLER_H
+#endif // __ANGEL_DISPATCHER_H

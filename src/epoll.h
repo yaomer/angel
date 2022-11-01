@@ -3,13 +3,13 @@
 
 #include <sys/epoll.h>
 
-#include "poller.h"
+#include "dispatcher.h"
 
 namespace angel {
 
 class evloop;
 
-class epoll_base_t : public poller {
+class epoll_base_t : public dispatcher {
 public:
     epoll_base_t();
     ~epoll_base_t();

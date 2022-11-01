@@ -5,13 +5,13 @@
 
 #include <unordered_map>
 
-#include "poller.h"
+#include "dispatcher.h"
 
 namespace angel {
 
 class evloop;
 
-class poll_base_t : public poller {
+class poll_base_t : public dispatcher {
 public:
     poll_base_t();
     ~poll_base_t();

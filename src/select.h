@@ -5,11 +5,11 @@
 
 #include <unordered_set>
 
-#include "poller.h"
+#include "dispatcher.h"
 
 namespace angel {
 
-class select_base_t : public poller {
+class select_base_t : public dispatcher {
 public:
     select_base_t();
     ~select_base_t();
