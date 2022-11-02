@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <string>
-#include <unordered_map>
 #include <mutex>
 #include <future>
 
@@ -12,6 +11,7 @@
 #include <angel/evloop_thread.h>
 #include <angel/resolver.h>
 #include <angel/util.h>
+#include <angel/insensitive_unordered_map.h>
 
 namespace angel {
 namespace httplib {
@@ -74,26 +74,8 @@ enum StatusCode {
 
 const char *to_str(StatusCode code);
 
-struct field {
-    field(const char *s) : val(s) {  }
-    field(std::string_view s) : val(s) {  }
-    std::string val;
-};
-
-inline bool operator==(const field& f1, const field& f2)
-{
-    return util::equal_case(f1.val, f2.val);
-}
-
-struct field_hash {
-    bool operator()(const field& f) const
-    {
-        return std::hash<std::string>()(util::to_lower(f.val));
-    }
-};
-
 typedef std::unordered_map<std::string, std::string> Params;
-typedef std::unordered_map<field, std::string, field_hash> Headers;
+typedef angel::insensitive_unordered_map<std::string> Headers;
 
 enum ParseState {
     ParseLine,

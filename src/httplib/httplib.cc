@@ -412,7 +412,7 @@ std::string& response::header()
     add_header("Date", format_date());
 
     for (auto& [field, value] : headers) {
-        format_header(buf, field.val, value);
+        format_header(buf, field.key, value);
     }
     buf.append(CRLF);
 
@@ -1355,7 +1355,7 @@ std::string& http_request::str()
 
     headers["Host"] = uri.host;
     for (auto& [field, value] : headers)
-        format_header(buf, field.val, value);
+        format_header(buf, field.key, value);
 
     buf.append(CRLF);
 
