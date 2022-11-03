@@ -4,14 +4,18 @@ namespace angel {
 
 static const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-// 首先我们以3-byte为一个分组，每次取6-bit进行计算，这刚好可以表示为4个base64字符。
-//
-// 如果要编码的字节数不能被3整除，我们就在后面补足0，以便其能够被3整除，
-// 并在编码后的base64文本后添加一个或两个'='，表示补足的字节数。
-//
-// 也就是说，如果剩下1个字节，就补上4个0，以便表示为2个base64字符，再在编码后的base64文本后添加'=='；
-// 剩下2个字节，就补上2个0，以便表示为3个base64字符，再在编码后的base64文本后添加'='。
-//
+// Firstly, we take 3-byte as a group, and take 6-bit for calculation each time,
+// which can just be represented as 4 base64-char.
+
+// If the number of bytes to be encoded is not divisible by 3, we will complement
+// zero at the back so that it can be divisible by 3, and add one or two '=' after
+// the encoded base64 text to indicate the number of bytes to be supplemented.
+
+// That is to say, if there is 1 byte left, just add 4 zeros at the end to
+// represent 2 base64-char, and then add '==' after the encoded base64 text;
+// there are 2 bytes left, 2 zeros are added to represent 3 base64-char,
+// and then add '=' after the encoded base64 text.
+
 // e.g.
 // base64_encode("ABC") = "QUJD"
 // +-----------------+-----------------+-----------------+
@@ -26,12 +30,16 @@ static const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw
 static const int max_line_limit = 76;
 
 static const char *CRLF = "\r\n";
+static const char CR = '\r';
+static const char LF = '\n';
 
 std::string base64::encode(std::string_view data)
 {
     std::string res;
     unsigned char a, b, c;
     unsigned char r[4];
+
+    if (data.empty()) return res;
 
     size_t len = data.size();
     res.reserve(len);
@@ -119,7 +127,8 @@ std::string base64::decode(std::string_view data)
     unsigned char r[3];
 
     size_t len = data.size();
-    assert(len > 0 && len % 4 == 0);
+    // A valid base64 text has at least 4 bytes.
+    if (len < 4 || len % 4 != 0) return res;
     res.reserve(len * 0.75);
 
     size_t i = 0;
@@ -143,6 +152,51 @@ std::string base64::decode(std::string_view data)
         if (data[i + 3] != '=') {
             res.push_back((c << 6) | (d));
         }
+    }
+    return res;
+}
+
+std::string base64::decode_mime(std::string_view data)
+{
+    std::string res;
+    unsigned char a, b, c, d;
+    unsigned char r[3];
+
+    size_t len = data.size();
+    // A valid mime base64 text has at least 4 + 2(CRLF) bytes.
+    if (len < 6) return res;
+    auto remain = len % (max_line_limit + 2);
+    if (remain != 0 && remain % 4 != 2) return res;
+    res.reserve(len * 0.75);
+
+    size_t i = 0, j = 0;
+    while (i + 4 <= len - 6) {
+        MAP4CHAR(a, b, c, d, data[i], data[i + 1], data[i + 2], data[i + 3])
+        r[0] = (a << 2) | (b >> 4);
+        r[1] = (b << 4) | (c >> 2);
+        r[2] = (c << 6) | (d);
+        res.append((const char*)r, 3);
+        i += 4;
+        j += 4;
+        if (j == max_line_limit) {
+            if (data[i] != CR || data[i + 1] != LF) return "";
+            i += 2;
+            j = 0;
+        }
+    }
+
+    MAP4CHAR(a, b, c, d, data[i], data[i + 1], data[i + 2], data[i + 3])
+    res.push_back((a << 2) | (b >> 4));
+    if (data[i + 2] != '=') {
+        res.push_back((b << 4) | (c >> 2));
+        if (data[i + 3] != '=') {
+            res.push_back((c << 6) | (d));
+        }
+    }
+
+    if (data[i + 4] != CR || data[i + 5] != LF) {
+        // Must end with CRLF.
+        return "";
     }
     return res;
 }

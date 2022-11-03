@@ -14,6 +14,7 @@ public:
     // and ensure that the output always ends with CRLF.
     // (As required by rfc2045)
     std::string encode_mime(std::string_view data);
+    std::string decode_mime(std::string_view data);
 private:
     bool mime = false;
 };
