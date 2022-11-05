@@ -2,8 +2,6 @@
 
 namespace angel {
 
-static const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
 // Firstly, we take 3-byte as a group, and take 6-bit for calculation each time,
 // which can just be represented as 4 base64-char.
 
@@ -27,23 +25,28 @@ static const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw
 // +------------+-------------+-------------+------------+
 //
 
+static const char *standard_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char *url_safe_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
 static const int max_line_limit = 76;
 
 static const char *CRLF = "\r\n";
-static const char CR = '\r';
-static const char LF = '\n';
 
-std::string base64::encode(std::string_view data)
+enum Encode { Standard, Mime, UrlSafe };
+
+static std::string base64_encode(std::string_view data, Encode code)
 {
     std::string res;
-    unsigned char a, b, c;
-    unsigned char r[4];
 
     if (data.empty()) return res;
 
     size_t len = data.size();
     res.reserve(len);
 
+    const char *alphabet = (code == UrlSafe) ? url_safe_alphabet : standard_alphabet;
+
+    unsigned char a, b, c;
+    unsigned char r[4];
     size_t j = 0;
     for (size_t i = 0; i + 3 <= len; i += 3) {
         a = data[i];
@@ -54,7 +57,7 @@ std::string base64::encode(std::string_view data)
         r[2] = alphabet[((b & 0x0F) << 2) | (c >> 6)];
         r[3] = alphabet[( c & 0x3F)];
         res.append((const char*)r, 4);
-        if (mime) {
+        if (code == Mime) {
             j += 4;
             if (j == max_line_limit) {
                 res.append(CRLF);
@@ -69,7 +72,6 @@ std::string base64::encode(std::string_view data)
         r[1] = alphabet[((a & 0x03) << 4)];
         res.append((const char*)r, 2);
         res.append("==");
-        j += 2;
         break;
     case 2:
         a = data[len - 2];
@@ -79,23 +81,12 @@ std::string base64::encode(std::string_view data)
         r[2] = alphabet[((b & 0x0F) << 2)];
         res.append((const char*)r, 3);
         res.append("=");
-        j += 3;
         break;
     }
-    if (mime) {
-        if (j > 0) res.append(CRLF);
-    }
-    mime = false;
     return res;
 }
 
-std::string base64::encode_mime(std::string_view data)
-{
-    mime = true;
-    return encode(data);
-}
-
-static constexpr unsigned char mapchars[256] = {
+static constexpr unsigned char standard_mapchars[256] = {
     0,      0,      0,      0,      0,      0,      0,      0, //  1
     0,      0,      0,      0,      0,      0,      0,      0, //  2
     0,      0,      0,      0,      0,      0,      0,      0, //  3
@@ -114,91 +105,117 @@ static constexpr unsigned char mapchars[256] = {
    49,     50,     51,      0,      0,      0,      0,      0, // 16 xyz
 };
 
-#define MAP4CHAR(a, b, c, d, c1, c2, c3, c4) \
-    a = mapchars[(unsigned char)(c1)]; \
-    b = mapchars[(unsigned char)(c2)]; \
-    c = mapchars[(unsigned char)(c3)]; \
-    d = mapchars[(unsigned char)(c4)];
+static constexpr unsigned char url_safe_mapchars[256] = {
+    0,      0,      0,      0,      0,      0,      0,      0, //  1
+    0,      0,      0,      0,      0,      0,      0,      0, //  2
+    0,      0,      0,      0,      0,      0,      0,      0, //  3
+    0,      0,      0,      0,      0,      0,      0,      0, //  4
+    0,      0,      0,      0,      0,      0,      0,      0, //  5
+    0,      0,      0,      0,      0,     62,      0,      0, //  6 -
+   52,     53,     54,     55,     56,     57,     58,     59, //  7 01234567
+   60,     61,      0,      0,      0,      0,      0,      0, //  8 89
+    0,      0,      1,      2,      3,      4,      5,      6, //  9 ABCDEFG
+    7,      8,      9,     10,     11,     12,     13,     14, // 10 HIJKLMNO
+   15,     16,     17,     18,     19,     20,     21,     22, // 11 PQRSTUVW
+   23,     24,     25,      0,      0,      0,      0,     63, // 12 XYZ_
+    0,     26,     27,     28,     29,     30,     31,     32, // 13 abcdefg
+   33,     34,     35,     36,     37,     38,     39,     40, // 14 hijklmno
+   41,     42,     43,     44,     45,     46,     47,     48, // 15 pqrstuvw
+   49,     50,     51,      0,      0,      0,      0,      0, // 16 xyz
+};
 
-std::string base64::decode(std::string_view data)
+#define __map_char(c) (mapchars[(unsigned char)(c)])
+
+// ascii('=') = 61 = __map_char('9')
+static const unsigned char EQ = 128;
+
+// 1) We ignore invalid characters (not in 'alphabet') in decoding.
+// 2) We terminate decoding when we meet 'xx==' or 'x==='. ('x' indicates a valid base64-char)
+// 3) When 'xxxx' is a valid character sequence at the end, it can also be followed by some invalid characters.
+static std::string base64_decode(std::string_view data, Encode code)
 {
     std::string res;
-    unsigned char a, b, c, d;
-    unsigned char r[3];
 
     size_t len = data.size();
     // A valid base64 text has at least 4 bytes.
-    if (len < 4 || len % 4 != 0) return res;
+    if (len < 4) return res;
     res.reserve(len * 0.75);
 
-    size_t i = 0;
-    while (i + 4 <= len - 4) {
-        MAP4CHAR(a, b, c, d, data[i], data[i + 1], data[i + 2], data[i + 3])
-        // 00xx xxxx 00xx xxxx 00xx xxxx 00xx xxxx
-        r[0] = (a << 2) | (b >> 4);
-        r[1] = (b << 4) | (c >> 2);
-        r[2] = (c << 6) | (d);
+    auto *mapchars = (code == UrlSafe) ? url_safe_mapchars : standard_mapchars;
+
+    unsigned char r[3];
+    unsigned char c[4];
+    unsigned char ch;
+    size_t i = 0, j = 0;
+    while (i < len) {
+        ch = data[i++];
+        if ((c[j] = __map_char(ch))) {
+            ; // Get a valid base64-char
+        } else if (ch == '=') {
+            if (j < 2) continue;
+            c[j] = EQ;
+        } else {
+            continue;
+        }
+        if (++j < 4) continue;
+        // 'xx=x' is illegal.
+        if (c[2] == EQ && c[3] != EQ) {
+            c[2] = c[3];
+            j--;
+            continue;
+        }
+        j = 0;
+
+        // xx==: 00xx xxxx 00xx 0000
+        // xxx=: 00xx xxxx 00xx xxxx 00xx xx00
+        // xxxx: 00xx xxxx 00xx xxxx 00xx xxxx 00xx xxxx
+        r[0] = (c[0] << 2) | (c[1] >> 4);
+        if (c[2] == EQ) {
+            res.append((const char*)r, 1);
+            return res;
+        }
+
+        r[1] = (c[1] << 4) | (c[2] >> 2);
+        if (c[3] == EQ) {
+            res.append((const char*)r, 2);
+            return res;
+        }
+
+        r[2] = (c[2] << 6) | (c[3]);
         res.append((const char*)r, 3);
-        i += 4;
     }
 
-    MAP4CHAR(a, b, c, d, data[i], data[i + 1], data[i + 2], data[i + 3])
-    // xx==: 00xx xxxx 00xx 0000
-    // xxx=: 00xx xxxx 00xx xxxx 00xx xx00
-    // xxxx: 00xx xxxx 00xx xxxx 00xx xxxx 00xx xxxx
-    res.push_back((a << 2) | (b >> 4));
-    if (data[i + 2] != '=') {
-        res.push_back((b << 4) | (c >> 2));
-        if (data[i + 3] != '=') {
-            res.push_back((c << 6) | (d));
-        }
-    }
-    return res;
+    return j == 0 ? res : "";
 }
 
-std::string base64::decode_mime(std::string_view data)
+std::string base64::encode(std::string_view data)
 {
-    std::string res;
-    unsigned char a, b, c, d;
-    unsigned char r[3];
+    return base64_encode(data, Standard);
+}
 
-    size_t len = data.size();
-    // A valid mime base64 text has at least 4 + 2(CRLF) bytes.
-    if (len < 6) return res;
-    auto remain = len % (max_line_limit + 2);
-    if (remain != 0 && remain % 4 != 2) return res;
-    res.reserve(len * 0.75);
+std::string base64::decode(std::string_view data)
+{
+    return base64_decode(data, Standard);
+}
 
-    size_t i = 0, j = 0;
-    while (i + 4 <= len - 6) {
-        MAP4CHAR(a, b, c, d, data[i], data[i + 1], data[i + 2], data[i + 3])
-        r[0] = (a << 2) | (b >> 4);
-        r[1] = (b << 4) | (c >> 2);
-        r[2] = (c << 6) | (d);
-        res.append((const char*)r, 3);
-        i += 4;
-        j += 4;
-        if (j == max_line_limit) {
-            if (data[i] != CR || data[i + 1] != LF) return "";
-            i += 2;
-            j = 0;
-        }
-    }
+std::string base64::urlsafe_encode(std::string_view data)
+{
+    return base64_encode(data, UrlSafe);
+}
 
-    MAP4CHAR(a, b, c, d, data[i], data[i + 1], data[i + 2], data[i + 3])
-    res.push_back((a << 2) | (b >> 4));
-    if (data[i + 2] != '=') {
-        res.push_back((b << 4) | (c >> 2));
-        if (data[i + 3] != '=') {
-            res.push_back((c << 6) | (d));
-        }
-    }
+std::string base64::urlsafe_decode(std::string_view data)
+{
+    return base64_decode(data, UrlSafe);
+}
 
-    if (data[i + 4] != CR || data[i + 5] != LF) {
-        // Must end with CRLF.
-        return "";
-    }
-    return res;
+std::string base64::mime_encode(std::string_view data)
+{
+    return base64_encode(data, Mime);
+}
+
+std::string base64::mime_decode(std::string_view data)
+{
+    return base64_decode(data, Mime);
 }
 
 }

@@ -85,7 +85,8 @@ list(APPEND SRC_FILES ${SRC_DIR}/smtplib/smtplib.cc)
 list(APPEND SRC_FILES
     ${SRC_DIR}/mime/mime.cc
     ${SRC_DIR}/mime/charset.cc
-    ${SRC_DIR}/mime/encoder.cc
+    ${SRC_DIR}/mime/codec.cc
+    ${SRC_DIR}/mime/qp.cc
     ${SRC_DIR}/mime/mime_types.cc
 )
 

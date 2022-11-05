@@ -20,7 +20,7 @@ public:
 
     char *begin() { return &*buf.begin(); }
     char *peek() { return begin() + read_index; }
-    char *end() { return peek() + readable(); }
+    char *end() { return begin() + write_index; }
     size_t prependable() const { return read_index; }
     size_t readable() const { return write_index - read_index; }
     size_t writeable() const { return buf.size() - write_index; }

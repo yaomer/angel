@@ -184,8 +184,6 @@ void message::clear()
 //===================== Uri =======================
 //=================================================
 
-static constexpr const char *hexchars = "0123456789ABCDEF";
-
 std::string uri::encode(std::string_view uri)
 {
     std::string res;
@@ -193,21 +191,12 @@ std::string uri::encode(std::string_view uri)
     for (size_t i = 0; i < n; i++) {
         unsigned char c = uri[i];
         if (!isalnum(c) && !strchr("-_.~", c)) {
-            res.push_back('%');
-            res.push_back(hexchars[c >> 4]);
-            res.push_back(hexchars[c & 0x0f]);
+            mime::codec::to_hex_pair(res, '%', c);
         } else {
             res.push_back(c);
         }
     }
     return res;
-}
-
-static char from_hex(char c)
-{
-    if (c >= '0' && c <= '9') return c - '0';
-    else if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    else return -1;
 }
 
 bool uri::decode(std::string_view uri, std::string& res)
@@ -216,13 +205,13 @@ bool uri::decode(std::string_view uri, std::string& res)
     for (size_t i = 0; i < n; i++) {
         unsigned char c = uri[i];
         if (c == '%') {
-            char c1 = from_hex(uri[++i]);
-            char c2 = from_hex(uri[++i]);
-            if (c1 == -1 || c2 == -1) return false;
-            res.push_back(((unsigned char)c1 << 4) | c2);
-        } else {
-            res.push_back(c);
+            if (i + 2 >= n) return false;
+            char c1 = uri[++i];
+            char c2 = uri[++i];
+            if (!ishexnumber(c1) || !ishexnumber(c2)) return false;
+            c = mime::codec::from_hex_pair(c1, c2);
         }
+        res.push_back(c);
     }
     return true;
 }

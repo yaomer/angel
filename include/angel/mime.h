@@ -8,6 +8,8 @@
 #include <memory>
 
 #include <angel/util.h>
+#include <angel/insensitive_unordered_map.h>
+#include <angel/buffer.h>
 
 namespace angel {
 namespace mime {
@@ -18,35 +20,67 @@ struct charset {
     static const char *get_canonical(std::string_view charset);
 };
 
-struct encoder {
+typedef insensitive_unordered_map<std::string> Headers;
+typedef insensitive_unordered_map<std::string> Parameters;
+
+enum ParseCode {
+    NotEnough, Error, Ok,
+};
+
+struct codec {
+    static void to_hex_pair(std::string& buf, char leading_char, unsigned char c)
+    {
+        static const char *tohexchar = "0123456789ABCDEF";
+        char hexs[3] = { leading_char, tohexchar[c >> 4], tohexchar[c & 0x0f] };
+        buf.append(hexs, 3);
+    }
+
+    static char to_hex_value(char c)
+    {
+        if (c >= '0' && c <= '9') return c - '0';
+        else if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        else if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        else return -1;
+    }
+
+    static char from_hex_pair(char c1, char c2)
+    {
+        return ((unsigned char)to_hex_value(c1) << 4) | to_hex_value(c2);
+    }
+
     // QP: quoted-printable
     static std::string encode_QP(std::string_view data);
+    static std::string decode_QP(std::string_view data);
+
     static std::string encode_base64(std::string_view data);
+    static std::string decode_base64(std::string_view data);
+
     // Return "7bit" or "8bit"
     static std::string encode_7or8bit(std::string_view data);
+
+    // Parse MIME-headers.
+    static ParseCode parse_header(Headers& headers, buffer& buf);
+    // *(";" parameter)
+    // parameter := attribute "=" value
+    static bool parse_parameter(Parameters& parameters, std::string_view str);
+    // Point to the closed <"> if successful, nullptr otherwise.
+    static const char *parse_quoted_string(const char *first, const char *last);
 };
 
-struct field_type {
-    field_type(const char *s) : val(s) {  }
-    field_type(std::string_view s) : val(s) {  }
-    std::string val;
-};
-
-inline bool operator==(const field_type& l, const field_type& r)
-{
-    return util::equal_case(l.val, r.val);
-}
-
-struct field_hash {
-    size_t operator()(const field_type& f) const
-    {
-        return std::hash<std::string>()(util::to_lower(f.val));
-    }
+struct content_type_value {
+    std::string type;
+    std::string subtype;
+    Parameters parameters;
+    bool parse(std::string_view value);
 };
 
 class base {
 public:
+    base() {  }
     virtual ~base() {  }
+    base(const base&) = delete;
+    base& operator=(const base&) = delete;
+
     std::string& operator[](std::string_view field);
     void add_header(std::string_view field, std::string_view value);
     virtual std::string& str();
@@ -57,11 +91,10 @@ private:
               const char *name,
               int encoding,
               const char *charset = nullptr);
-    void encode(int encoding);
+    void encode(std::string_view data, int encoding);
 
     bool top_level = true;
-    std::unordered_map<field_type, std::string, field_hash> headers;
-    std::string_view data;
+    Headers headers;
     std::string encoded_data;
     std::string buf;
 
@@ -72,6 +105,7 @@ private:
     friend struct application;
     friend class message;
     friend class multipart;
+    friend class form_data_writer;
 };
 
 struct text : public base {
@@ -107,21 +141,96 @@ private:
     std::string data;
 };
 
+class multipart;
+
+// build HTTP multipart/form-data
+class form_data_writer {
+public:
+    explicit form_data_writer(multipart *);
+    void add_text_part(std::string_view name, std::string_view value);
+    void add_file_part(std::string_view name, const std::string& pathname);
+    std::string get_content_type();
+private:
+    multipart *multipart;
+};
+
 class multipart : public base {
 public:
     // subtype: mixed, related, or alternative
-    explicit multipart(const char *subtype = "mixed");
-    multipart& attach(base *message);
+    explicit multipart(std::string_view subtype = "mixed");
+    multipart& attach(base *part);
     std::string& str() override;
+    const std::string& get_boundary() const { return boundary; }
+    form_data_writer new_form_data_writer();
 private:
-    std::vector<std::unique_ptr<base>> bodies;
-    std::string data;
+    std::vector<std::unique_ptr<base>> parts;
     std::string boundary;
+    std::string data;
+};
+
+class part_node;
+
+typedef std::function<void(const part_node&)> iter_part_handler;
+
+// A MIME Stream Parser.
+// Designed to read and parse MIME Message from nonblocking socket.
+class parser {
+public:
+    // When NotEnough is returned, you should continue to call when
+    // there is new data, until Ok or Error is returned.
+    ParseCode parse(buffer& buf);
+    const std::string& get_preamble() const { return preamble; }
+    const std::string& get_epilogue() const { return epilogue; }
+    // You can call iter_parts() to walk all parts when parse() returns Ok.
+    void iter_parts(iter_part_handler handler);
+private:
+    enum ParseState { Preamble, MultipartBody, Epilogue };
+    ParseState state;
+    Headers headers;
+    std::string preamble;
+    std::string epilogue;
+    std::unique_ptr<part_node> root;
+};
+
+class part_node {
+public:
+    virtual ~part_node() {  }
+    virtual ParseCode parse(buffer& buf);
+    virtual bool is_multipart() { return false; }
+    virtual void iter_parts(const iter_part_handler& handler);
+    const std::string& get_body() const { return body; }
+private:
+    Headers headers;
+    std::string body;
+    bool decode(std::string_view data);
+    static part_node *get_part_node(Headers& headers);
+    friend class multipart_node;
+    friend class parser;
+};
+
+class multipart_node : public part_node {
+public:
+    explicit multipart_node(std::string_view boundary);
+    ParseCode parse(buffer& buf) override;
+    bool is_multipart() override { return true; }
+    void iter_parts(const iter_part_handler& handler) override;
+private:
+    enum ParseState {
+        DashBoundary,
+        HeaderPart,
+        BodyPart,
+        Delimiter,
+    };
+    ParseState state = DashBoundary;
+    std::vector<std::unique_ptr<part_node>> parts;
+    std::string dash_boundary;
+    std::string delimiter;
+    Headers part_headers;
+    part_node *cur = nullptr;
+    friend class parser;
 };
 
 std::string generate_boundary();
-
-struct unknown_charset_exception {  };
 
 class mimetypes {
 public:

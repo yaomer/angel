@@ -14,7 +14,9 @@ buffer::buffer(size_t size) : buf(size)
 {
 }
 
-buffer::~buffer() = default;
+buffer::~buffer()
+{
+}
 
 void buffer::make_space(size_t len)
 {
@@ -37,7 +39,7 @@ void buffer::append(std::string_view s)
 void buffer::append(const char *data, size_t len)
 {
     make_space(len);
-    std::copy(data, data + len, buf.begin() + write_index);
+    std::copy(data, data + len, end());
     write_index += len;
 }
 
