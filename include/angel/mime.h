@@ -60,18 +60,8 @@ struct codec {
 
     // Parse MIME-headers.
     static ParseCode parse_header(Headers& headers, buffer& buf);
-    // *(";" parameter)
-    // parameter := attribute "=" value
-    static bool parse_parameter(Parameters& parameters, std::string_view str);
     // Point to the closed <"> if successful, nullptr otherwise.
     static const char *parse_quoted_string(const char *first, const char *last);
-};
-
-struct content_type_value {
-    std::string type;
-    std::string subtype;
-    Parameters parameters;
-    bool parse(std::string_view value);
 };
 
 class base {
@@ -168,52 +158,85 @@ private:
     std::string data;
 };
 
+// Parse such header:
+//
+// content := "Content-Field" ":" value
+//            *(";" parameter)
+// parameter := attribute "=" value
+//
+// Typical such as Content-Type, Content-Disposition
+struct content_value_t {
+    std::string value;
+    Parameters parameters;
+    bool parse(std::string_view str);
+};
+
+struct content_type_t {
+    std::string_view type() { return value.value; }
+    std::string_view maintype() { return util::split(value.value, '/')[0]; }
+    std::string_view subtype() { return util::split(value.value, '/')[1]; }
+    const Parameters& parameters() { return value.parameters; }
+    bool parse(std::string_view str)
+    {
+        return value.parse(str) && util::split(value.value, '/').size() == 2;
+    }
+    content_value_t value;
+};
+
 class part_node;
+class multipart_node;
 
-typedef std::function<void(const part_node&)> iter_part_handler;
-
-// A MIME Stream Parser.
+// A MIME Multipart Stream Parser.
 // Designed to read and parse MIME Message from nonblocking socket.
-class parser {
+class multipart_parser {
 public:
+    explicit multipart_parser(std::string_view content_type);
+
+    multipart_parser(const multipart_parser&) = delete;
+    multipart_parser& operator=(const multipart_parser&) = delete;
+
     // When NotEnough is returned, you should continue to call when
     // there is new data, until Ok or Error is returned.
     ParseCode parse(buffer& buf);
     const std::string& get_preamble() const { return preamble; }
     const std::string& get_epilogue() const { return epilogue; }
-    // You can call iter_parts() to walk all parts when parse() returns Ok.
-    void iter_parts(iter_part_handler handler);
+    // Return the root of MIME message tree.
+    // You can use it to iterate all parts when parse() returns Ok.
+    part_node *get_root();
 private:
     enum ParseState { Preamble, MultipartBody, Epilogue };
     ParseState state;
-    Headers headers;
+    std::string content_type;
     std::string preamble;
     std::string epilogue;
-    std::unique_ptr<part_node> root;
+    std::unique_ptr<multipart_node> root;
 };
+
+typedef std::vector<part_node*> iter_part_list;
 
 class part_node {
 public:
     virtual ~part_node() {  }
-    virtual ParseCode parse(buffer& buf);
     virtual bool is_multipart() { return false; }
-    virtual void iter_parts(const iter_part_handler& handler);
-    const std::string& get_body() const { return body; }
+    virtual iter_part_list iter_parts();
+    content_type_t& get_content_type() { return content_type; }
+    const Headers& get_headers() { return headers; }
+    const std::string& get_body() { return body; }
 private:
-    Headers headers;
-    std::string body;
     bool decode(std::string_view data);
-    static part_node *get_part_node(Headers& headers);
+
+    Headers headers;
+    content_type_t content_type;
+    std::string body;
     friend class multipart_node;
-    friend class parser;
+    friend class multipart_parser;
 };
 
 class multipart_node : public part_node {
 public:
     explicit multipart_node(std::string_view boundary);
-    ParseCode parse(buffer& buf) override;
     bool is_multipart() override { return true; }
-    void iter_parts(const iter_part_handler& handler) override;
+    iter_part_list iter_parts() override;
 private:
     enum ParseState {
         DashBoundary,
@@ -221,13 +244,17 @@ private:
         BodyPart,
         Delimiter,
     };
+
+    ParseCode parse(buffer& buf);
+    part_node *get_part_node(Headers& headers);
+
     ParseState state = DashBoundary;
     std::vector<std::unique_ptr<part_node>> parts;
     std::string dash_boundary;
     std::string delimiter;
     Headers part_headers;
     part_node *cur = nullptr;
-    friend class parser;
+    friend class multipart_parser;
 };
 
 std::string generate_boundary();

@@ -344,47 +344,27 @@ ParseCode codec::parse_header(Headers& headers, buffer& buf)
     return NotEnough;
 }
 
-// content := "Content-Type" ":" type "/" subtype
-//            *(";" parameter)
-//            ; Matching of media type and subtype
-//            ; is ALWAYS case-insensitive.
-//
-// type := discrete-type / composite-type
-//
-// discrete-type := "text" / "image" / "audio" / "video" /
-//                  "application" / extension-token
-//
-// composite-type := "message" / "multipart" / extension-token
-//
-// parameter := attribute "=" value
-//
-// attribute := token
-//              ; Matching of attributes
-//              ; is ALWAYS case-insensitive.
-//
-// value := token / quoted-string
-//
-bool content_type_value::parse(std::string_view value)
+const char *codec::parse_quoted_string(const char *first, const char *last)
 {
-    auto pos = value.find("/");
-    if (pos == value.npos) return false;
-    type.assign(value.data(), pos);
-    value.remove_prefix(pos + 1);
-
-    pos = value.find(";");
-    if (pos == value.npos) {
-        subtype.assign(value);
-        return true;
+    for ( ; first != last; ++first) {
+        if (*first == '\\') {
+            if (++first == last) return nullptr;
+        } else if (*first == '\"') {
+            return first;
+        }
     }
-    subtype.assign(value.data(), pos);
-    value.remove_prefix(pos + 1);
-
-    return codec::parse_parameter(parameters, value);
+    return nullptr;
 }
 
-bool codec::parse_parameter(Parameters& parameters, std::string_view str)
+bool content_value_t::parse(std::string_view str)
 {
+    auto pos = str.find(";");
+    value.assign(str.begin(), pos);
+    if (pos == str.npos) return true;
+    str.remove_prefix(pos + 1);
+
     while (true) {
+        // parameter := attribute "=" value
         auto p = std::find_if_not(str.begin(), str.end(), isspace);
         if (p == str.end()) return true;
         auto sep = std::find(p, str.end(), '=');
@@ -393,7 +373,7 @@ bool codec::parse_parameter(Parameters& parameters, std::string_view str)
         if (++sep == str.end()) return false;
         const char *end;
         if (*sep == '\"') {
-            end = parse_quoted_string(++sep, str.end());
+            end = codec::parse_quoted_string(++sep, str.end());
             if (end == nullptr) return false;
             std::string_view value(sep, end - sep);
             parameters.emplace(attr, value);
@@ -409,36 +389,26 @@ bool codec::parse_parameter(Parameters& parameters, std::string_view str)
     return true;
 }
 
-const char *codec::parse_quoted_string(const char *first, const char *last)
+multipart_parser::multipart_parser(std::string_view content_type)
+    : content_type(content_type)
 {
-    for ( ; first != last; ++first) {
-        if (*first == '\\') {
-            if (++first == last) return nullptr;
-        } else if (*first == '\"') {
-            return first;
-        }
-    }
-    return nullptr;
 }
 
-ParseCode parser::parse(buffer& buf)
+ParseCode multipart_parser::parse(buffer& buf)
 {
     if (!root) {
-        auto code = codec::parse_header(headers, buf);
-        if (code != Ok) return code;
+        content_type_t content_type;
+        if (!content_type.parse(this->content_type)) return Error;
+        if (!util::equal_case(content_type.maintype(), "multipart")) return Error;
 
-        auto *node = part_node::get_part_node(headers);
-        if (!node) return Error;
+        auto it = content_type.parameters().find("boundary");
+        if (it == content_type.parameters().end()) return Error;
+
+        auto *node = new multipart_node(it->second);
+        node->content_type = std::move(content_type);
 
         root.reset(node);
-
-        if (root->is_multipart()) {
-            state = Preamble;
-        }
-    }
-
-    if (!root->is_multipart()) {
-        return root->parse(buf);
+        state = Preamble;
     }
 
     switch (state) {
@@ -447,8 +417,7 @@ ParseCode parser::parse(buffer& buf)
         // Optional [preamble CRLF]
         auto crlf = buf.find_crlf();
         if (crlf < 0) return NotEnough;
-        auto& dash_boundary = dynamic_cast<multipart_node*>(root.get())->dash_boundary;
-        if (!buf.starts_with(dash_boundary)) {
+        if (!buf.starts_with(root->dash_boundary)) {
             preamble.assign(buf.peek(), crlf);
             buf.retrieve(crlf + 2);
         }
@@ -477,42 +446,52 @@ ParseCode parser::parse(buffer& buf)
     }
 }
 
-void parser::iter_parts(iter_part_handler handler)
+part_node *multipart_parser::get_root()
 {
-    root->iter_parts(handler);
+    return root.get();
 }
 
-ParseCode part_node::parse(buffer& buf)
-{
-    return Ok;
-}
-
-part_node *part_node::get_part_node(Headers& headers)
+// message/rfc822
+// message = fields *( CRLF *text )
+// ; Everything after first null line is message body
+part_node *multipart_node::get_part_node(Headers& headers)
 {
     auto it = headers.find("Content-Type");
     if (it == headers.end()) {
+        auto *node = new part_node();
+        node->headers.swap(headers);
         // If no Content-Type field is present it is assumed to be
         // "message/rfc822" in a "multipart/digest" and
         // "text/plain; charset=us-ascii" otherwise.
-        auto *node = new part_node();
-        node->headers.swap(headers);
+        if (util::equal_case(this->get_content_type().type(), "multipart/digest")) {
+            node->content_type.value.value = "message/rfc822";
+        } else {
+            node->content_type.value.value = "text/plain";
+            node->content_type.value.parameters.emplace("charset", "us-ascii");
+        }
         return node;
     }
 
-    content_type_value content_type;
+    content_type_t content_type;
     if (!content_type.parse(it->second)) {
         return nullptr;
     }
 
-    it = content_type.parameters.find("boundary");
-    if (it == content_type.parameters.end()) {
+    if (!util::equal_case(content_type.maintype(), "multipart")) {
         auto *node = new part_node();
         node->headers.swap(headers);
+        node->content_type = std::move(content_type);
         return node;
     }
 
-    auto *node = new multipart_node(it->second);
+    auto iter = content_type.parameters().find("boundary");
+    if (iter == content_type.parameters().end()) {
+        return nullptr;
+    }
+
+    auto *node = new multipart_node(iter->second);
     node->headers.swap(headers);
+    node->content_type = std::move(content_type);
     return node;
 }
 
@@ -533,10 +512,8 @@ bool part_node::decode(std::string_view data)
     } else {
         body = data;
     }
-    printf("%s\n", body.c_str());
     return !body.empty();
 }
-
 
 // The "mixed" subtype of "multipart" is intended for use when
 // the body parts are independent and need to be bundled in a
@@ -549,6 +526,9 @@ bool part_node::decode(std::string_view data)
 // "multipart/mixed", but the semantics are different. In particular,
 // each of the body parts is an "alternative" version of the same
 // information.
+//
+// The Multipart/Related media type is intended for compound objects
+// consisting of several inter-related body parts.
 
 // LWSP-char = SP / HT ; LWSP(linear-white-space)
 static bool islwsp(int c)
@@ -594,7 +574,7 @@ ParseCode multipart_node::parse(buffer& buf)
         }
 
         if (cur->is_multipart()) {
-            auto code = cur->parse(buf);
+            auto code = dynamic_cast<multipart_node*>(cur)->parse(buf);
             if (code != Ok) return code;
         }
         state = BodyPart;
@@ -636,16 +616,18 @@ ParseCode multipart_node::parse(buffer& buf)
     }
 }
 
-void part_node::iter_parts(const iter_part_handler& handler)
+iter_part_list part_node::iter_parts()
 {
-    handler(*this);
+    return { };
 }
 
-void multipart_node::iter_parts(const iter_part_handler& handler)
+iter_part_list multipart_node::iter_parts()
 {
+    iter_part_list part_list;
     for (auto& part : parts) {
-        part->iter_parts(handler);
+        part_list.emplace_back(part.get());
     }
+    return part_list;
 }
 
 }
