@@ -1,10 +1,9 @@
-#ifndef _ANGEL_EVLOOP_THREAD_H
-#define _ANGEL_EVLOOP_THREAD_H
+#ifndef __ANGEL_EVLOOP_THREAD_H
+#define __ANGEL_EVLOOP_THREAD_H
 
 #include <functional>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
+#include <future>
 
 #include <angel/evloop.h>
 
@@ -13,52 +12,46 @@ namespace angel {
 // One-loop-per-thread
 class evloop_thread {
 public:
-    evloop_thread()
-        : loop(nullptr),
-        thread([this]{ this->thread_func(); }) {  }
-    ~evloop_thread() { quit(); }
+    evloop_thread() : loop(nullptr)
+    {
+        auto f = barrier.get_future();
+        std::thread t(&evloop_thread::thread_func, this);
+        loop_thread.swap(t);
+        // Wait for loop to complete initialization
+        f.wait();
+    }
+    ~evloop_thread() { join(); }
 
     evloop_thread(const evloop_thread&) = delete;
     evloop_thread& operator=(const evloop_thread&) = delete;
 
-    // Wait for loop to complete initialization
-    evloop *wait_loop()
-    {
-        std::unique_lock<std::mutex> ulock(mutex);
-        condvar.wait(ulock, [this]{ return this->loop; });
-        return loop;
-    }
-    std::thread& get_thread() { return thread; }
+    std::thread& get_thread() { return loop_thread; }
     evloop *get_loop() { return loop; }
-    void quit()
+    void join()
     {
         if (loop) loop->quit();
-        if (thread.joinable())
-            thread.join();
+        if (loop_thread.joinable())
+            loop_thread.join();
     }
 private:
     void thread_func()
     {
         evloop t_loop;
-        {
-            std::lock_guard<std::mutex> mlock(mutex);
-            loop = &t_loop;
-            condvar.notify_one();
-        }
+        loop = &t_loop;
+        barrier.set_value();
         loop->run();
         // If not set loop to nullptr, it will become a dangling pointer
         // after exiting from thread_func().
         //
-        // If you call quit() later, it will cause a segmentation fault.
+        // If you call join() later, it will cause a segmentation fault.
         //
         loop = nullptr;
     }
 
     evloop *loop;
-    std::thread thread;
-    std::mutex mutex;
-    std::condition_variable condvar;
+    std::thread loop_thread;
+    std::promise<void> barrier;
 };
 }
 
-#endif // _ANGEL_EVLOOP_THREAD_H
+#endif // __ANGEL_EVLOOP_THREAD_H

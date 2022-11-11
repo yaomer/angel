@@ -1,5 +1,5 @@
-#ifndef _ANGEL_EVLOOP_THREAD_POOL_H
-#define _ANGEL_EVLOOP_THREAD_POOL_H
+#ifndef __ANGEL_EVLOOP_THREAD_POOL_H
+#define __ANGEL_EVLOOP_THREAD_POOL_H
 
 #include <vector>
 #include <memory>
@@ -28,11 +28,6 @@ public:
                         evthr->get_thread().native_handle(), cpu_number++);
             }
         }
-        // Wait for all io threads to complete initialization
-        for (size_t i = 0; i < thread_nums; i++) {
-            while (!thread_pool[i]->wait_loop())
-                ;
-        }
     }
     ~evloop_thread_pool() = default;
     evloop_thread_pool(const evloop_thread_pool&) = delete;
@@ -52,4 +47,4 @@ private:
 
 }
 
-#endif // _ANGEL_EVLOOP_THREAD_POOL_H
+#endif // __ANGEL_EVLOOP_THREAD_POOL_H

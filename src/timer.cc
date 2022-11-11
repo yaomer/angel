@@ -11,13 +11,14 @@ timer_t::timer_t(evloop *loop) : loop(loop), timer_id(1)
 
 timer_t::~timer_t()
 {
+    log_debug("~timer_t()");
 }
 
 int64_t timer_t::timeout()
 {
     int64_t timeval;
     if (!timer_set.empty()) {
-        timeval = timer_set.begin()->get()->expire - util::get_cur_time_ms();
+        timeval = (*timer_set.begin())->expire - util::get_cur_time_ms();
         timeval = timeval > 0 ? timeval : 0;
     } else
         timeval = -1;
@@ -26,58 +27,36 @@ int64_t timer_t::timeout()
 
 size_t timer_t::add_timer(timer_task_t *task)
 {
-    size_t id = timer_id++;
-    loop->run_in_loop(
-            [this, task, id]{ this->add_timer_in_loop(task, id); });
-    return id;
+    task->id = timer_id.fetch_add(1, std::memory_order_relaxed);
+    loop->run_in_loop([this, task]{ this->add_timer_in_loop(task); });
+    return task->id;
 }
 
 void timer_t::cancel_timer(size_t id)
 {
-    loop->run_in_loop(
-            [this, id]{ this->cancel_timer_in_loop(id); });
+    loop->run_in_loop([this, id]{ this->cancel_timer_in_loop(id); });
 }
 
 // Add a timer task is O(log n)
-void timer_t::add_timer_in_loop(timer_task_t *task, size_t id)
+void timer_t::add_timer_in_loop(timer_task_t *task)
 {
-    task->id = id;
-    auto it = std::shared_ptr<timer_task_t>(task);
-    timer_set.emplace(it);
-    timer_map.emplace(id, it);
+    timer_set.emplace(task);
+    timer_map.emplace(task->id, task);
 }
 
 // Cancel a timer task is O(log n)
 void timer_t::cancel_timer_in_loop(size_t id)
 {
-    auto it = timer_map.find(id);
-    if (it == timer_map.end()) return;
-    auto range = timer_set.equal_range(it->second);
-    timer_map.erase(it);
+    auto iter = timer_map.find(id);
+    if (iter == timer_map.end()) return;
+    auto range = timer_set.equal_range(iter->second.get());
     for (auto it = range.first; it != range.second; ++it) {
         if ((*it)->id == id) {
             log_debug("timer(id=%d) has been canceled", id);
-            (*it)->canceled = true;
             timer_set.erase(it);
+            timer_map.erase(iter);
             break;
         }
-    }
-}
-
-void timer_t::update_timer(int64_t now)
-{
-    auto& task = *timer_set.begin();
-    if (task->interval > 0) {
-        timer_task_t *new_task = new timer_task_t(now + task->interval,
-                task->interval, task->timer_cb);
-        new_task->id = task->id;
-        // Remove old task first, then add new task to ensure correct execution order.
-        timer_set.erase(timer_set.begin());
-        timer_map.erase(task->id);
-        add_timer_in_loop(new_task, new_task->id);
-    } else {
-        timer_set.erase(timer_set.begin());
-        timer_map.erase(task->id);
     }
 }
 
@@ -85,12 +64,25 @@ void timer_t::tick()
 {
     int64_t now = util::get_cur_time_ms();
     while (!timer_set.empty()) {
-        auto task = *timer_set.begin();
-        if (task->expire > now) break;
-        task->timer_cb();
-        // task can be canceled in timer_cb()
-        if (!task->canceled) {
-            update_timer(now);
+        // Get the minimum timeout timer.
+        auto cur = *timer_set.begin();
+        if (cur->expire > now) break;
+
+        // Current timer may be canceled in timer_cb(),
+        // so we "delete" (release ownership to `guard`) it in advance.
+        auto it = timer_map.find(cur->id);
+        std::unique_ptr<timer_task_t> guard(it->second.release());
+        timer_set.erase(timer_set.begin());
+        timer_map.erase(it);
+
+        cur->timer_cb();
+
+        // Update interval timer.
+        if (cur->interval > 0) {
+            auto *task = new timer_task_t(now + cur->interval,
+                    cur->interval, cur->timer_cb);
+            task->id = cur->id;
+            add_timer_in_loop(task);
         }
     }
 }

@@ -66,13 +66,9 @@ if ! cmake $cmake_args .. || ! make -j4 install ; then
     exit 1;
 fi
 
-echo -e "$LCOLOR ########################## $RCOLOR"
-echo -e "$LCOLOR ##### angel is built ##### $RCOLOR"
-echo -e "$LCOLOR ########################## $RCOLOR"
-
-echo -e "$LCOLOR                         _     $RCOLOR"
-echo -e "$LCOLOR   __ _ _ __   __ _  ___| |    $RCOLOR"
-echo -e "$LCOLOR  / _\` | '_ \\ / _\` |/ _ \\ |$RCOLOR"
-echo -e "$LCOLOR | (_| | | | | (_| |  __/ |    $RCOLOR"
-echo -e "$LCOLOR  \\__,_|_| |_|\\__, |\\___|_| $RCOLOR"
-echo -e "$LCOLOR              |___/            $RCOLOR"
+echo -e "                         _     "
+echo -e "   __ _ _ __   __ _  ___| |    "
+echo -e "  / _\` | '_ \\ / _\` |/ _ \\ |"
+echo -e " | (_| | | | | (_| |  __/ |    "
+echo -e "  \\__,_|_| |_|\\__, |\\___|_| "
+echo -e "              |___/            "

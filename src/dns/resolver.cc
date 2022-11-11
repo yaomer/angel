@@ -197,7 +197,7 @@ resolver::resolver()
     client_options ops;
     ops.protocol = "udp";
     ops.is_reconnect = true;
-    cli.reset(new client(receiver.wait_loop(), inet_addr(name_server_addr, name_server_port), ops));
+    cli.reset(new client(receiver.get_loop(), inet_addr(name_server_addr, name_server_port), ops));
     cli->set_connection_handler([this](const connection_ptr& conn){
             lock_t lk(delay_task_queue_mutex);
             while (!delay_task_queue.empty()) {

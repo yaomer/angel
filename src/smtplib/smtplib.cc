@@ -16,7 +16,6 @@ namespace smtplib {
 
 smtp::smtp() : id(1)
 {
-    sender.wait_loop();
     resolver = dns::resolver::get_resolver();
 }
 

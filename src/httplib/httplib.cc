@@ -1387,13 +1387,12 @@ StatusCode http_response::parse_line(buffer& buf)
 HttpClient::HttpClient()
 {
     resolver = dns::resolver::get_resolver();
-    sender.wait_loop();
 }
 
 HttpClient::~HttpClient()
 {
     router.clear();
-    sender.quit();
+    sender.join();
 }
 
 void HttpClient::set_max_conns_per_route(int conns)

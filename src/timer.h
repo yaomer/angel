@@ -1,5 +1,5 @@
-#ifndef _ANGEL_TIMER_H
-#define _ANGEL_TIMER_H
+#ifndef __ANGEL_TIMER_H
+#define __ANGEL_TIMER_H
 
 #include <set>
 #include <unordered_map>
@@ -9,27 +9,23 @@
 
 namespace angel {
 
-typedef std::function<void()> timer_callback_t;
-
 struct timer_task_t {
+    typedef std::function<void()> timer_callback_t;
     timer_task_t(int64_t expire_ms, int64_t interval_ms, const timer_callback_t cb)
         : id(0),
         expire(expire_ms),
         interval(interval_ms),
-        timer_cb(cb),
-        canceled(false)
+        timer_cb(cb)
     {
     }
     size_t id;
     int64_t expire; // timestamp (ms)
     int64_t interval;
     timer_callback_t timer_cb;
-    bool canceled;
 };
 
 struct timer_task_cmp {
-    bool operator()(const std::shared_ptr<timer_task_t>& lhs,
-                    const std::shared_ptr<timer_task_t>& rhs) const
+    bool operator()(const timer_task_t *lhs, const timer_task_t *rhs) const
     {
         return lhs->expire < rhs->expire;
     }
@@ -55,7 +51,7 @@ public:
 
     // Returns the minimum timeout value
     //
-    // Set can get the node with the earliest timeout in O(1),
+    // stl::set can get the node with the earliest timeout in O(1),
     // which only needs to maintain a pointer to the node.
     int64_t timeout();
     size_t add_timer(timer_task_t *task);
@@ -63,23 +59,21 @@ public:
     // Handle all expired timer events
     void tick();
 private:
-    void add_timer_in_loop(timer_task_t *task, size_t id);
+    void add_timer_in_loop(timer_task_t *task);
     void cancel_timer_in_loop(size_t id);
-
-    void update_timer(int64_t now);
 
     evloop *loop;
     // The timer task needs to be stored in order by expiration time,
     // so that we can execute the scheduled task according to the expiration time.
     //
     // And because expire may be repeated, we use multiset.
-    std::multiset<std::shared_ptr<timer_task_t>, timer_task_cmp> timer_set;
+    std::multiset<timer_task_t*, timer_task_cmp> timer_set;
     // Let us find a timer task by id in O(1)
-    std::unordered_map<size_t, std::shared_ptr<timer_task_t>> timer_map;
+    std::unordered_map<size_t, std::unique_ptr<timer_task_t>> timer_map;
     // Global increment id (increments from 1)
     // In this way, when timer_id is 0, we consider it not a valid timer task.
-    size_t timer_id;
+    std::atomic_size_t timer_id;
 };
 }
 
-#endif // _ANGEL_TIMERTASK_H
+#endif // __ANGEL_TIMER_H

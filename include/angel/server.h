@@ -69,7 +69,7 @@ public:
         high_water_mark_handler = std::move(handler);
     }
 
-    virtual void start();
+    void start();
     void quit();
 
     static void daemon();

@@ -26,11 +26,13 @@ namespace angel {
 
 using namespace util;
 
-static thread_local evloop *this_thread_loop = nullptr;
+namespace {
+    // Ensure that each thread can only run one event loop at a time.
+    thread_local evloop *this_thread_loop = nullptr;
+}
 
 evloop::evloop()
-    : timer(new timer_t(this)),
-    is_quit(false),
+    : is_quit(false),
     cur_tid(std::this_thread::get_id())
 {
 #if defined (ANGEL_HAVE_EPOLL)
@@ -46,9 +48,9 @@ evloop::evloop()
 #endif
     if (this_thread_loop) {
         log_fatal("Only have one evloop in this thread");
-    } else {
-        this_thread_loop = this;
     }
+    this_thread_loop = this;
+    timer.reset(new timer_t(this));
     log_info("Use I/O multiplexing (%s)", dispatcher->name());
     sockops::socketpair(wake_fd);
     std::lock_guard<std::mutex> mlock(_SYNC_SIG_INIT_LOCK);
@@ -60,30 +62,32 @@ evloop::evloop()
 
 evloop::~evloop()
 {
+    this_thread_loop = nullptr;
 }
 
-void evloop::add_channel(const channel_ptr& chl)
+void evloop::add_channel(channel_ptr chl)
 {
-    run_in_loop([this, chl]{ this->add_channel_in_loop(chl); });
+    run_in_loop(std::bind(&evloop::add_channel_in_loop, this, std::move(chl)));
 }
 
-void evloop::remove_channel(const channel_ptr& chl)
+void evloop::remove_channel(channel_ptr chl)
 {
-    run_in_loop([this, chl]{ this->remove_channel_in_loop(chl); });
+    run_in_loop(std::bind(&evloop::remove_channel_in_loop, this, std::move(chl)));
 }
 
-void evloop::add_channel_in_loop(const channel_ptr& chl)
+void evloop::add_channel_in_loop(channel_ptr chl)
 {
     chl->enable_read();
-    auto it = channel_map.emplace(chl->fd(), chl);
-    if (it.second) {
-        log_debug("Add channel(fd=%d) to loop", chl->fd());
+    int fd = chl->fd();
+    auto r = channel_map.emplace(fd, std::move(chl));
+    if (r.second) {
+        log_debug("Add channel(fd=%d) to loop", fd);
     } else {
-        log_warn("channel(fd=%d) has already exists", chl->fd());
+        log_warn("Try to add a duplicate channel(fd=%d) to loop", fd);
     }
 }
 
-void evloop::remove_channel_in_loop(const channel_ptr& chl)
+void evloop::remove_channel_in_loop(channel_ptr chl)
 {
     log_debug("Remove channel(fd=%d) from loop", chl->fd());
     chl->disable_all();
@@ -113,41 +117,40 @@ void evloop::do_functors()
 {
     std::vector<functor> tfuncs;
     {
-        std::lock_guard<std::mutex> mlock(mutex);
+        std::lock_guard<std::mutex> lk(mtx);
         if (!functors.empty()) {
             tfuncs.swap(functors);
-            functors.clear();
         }
     }
-    for (auto& func : tfuncs)
-        func();
+    if (!tfuncs.empty()) {
+        for (auto& f : tfuncs) f();
+    }
 }
 
 void evloop::wakeup_init()
 {
-    auto chl = channel_ptr(new channel(this));
+    auto chl = std::make_shared<channel>(this);
     chl->set_fd(wake_fd[0]);
-    chl->set_read_handler([this]{ this->handle_read(); });
-    add_channel(chl);
+    chl->set_read_handler([this]{ this->wakeup_read(); });
+    add_channel(std::move(chl));
+    log_info("Add wake_fd(%d)", wake_fd[0]);
+}
+
+void evloop::wakeup_read()
+{
+    Wake v;
+    ssize_t n = read(wake_fd[0], &v, sizeof(v));
+    if (n > 0) {
+        if (v == QuitWake) is_quit = true;
+    } else {
+        log_error("wakeup_read(): %s", strerrno());
+    }
 }
 
 // Wakeup current io loop thread
-void evloop::wakeup()
+void evloop::wakeup(Wake v)
 {
-    uint64_t one = 1;
-    ssize_t n = write(wake_fd[1], &one, sizeof(one));
-    if (n != sizeof(one)) {
-        log_error("Write (%zd) bytes instead of (%zu)", n, sizeof(one));
-    }
-}
-
-void evloop::handle_read()
-{
-    uint64_t one;
-    ssize_t n = read(wake_fd[0], &one, sizeof(one));
-    if (n != sizeof(one)) {
-        log_error("Read (%zd) bytes instead of (%zu)", n, sizeof(one));
-    }
+    write(wake_fd[1], &v, sizeof(v));
 }
 
 bool evloop::is_io_loop_thread()
@@ -158,7 +161,7 @@ bool evloop::is_io_loop_thread()
 void evloop::run_in_loop(const functor cb)
 {
     if (!is_io_loop_thread()) {
-        queue_in_loop(cb);
+        queue_in_loop(std::move(cb));
     } else {
         cb();
     }
@@ -166,11 +169,9 @@ void evloop::run_in_loop(const functor cb)
 
 void evloop::queue_in_loop(const functor cb)
 {
-    {
-        std::lock_guard<std::mutex> mlock(mutex);
-        functors.emplace_back(cb);
-    }
-    wakeup();
+    std::lock_guard<std::mutex> lk(mtx);
+    functors.emplace_back(std::move(cb));
+    wakeup(EventWake);
 }
 
 size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
@@ -199,8 +200,7 @@ void evloop::cancel_timer(size_t id)
 
 void evloop::quit()
 {
-    is_quit = true;
-    wakeup();
+    wakeup(QuitWake);
 }
 
 }

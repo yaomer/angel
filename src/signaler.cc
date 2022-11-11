@@ -55,7 +55,10 @@ signaler_t::signaler_t(evloop *loop)
     sig_channel->set_read_handler([this]{ this->sig_catch(); });
 }
 
-signaler_t::~signaler_t() = default;
+signaler_t::~signaler_t()
+{
+    log_debug("~signaler_t()");
+}
 
 void signaler_t::start()
 {
