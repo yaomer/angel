@@ -19,24 +19,24 @@ static angel::evloop *g_loop = nullptr;
 
 static void read_cb(int fd, int idx)
 {
-	int widx = idx + 1;
+    int widx = idx + 1;
     unsigned char ch;
     ssize_t n;
 
-	n = read(fd, (char*)&ch, sizeof(ch));
-	if (n >= 0)
-		count += n;
-	else
-		failures++;
-	if (writes) {
-		if (widx >= num_pipes)
-			widx -= num_pipes;
-		n = write(pipes[2 * widx + 1], "e", 1);
-		if (n != 1)
-			failures++;
-		writes--;
-		fired++;
-	}
+    n = read(fd, (char*)&ch, sizeof(ch));
+    if (n >= 0)
+        count += n;
+    else
+        failures++;
+    if (writes) {
+        if (widx >= num_pipes)
+            widx -= num_pipes;
+        n = write(pipes[2 * widx + 1], "e", 1);
+        if (n != 1)
+            failures++;
+        writes--;
+        fired++;
+    }
 
     if (count == fired) {
         g_loop->quit();
@@ -56,10 +56,10 @@ int64_t run_once()
     }
 
     fired = 0;
-	int space = num_pipes / num_active;
-	space = space * 2;
+    int space = num_pipes / num_active;
+    space = space * 2;
     for (int i = 0; i < num_active; i++, fired++) {
-		write(pipes[i * space + 1], "e", 1);
+        write(pipes[i * space + 1], "e", 1);
     }
 
     count = 0;
@@ -73,25 +73,25 @@ int64_t run_once()
 int main(int argc, char *argv[])
 {
     int c;
-	num_pipes = 100;
-	num_active = 1;
-	num_writes = num_pipes;
-	while ((c = getopt(argc, argv, "n:a:w:")) != -1) {
-		switch (c) {
-		case 'n':
-			num_pipes = atoi(optarg);
-			break;
-		case 'a':
-			num_active = atoi(optarg);
-			break;
-		case 'w':
-			num_writes = atoi(optarg);
-			break;
-		default:
-			fprintf(stderr, "Illegal argument \"%c\"\n", c);
-			exit(1);
-		}
-	}
+    num_pipes   = 100;
+    num_active  = 1;
+    num_writes  = num_pipes;
+    while ((c = getopt(argc, argv, "n:a:w:")) != -1) {
+        switch (c) {
+        case 'n':
+            num_pipes = atoi(optarg);
+            break;
+        case 'a':
+            num_active = atoi(optarg);
+            break;
+        case 'w':
+            num_writes = atoi(optarg);
+            break;
+        default:
+            fprintf(stderr, "Illegal argument \"%c\"\n", c);
+            exit(1);
+        }
+    }
 
     struct rlimit rl;
     rl.rlim_cur = rl.rlim_max = num_pipes * 2 + 100;
