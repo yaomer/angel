@@ -143,3 +143,6 @@ target_link_libraries(http-server angel)
 
 add_executable(signal-test ${SAMPLE}/signal-test.cc)
 target_link_libraries(signal-test angel)
+
+add_executable(dns-resolve ${SAMPLE}/dns-resolve.cc)
+target_link_libraries(dns-resolve angel)
