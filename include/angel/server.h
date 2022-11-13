@@ -46,10 +46,6 @@ public:
                             enum thread_pool::policy policy = thread_pool::policy::fixed);
     // execute a task in the task thread pool
     void executor(const task_callback_t task);
-    void set_exit_handler(const signaler_handler_t handler)
-    {
-        exit_handler = std::move(handler);
-    }
 
     void set_nodelay(bool on);
     void set_keepalive(bool on);
@@ -92,7 +88,6 @@ private:
     message_handler_t message_handler;
     close_handler_t close_handler;
     high_water_mark_handler_t high_water_mark_handler;
-    signaler_handler_t exit_handler;
     size_t high_water_mark;
     // bool is_set_cpu_affinity;
     friend class ssl_server;

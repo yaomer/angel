@@ -126,7 +126,6 @@ void server::executor(const task_callback_t task)
 
 void server::clean_up()
 {
-    if (exit_handler) exit_handler();
     log_info("Server ready to exit...");
     __logger.quit();
     fprintf(stderr, "\n");
@@ -162,9 +161,9 @@ void server::handle_signals()
 {
     // The SIGPIPE signal must be ignored, otherwise sending a message
     // to a closed connection will cause the server to exit unexpectedly.
-    add_signal(SIGPIPE, nullptr);
-    add_signal(SIGINT, [this]{ this->clean_up(); });
-    add_signal(SIGTERM, [this]{ this->clean_up(); });
+    loop->ignore_signal(SIGPIPE);
+    loop->add_signal(SIGINT, [this]{ this->clean_up(); });
+    loop->add_signal(SIGTERM, [this]{ this->clean_up(); });
 }
 
 void server::start()

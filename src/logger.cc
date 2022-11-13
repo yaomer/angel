@@ -28,7 +28,7 @@ static void log_term_handler(int signo)
 }
 
 logger::logger()
-    : cur_thread(std::thread([this]{ this->thread_func(); })),
+    : cur_thread([this]{ this->thread_func(); }),
     is_quit(false),
     cur_fd(-1),
     dir(".log/"),

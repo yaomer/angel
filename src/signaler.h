@@ -1,8 +1,9 @@
-#ifndef _ANGEL_SIGNALER_H
-#define _ANGEL_SIGNALER_H
+#ifndef __ANGEL_SIGNALER_H
+#define __ANGEL_SIGNALER_H
 
 #include <functional>
-#include <map>
+#include <unordered_map>
+#include <forward_list>
 #include <memory>
 #include <mutex>
 
@@ -30,33 +31,34 @@ class signaler_t {
 public:
     explicit signaler_t(evloop *);
     ~signaler_t();
+
     signaler_t(const signaler_t&) = delete;
     signaler_t& operator=(const signaler_t&) = delete;
 
-    // if handler == nullptr, ignore signo
-    void add_signal(int signo, const signaler_handler_t handler);
+    size_t add_signal(int signo, const signaler_handler_t handler);
+    void ignore_siganl(int signo);
     // Restore the default semantics of signo
-    void cancel_signal(int signo);
+    void cancel_signal(size_t id);
     void start();
 private:
-    void add_signal_in_loop(int signo, const signaler_handler_t handler);
-    void cancel_signal_in_loop(int signo);
+    struct signaler_event {
+        size_t sig_id;
+        signaler_handler_t sig_cb;
+    };
+
+    void add_signal_in_loop(int signo, signaler_event event);
+    void ignore_siganl_in_loop(int signo);
+    void cancel_signal_in_loop(size_t id);
     void sig_catch();
-    static void sig_handler(int signo);
 
     evloop *loop;
     std::shared_ptr<channel> sig_channel;
-    std::map<int, signaler_handler_t> sig_callback_map;
-    int pair_fd[2];
+    std::unordered_map<int, std::forward_list<signaler_event>> sig_map;
+    std::unordered_map<size_t, int> id_map;
+    std::atomic_size_t sig_id;
+    int sig_pair[2];
 };
-
-extern std::mutex _SYNC_SIG_INIT_LOCK;
-
-extern angel::signaler_t *__signaler_ptr;
-
-void add_signal(int signo, const signaler_handler_t handler);
-void cancel_signal(int signo);
 
 }
 
-#endif // _ANGEL_SIGNALER_H
+#endif // __ANGEL_SIGNALER_H

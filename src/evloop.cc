@@ -29,10 +29,17 @@ using namespace util;
 namespace {
     // Ensure that each thread can only run one event loop at a time.
     thread_local evloop *this_thread_loop = nullptr;
+    // Protect __signaler_ptr to initialize properly.
+    //
+    // Due to the particularity of signals, there can only be one signaler instance per process,
+    // that is, it can only be bound to one evloop.
+    std::mutex sig_mutex;
+    signaler_t *__signaler_ptr = nullptr;
 }
 
 evloop::evloop()
-    : is_quit(false),
+    : timer(new timer_t(this)),
+    is_quit(false),
     cur_tid(std::this_thread::get_id())
 {
 #if defined (ANGEL_HAVE_EPOLL)
@@ -48,12 +55,12 @@ evloop::evloop()
 #endif
     if (this_thread_loop) {
         log_fatal("Only have one evloop in this thread");
+    } else {
+        this_thread_loop = this;
     }
-    this_thread_loop = this;
-    timer.reset(new timer_t(this));
     log_info("Use I/O multiplexing (%s)", dispatcher->name());
-    sockops::socketpair(wake_fd);
-    std::lock_guard<std::mutex> mlock(_SYNC_SIG_INIT_LOCK);
+    sockops::socketpair(wake_pair);
+    std::lock_guard<std::mutex> lk(sig_mutex);
     if (!__signaler_ptr) {
         signaler.reset(new signaler_t(this));
         __signaler_ptr = signaler.get();
@@ -67,23 +74,22 @@ evloop::~evloop()
 
 void evloop::add_channel(channel_ptr chl)
 {
-    run_in_loop(std::bind(&evloop::add_channel_in_loop, this, std::move(chl)));
+    run_in_loop([this, chl = std::move(chl)]{ this->add_channel_in_loop(std::move(chl)); });
 }
 
 void evloop::remove_channel(channel_ptr chl)
 {
-    run_in_loop(std::bind(&evloop::remove_channel_in_loop, this, std::move(chl)));
+    run_in_loop([this, chl = std::move(chl)]{ this->remove_channel_in_loop(std::move(chl)); });
 }
 
 void evloop::add_channel_in_loop(channel_ptr chl)
 {
-    chl->enable_read();
-    int fd = chl->fd();
-    auto r = channel_map.emplace(fd, std::move(chl));
+    auto r = channel_map.emplace(chl->fd(), chl);
     if (r.second) {
-        log_debug("Add channel(fd=%d) to loop", fd);
+        chl->enable_read();
+        log_debug("Add channel(fd=%d) to loop", chl->fd());
     } else {
-        log_warn("Try to add a duplicate channel(fd=%d) to loop", fd);
+        log_warn("Add duplicate channel(fd=%d) to loop", chl->fd());
     }
 }
 
@@ -119,6 +125,8 @@ void evloop::do_functors()
     {
         std::lock_guard<std::mutex> lk(mtx);
         if (!functors.empty()) {
+            // It can't be executed here, otherwise deadlock may occur.
+            // (such as queue_in_loop())
             tfuncs.swap(functors);
         }
     }
@@ -130,27 +138,30 @@ void evloop::do_functors()
 void evloop::wakeup_init()
 {
     auto chl = std::make_shared<channel>(this);
-    chl->set_fd(wake_fd[0]);
+    chl->set_fd(wake_pair[0]);
     chl->set_read_handler([this]{ this->wakeup_read(); });
     add_channel(std::move(chl));
-    log_info("Add wake_fd(%d)", wake_fd[0]);
+    log_info("Add wake_pair(%d)", wake_pair[0]);
+}
+
+// Wakeup current io loop thread
+void evloop::wakeup(uint8_t v)
+{
+    ssize_t n = write(wake_pair[1], &v, sizeof(v));
+    if (n != sizeof(v)) {
+        log_error("Write (%zd) bytes instead of (%zu)", n, sizeof(v));
+    }
 }
 
 void evloop::wakeup_read()
 {
-    Wake v;
-    ssize_t n = read(wake_fd[0], &v, sizeof(v));
+    uint8_t v;
+    ssize_t n = read(wake_pair[0], &v, sizeof(v));
     if (n > 0) {
-        if (v == QuitWake) is_quit = true;
+        if (v) is_quit = true;
     } else {
         log_error("wakeup_read(): %s", strerrno());
     }
-}
-
-// Wakeup current io loop thread
-void evloop::wakeup(Wake v)
-{
-    write(wake_fd[1], &v, sizeof(v));
 }
 
 bool evloop::is_io_loop_thread()
@@ -169,9 +180,11 @@ void evloop::run_in_loop(const functor cb)
 
 void evloop::queue_in_loop(const functor cb)
 {
-    std::lock_guard<std::mutex> lk(mtx);
-    functors.emplace_back(std::move(cb));
-    wakeup(EventWake);
+    {
+        std::lock_guard<std::mutex> lk(mtx);
+        functors.emplace_back(std::move(cb));
+    }
+    wakeup(0);
 }
 
 size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
@@ -198,9 +211,28 @@ void evloop::cancel_timer(size_t id)
     log_debug("Cancel a timer(id=%zu)", id);
 }
 
+size_t evloop::add_signal(int signo, const signaler_handler_t handler)
+{
+    if (__signaler_ptr)
+        return __signaler_ptr->add_signal(signo, std::move(handler));
+    return (-1);
+}
+
+void evloop::ignore_signal(int signo)
+{
+    if (__signaler_ptr)
+        __signaler_ptr->ignore_siganl(signo);
+}
+
+void evloop::cancel_signal(size_t id)
+{
+    if (__signaler_ptr)
+        __signaler_ptr->cancel_signal(id);
+}
+
 void evloop::quit()
 {
-    wakeup(QuitWake);
+    wakeup(1);
 }
 
 }

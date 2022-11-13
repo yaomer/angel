@@ -32,19 +32,19 @@ connection::connection(size_t id, evloop *loop, int sockfd)
     channel->set_read_handler([this]{ this->handle_read(); });
     channel->set_write_handler([this]{ this->handle_write(); });
     channel->set_error_handler([this]{ this->handle_error(); });
-    log_info("connection(id=%d, fd=%d) is %s", id, sockfd, get_state_str());
+    log_info("connection(id=%zu, fd=%d) is %s", id, sockfd, get_state_str());
 }
 
 connection::~connection()
 {
-    log_info("connection(id=%d, fd=%d) is %s", conn_id, socket->fd(), get_state_str());
+    log_info("connection(id=%zu, fd=%d) is %s", conn_id, socket->fd(), get_state_str());
 }
 
 void connection::establish()
 {
     loop->add_channel(channel);
     set_state(state::connected);
-    log_info("connection(id=%d, fd=%d) is %s", conn_id, socket->fd(), get_state_str());
+    log_info("connection(id=%zu, fd=%d) is %s", conn_id, socket->fd(), get_state_str());
     if (connection_handler) {
         connection_handler(shared_from_this());
     }
@@ -53,7 +53,7 @@ void connection::establish()
 void connection::handle_read()
 {
     ssize_t n = input_buf.read_fd(channel->fd());
-    log_debug("Read (%zd) bytes from connection(id=%d, fd=%d)", n, conn_id, channel->fd());
+    log_debug("Read (%zd) bytes from connection(id=%zu, fd=%d)", n, conn_id, channel->fd());
     if (n > 0) {
         if (message_handler) {
             handle_message();
@@ -153,9 +153,9 @@ void connection::handle_close(bool is_forced)
 void connection::handle_error()
 {
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-        log_warn("connection(id=%d, fd=%d): %s", conn_id, channel->fd(), strerrno());
+        log_warn("connection(id=%zu, fd=%d): %s", conn_id, channel->fd(), strerrno());
     } else {
-        log_error("connection(id=%d, fd=%d): %s", conn_id, channel->fd(), strerrno());
+        log_error("connection(id=%zu, fd=%d): %s", conn_id, channel->fd(), strerrno());
         force_close_connection();
     }
 }
@@ -234,7 +234,7 @@ ssize_t connection::write(const char *data, size_t len)
 {
     int fd = channel->fd();
     ssize_t n = ::write(fd, data, len);
-    log_debug("Write (%zd) bytes to connection(id=%d, fd=%d)", n, conn_id, fd);
+    log_debug("Write (%zd) bytes to connection(id=%zu, fd=%d)", n, conn_id, fd);
     if (n < 0) {
         handle_error();
         return is_closed() ? -2 : -1;
@@ -246,7 +246,7 @@ ssize_t connection::sendfile(int fd, off_t offset, off_t count)
 {
     int sockfd = channel->fd();
     ssize_t n = sockops::sendfile(fd, sockfd, offset, count);
-    log_debug("Send file(fd=%d) (%lld, %lld) (%zu) bytes to connection(id=%d, fd=%d)",
+    log_debug("Send file(fd=%d) (%lld, %lld) (%zu) bytes to connection(id=%zu, fd=%d)",
               fd, offset, offset + n, n, conn_id, sockfd);
     if (n < 0) {
         handle_error();

@@ -49,6 +49,7 @@ public:
     void run_in_loop(const functor cb);
     // Put the callback into the task queue of the io thread.
     void queue_in_loop(const functor cb);
+
     // Execute a callback after timeout (ms), and a timer id is returned,
     // that can be used to cancel a timer.
     size_t run_after(int64_t timeout_ms, const timer_callback_t cb);
@@ -56,6 +57,11 @@ public:
     size_t run_every(int64_t interval_ms, const timer_callback_t cb);
     // Cancel a timer and use it with run_after() and run_every().
     void cancel_timer(size_t id);
+
+    size_t add_signal(int signo, const signaler_handler_t handler);
+    void ignore_signal(int signo);
+    // Restore the default semantics of signo.
+    void cancel_signal(size_t id);
 private:
     void add_channel_in_loop(channel_ptr chl);
     void remove_channel_in_loop(channel_ptr chl);
@@ -64,10 +70,9 @@ private:
     channel_ptr search_channel(int fd)
     { return channel_map.find(fd)->second; }
 
-    enum Wake : uint8_t { EventWake, QuitWake };
     void wakeup_init();
     void wakeup_read();
-    void wakeup(Wake);
+    void wakeup(uint8_t);
 
     std::unique_ptr<dispatcher> dispatcher;
     std::unique_ptr<timer_t> timer;
@@ -80,7 +85,7 @@ private:
     // from non-io threads to io threads for execution.
     std::vector<functor> functors;
     std::mutex mtx;
-    int wake_fd[2];
+    int wake_pair[2];
 
     friend class select_base_t;
     friend class poll_base_t;
