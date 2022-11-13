@@ -293,9 +293,32 @@ void uri::clear()
 //=================== HttpServer =====================
 //====================================================
 
-static const int UriMaxLength = 1024 * 1024;
+static const char *index_page()
+{
+    static const char *html =
+        "<html>\n"
+        "<head><title>angel-server</title></head>\n"
+        "<body>\n"
+        "<center><h1>Welcome to angel-server!</h1></center>\n"
+        "</body>\n"
+        "</html>\n";
+    return html;
+}
 
-static const char *err_page(StatusCode code);
+static const char *err_page(StatusCode code)
+{
+    static thread_local char buf[1024];
+    static const char *html =
+        "<html>\n"
+        "<head><title>%d %s</title></head>\n"
+        "<body>\n"
+        "<center><h1>%d %s</h1></center>\n"
+        "<hr><center>ange-server</center>\n"
+        "</body>\n"
+        "</html>";
+    snprintf(buf, sizeof(buf), html, code, to_str(code), code, to_str(code));
+    return buf;
+}
 
 static const std::unordered_map<std::string_view, Method> methods = {
     { "OPTIONS",    OPTIONS },
@@ -307,6 +330,8 @@ static const std::unordered_map<std::string_view, Method> methods = {
     { "TRACE",      TRACE },
     { "CONNECT",    CONNECT },
 };
+
+static const int UriMaxLength = 1024 * 1024;
 
 // Request-Line = Method <SP> Request-URI <SP> HTTP-Version <CRLF>
 StatusCode request::parse_line(buffer& buf)
@@ -600,8 +625,10 @@ void HttpServer::handle_file_router(request& req, response& res)
 
 void HttpServer::handle_static_file_request(request& req, response& res)
 {
+    bool root_index = false;
     if (req.path() == "/") {
         req.abs_path += "index.html";
+        root_index = true;
     }
     req.abs_path = base_dir + req.path();
     req.has_file = util::is_regular_file(req.path());
@@ -615,8 +642,13 @@ void HttpServer::handle_static_file_request(request& req, response& res)
     }
 
     if (!req.has_file) {
-        res.set_status_code(NotFound);
-        res.send_err();
+        if (root_index) {
+            res.set_status_code(Ok);
+            res.send(index_page());
+        } else {
+            res.set_status_code(NotFound);
+            res.send_err();
+        }
         return;
     }
 
@@ -1125,21 +1157,6 @@ void byte_range_set::send_range_response(request& req, response& res)
     buf.append("--").append(boundary).append("--").append(CRLF);
     res.conn->send(buf);
     res.conn->set_send_complete_handler([fd](const connection_ptr& conn){ close(fd); });
-}
-
-const char *err_page(StatusCode code)
-{
-    static thread_local char buf[1024];
-    static const char *fmt =
-        "<html>\n"
-        "<head><title>%d %s</title></head>\n"
-        "<body>\n"
-        "<center><h1>%d %s</h1></center>\n"
-        "<hr><center>ange-server</center>\n"
-        "</body>\n"
-        "</html>";
-    snprintf(buf, sizeof(buf), fmt, code, to_str(code), code, to_str(code));
-    return buf;
 }
 
 static const std::unordered_map<StatusCode, const char*> code_map = {

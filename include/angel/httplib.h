@@ -351,7 +351,7 @@ private:
     // <host:port, pool>
     std::unordered_map<std::string, std::unique_ptr<http_connection_pool>> router;
     std::mutex router_mutex;
-    int max_conns_per_route = 10;
+    int max_conns_per_route = 6;
 };
 
 }
