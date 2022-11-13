@@ -101,3 +101,45 @@ install(TARGETS angel
     ARCHIVE DESTINATION lib)
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/angel DESTINATION include)
+
+set (TEST "${PROJECT_SOURCE_DIR}/test")
+
+add_executable(bench ${TEST}/bench.cc)
+target_link_libraries(bench angel)
+
+set (SAMPLE "${PROJECT_SOURCE_DIR}/sample")
+
+add_executable(echo-server ${SAMPLE}/echo-server.cc)
+target_link_libraries(echo-server angel)
+add_executable(echo-client ${SAMPLE}/echo-client.cc)
+target_link_libraries(echo-client angel)
+
+add_executable(chargen-server ${SAMPLE}/chargen-server.cc)
+target_link_libraries(chargen-server angel)
+add_executable(chargen-client ${SAMPLE}/chargen-client.cc)
+target_link_libraries(chargen-client angel)
+
+add_executable(discard-server ${SAMPLE}/discard-server.cc)
+target_link_libraries(discard-server angel)
+add_executable(discard-client ${SAMPLE}/discard-client.cc)
+target_link_libraries(discard-client angel)
+
+add_executable(time-server ${SAMPLE}/time-server.cc)
+target_link_libraries(time-server angel)
+add_executable(time-client ${SAMPLE}/time-client.cc)
+target_link_libraries(time-client angel)
+
+add_executable(daytime-server ${SAMPLE}/daytime-server.cc)
+target_link_libraries(daytime-server angel)
+
+add_executable(chat-server ${SAMPLE}/chat-server.cc)
+target_link_libraries(chat-server angel)
+
+add_executable(fib-server ${SAMPLE}/fib-server.cc)
+target_link_libraries(fib-server angel)
+
+add_executable(http-server ${SAMPLE}/http-server.cc)
+target_link_libraries(http-server angel)
+
+add_executable(signal-test ${SAMPLE}/signal-test.cc)
+target_link_libraries(signal-test angel)

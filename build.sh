@@ -13,12 +13,12 @@ do
         use_ssl="-DANGEL_USE_OPENSSL=ON"
     elif [ ${arg:0:17} == "--install-prefix=" ]; then
         install_prefix="-DCMAKE_INSTALL_PREFIX=${arg:17}"
-    elif [ ${arg:0:9} == "--release" ]; then
+    elif [ $arg == "--release" ]; then
         build_type="-DCMAKE_BUILD_TYPE=Release"
-    elif [ ${arg:0:7} == "--debug" ]; then
+    elif [ $arg == "--debug" ]; then
         build_type="-DCMAKE_BUILD_TYPE=Debug"
     else
-        echo -e "illegal option -- '$arg'"
+        echo -e "illegal option \`$arg\`"
         exit 1;
     fi
 done

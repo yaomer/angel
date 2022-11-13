@@ -53,21 +53,6 @@ int main(void)
     loop.run();
 }
 ```
-#### 信号处理
-```cpp
-int main(void)
-{
-    // 信号处理需要evloop驱动
-    angel::evloop loop;
-    // 按两次Ctr+C才可退出程序
-    angel::add_signal(SIGINT, []{
-            std::cout << "SIGINT is triggered\n";
-            // 恢复信号原语义，使用add_signal(SIGINT, nullptr)可忽略SIGINT信号
-            angel::cancel_signal(SIGINT);
-            });
-    loop.run();
-}
-```
 #### 一个简单的Echo服务器与客户端
 ```cpp
 int main(void)
@@ -230,7 +215,7 @@ int main(void)
 - 内置的[websocket server](https://github.com/yaomer/angel/tree/master/src/websocket)
 - 内置的[httplib](https://github.com/yaomer/angel/tree/master/src/httplib)
 - 内置的[smtp client](https://github.com/yaomer/angel/tree/master/src/smtplib)
-- 一些简单的[例子](https://github.com/yaomer/angel/tree/master/examples)
+- 一些简单的[例子](https://github.com/yaomer/angel/tree/master/sample)
 - 一个更有意义的例子[alice](https://github.com/yaomer/alice)
 
 ### 性能测试

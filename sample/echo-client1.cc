@@ -13,7 +13,7 @@ int main()
     cli.start();
 
     char buf[1024];
-    angel::channel_ptr chl(new angel::channel(&loop));
+    auto chl = std::make_shared<angel::channel>(&loop);
     chl->set_fd(0);
     chl->set_read_handler([&buf, &cli, &loop]{
             fgets(buf, sizeof(buf), stdin);
