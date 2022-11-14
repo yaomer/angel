@@ -50,8 +50,8 @@ StatusCode message::parse_header(buffer& buf)
         int crlf = buf.find_crlf();
         if (crlf < 0) break;
 
-        if (buf.starts_with(CRLF)) {
-            buf.retrieve(crlf + 2);
+        if (crlf == 0) {
+            buf.retrieve(2);
             return Ok;
         }
 
@@ -122,6 +122,9 @@ StatusCode message::parse_body_by_content_length(buffer& buf)
 //                  chunk-data CRLF
 // chunk-size     = 1*HEX
 // last-chunk     = 1*("0") [ chunk-extension ] CRLF
+//
+// chunk-data     = chunk-size(OCTET)
+// trailer        = *(entity-header CRLF)
 
 static ssize_t from_hex_str(const std::string& str)
 {
@@ -140,25 +143,24 @@ StatusCode message::parse_body_by_chunked(buffer& buf)
         // Parse chunk-size <CRLF>
         if (chunk_size == -1) {
             int crlf = buf.find_crlf();
-            if (crlf < 0) return Continue;
-            if (buf.readable() < crlf + 4) return Continue;
+            if (crlf < 0) break;
+            if (buf.readable() < crlf + 4) break;
             chunk_size = from_hex_str({buf.peek(), (size_t)crlf});
             buf.retrieve(crlf + 2);
             if (chunk_size < 0) return BadRequest;
-            // 0\r\n\r\n
-            if (chunk_size == 0) { // last-chunk
-                if (!buf.starts_with(CRLF)) {
-                    return BadRequest;
-                }
-                buf.retrieve(2);
-                chunk_size = -1;
-                chunked = false;
-                return Ok;
-            }
+            // last-chunk
+            if (chunk_size == 0) continue;
+        } else if (chunk_size == 0) {
+            // Parse trailer <CRLF>
+            auto code = parse_header(buf);
+            if (code != Ok) return code;
+            chunk_size = -1;
+            chunked = false;
+            return Ok;
         }
         // chunk-data <CRLF>
         if (buf.readable() > chunk_size) {
-            if (buf.readable() < chunk_size + 2) return Continue;
+            if (buf.readable() < chunk_size + 2) break;
             body.append(buf.peek(), chunk_size);
             buf.retrieve(chunk_size);
             if (!buf.starts_with(CRLF)) return BadRequest;
@@ -168,7 +170,7 @@ StatusCode message::parse_body_by_chunked(buffer& buf)
             body.append(buf.peek(), buf.readable());
             chunk_size -= buf.readable();
             buf.retrieve_all();
-            return Continue;
+            break;
         }
     }
     return Continue;
@@ -244,6 +246,10 @@ bool uri::parse(std::string_view uri)
     scheme.assign(p, sep);
     p = sep + 3;
 
+    if (scheme == "http") port = 80;
+    else if (scheme == "https") port = 443;
+    else return false;
+
     sep = std::find(p, end, ':');
     if (sep != end) { // http://host:port/
         host.assign(p, sep);
@@ -254,8 +260,6 @@ bool uri::parse(std::string_view uri)
     } else { // http://host/
         sep = std::find(p, end, '/');
         host.assign(p, sep);
-        if (scheme == "http") port = 80;
-        else if (scheme == "https") port = 443;
     }
     // http://host => http://host/
     if (sep == end) {
