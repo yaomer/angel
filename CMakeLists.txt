@@ -103,49 +103,43 @@ install(TARGETS angel
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/angel DESTINATION include)
 
 set (TEST "${PROJECT_SOURCE_DIR}/test")
-
-add_executable(bench ${TEST}/bench.cc)
-target_link_libraries(bench angel)
-
 set (SAMPLE "${PROJECT_SOURCE_DIR}/sample")
 
-add_executable(echo-server ${SAMPLE}/echo-server.cc)
-target_link_libraries(echo-server angel)
-add_executable(echo-client ${SAMPLE}/echo-client.cc)
-target_link_libraries(echo-client angel)
+function(add_test target src)
+    add_executable(${target} ${TEST}/${src})
+    target_link_libraries(${target} angel)
+endfunction()
 
-add_executable(chargen-server ${SAMPLE}/chargen-server.cc)
-target_link_libraries(chargen-server angel)
-add_executable(chargen-client ${SAMPLE}/chargen-client.cc)
-target_link_libraries(chargen-client angel)
+function(add_sample target src)
+    add_executable(${target} ${SAMPLE}/${src})
+    target_link_libraries(${target} angel)
+endfunction()
 
-add_executable(discard-server ${SAMPLE}/discard-server.cc)
-target_link_libraries(discard-server angel)
-add_executable(discard-client ${SAMPLE}/discard-client.cc)
-target_link_libraries(discard-client angel)
+add_test(bench bench.cc)
 
-add_executable(time-server ${SAMPLE}/time-server.cc)
-target_link_libraries(time-server angel)
-add_executable(time-client ${SAMPLE}/time-client.cc)
-target_link_libraries(time-client angel)
+add_sample(echo-server echo-server.cc)
+add_sample(echo-client echo-client.cc)
 
-add_executable(daytime-server ${SAMPLE}/daytime-server.cc)
-target_link_libraries(daytime-server angel)
+add_sample(echo-channel echo-channel.cc)
 
-add_executable(chat-server ${SAMPLE}/chat-server.cc)
-target_link_libraries(chat-server angel)
+add_sample(chargen-server chargen-server.cc)
+add_sample(chargen-client chargen-client.cc)
 
-add_executable(fib-server ${SAMPLE}/fib-server.cc)
-target_link_libraries(fib-server angel)
+add_sample(discard-server discard-server.cc)
+add_sample(discard-client discard-client.cc)
 
-add_executable(http-server ${SAMPLE}/http-server.cc)
-target_link_libraries(http-server angel)
+add_sample(http-server http-server.cc)
+add_sample(http-client http-client.cc)
 
-add_executable(http-client ${SAMPLE}/http-client.cc)
-target_link_libraries(http-client angel)
+add_sample(dns-resolve dns-resolve.cc)
 
-add_executable(dns-resolve ${SAMPLE}/dns-resolve.cc)
-target_link_libraries(dns-resolve angel)
+add_sample(time-server time-server.cc)
+add_sample(time-client time-client.cc)
 
-add_executable(signal-test ${SAMPLE}/signal-test.cc)
-target_link_libraries(signal-test angel)
+add_sample(daytime-server daytime-server.cc)
+
+add_sample(chat-server chat-server.cc)
+
+add_sample(fib-server fib-server.cc)
+
+add_sample(signal-test signal-test.cc)
