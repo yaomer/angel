@@ -38,8 +38,8 @@ void ssl_filter::decrypt(buffer *input)
     while (true) {
         int n = SSL_read(ssl, buf, sizeof(buf));
         if (n > 0) {
+            // The read operation was successful.
             decrypted->append(buf, n);
-            if (n != sizeof(buf)) break;
         } else {
             // As at any time a re-negotiation is possible,
             // a call to SSL_read() can also cause write operations!
@@ -78,7 +78,6 @@ void ssl_filter::encrypt(buffer *output)
     while (true) {
         int n = BIO_read(wbio, buf, sizeof(buf));
         if (n > 0) encrypted->append(buf, n);
-        if (n != sizeof(buf)) break;
     }
 }
 
