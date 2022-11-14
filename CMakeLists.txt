@@ -141,8 +141,11 @@ target_link_libraries(fib-server angel)
 add_executable(http-server ${SAMPLE}/http-server.cc)
 target_link_libraries(http-server angel)
 
-add_executable(signal-test ${SAMPLE}/signal-test.cc)
-target_link_libraries(signal-test angel)
+add_executable(http-client ${SAMPLE}/http-client.cc)
+target_link_libraries(http-client angel)
 
 add_executable(dns-resolve ${SAMPLE}/dns-resolve.cc)
 target_link_libraries(dns-resolve angel)
+
+add_executable(signal-test ${SAMPLE}/signal-test.cc)
+target_link_libraries(signal-test angel)
