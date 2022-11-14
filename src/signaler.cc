@@ -36,13 +36,32 @@ void signaler_t::start()
     loop->add_channel(sig_channel);
 }
 
+// Only async-signal-safe functions can be called in signal handler.
+//
+// In particular, nonreentrant functions are generally unsafe to
+// call from a signal handler. It's also not safe that involves
+// dynamic memory allocation and locking.
+//
+// All functions of stdio library are not async-signal-safe.
+//
+// This is easy to understand, when performing buffered I/O on a file,
+// the stdio functions must maintain a statically allocated data buffer
+// along with associated counters and indexes (or pointers) that record
+// the amount of data and the current position in the buffer.
+//
+// Suppose that the main program is in the middle of a call to a stdio
+// function such as printf(3) where the buffer and associated variables
+// have been partially updated. If, at that moment, the program is
+// interrupted by a signal handler that also calls printf(3), then
+// the second call to printf(3) will operate on inconsistent data,
+// with unpredictable results.
+//
 static void sig_handler(int signo)
 {
-    ssize_t n = write(sig_fd,
-                      reinterpret_cast<void *>(&signo), 1);
-    log_info("Sig[%d] is triggered: %s", signo, strsignal(signo));
-    if (n != 1)
-        log_error("write %zd bytes instead of 1");
+    // Write only the signal value triggerred here to wake up the io loop,
+    // and then to execute the corresponding signal handler (in sig_catch)
+    // according to the read signal value in the io thread loop.
+    write(sig_fd, reinterpret_cast<void *>(&signo), 1);
 }
 
 static void sigaction(int signo, void (*handler)(int))
@@ -89,6 +108,8 @@ void signaler_t::add_signal_in_loop(int signo, signaler_event event)
 {
     auto& sl = sig_map[signo];
     if (sl.empty()) {
+        // The signal handler of each newly added signal
+        // will be set to sig_handler.
         sigaction(signo, sig_handler);
     }
     id_map.emplace(event.sig_id, signo);
@@ -130,8 +151,6 @@ void signaler_t::cancel_signal_in_loop(size_t id)
     }
 }
 
-// Call the corresponding signal processing function
-// according to the read signal value.
 void signaler_t::sig_catch()
 {
     static unsigned char buf[1024];
@@ -143,6 +162,7 @@ void signaler_t::sig_catch()
         int signo = buf[i];
         auto it = sig_map.find(signo);
         assert(it != sig_map.end());
+        log_info("Sig[%d] is triggered: %s", signo, strsignal(signo));
         for (auto& event : it->second) {
             event.sig_cb();
         }
