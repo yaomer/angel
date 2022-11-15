@@ -117,6 +117,15 @@ void evloop::run()
         }
         do_functors();
     }
+
+    // Ensure that all tasks are executed when exiting.
+    while (true) {
+        {
+            std::lock_guard<std::mutex> lk(mtx);
+            if (functors.empty()) break;
+        }
+        do_functors();
+    }
 }
 
 void evloop::do_functors()
