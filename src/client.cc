@@ -46,7 +46,7 @@ void client::close_connection()
     cli_conn->set_state(connection::state::closed);
     loop->remove_channel(cli_conn->channel);
     // should close(fd) after remove_channel()
-    loop->run_in_loop([conn = cli_conn]() mutable { conn.reset(); });
+    loop->run_in_loop([conn = std::move(cli_conn)]() mutable { conn.reset(); });
     cancel_connection_timeout_timer();
     if (ops.is_quit_loop) loop->quit();
 }
