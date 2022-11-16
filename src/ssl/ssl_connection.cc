@@ -9,7 +9,7 @@ namespace angel {
 
 ssl_connection::ssl_connection(size_t id, evloop *loop, int sockfd, ssl_handshake *sh)
     : connection(id, loop, sockfd), sh(sh),
-    sf(new ssl_filter(sh->get_ssl(), &decrypted, nullptr))
+    sf(std::make_unique<ssl_filter>(sh->get_ssl(), &decrypted, nullptr))
 {
 }
 

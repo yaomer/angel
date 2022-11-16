@@ -22,7 +22,7 @@ namespace {
 }
 
 // Just create a SSL_CTX for all clients of each thread.
-SSL_CTX *ssl_client::get_ssl_ctx()
+static SSL_CTX *get_ssl_ctx()
 {
     static thread_local std::unique_ptr<SSL_CTX, ssl_ctx_free> ctx;
     if (!ctx) {

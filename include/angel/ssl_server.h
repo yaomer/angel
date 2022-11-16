@@ -19,7 +19,6 @@ public:
 private:
     connection_ptr create_connection(int fd) override;
     void new_connection(int fd) override;
-    static SSL_CTX *get_ssl_ctx();
     std::unordered_map<int, std::unique_ptr<ssl_handshake>> shmap;
 };
 

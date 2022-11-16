@@ -15,26 +15,6 @@ ssl_server::~ssl_server()
 {
 }
 
-connection_ptr ssl_server::create_connection(int fd)
-{
-    size_t id = conn_id++;
-    evloop *io_loop = get_next_loop();
-    auto it = shmap.find(fd);
-    assert(it != shmap.end());
-    auto *sh = it->second.release();
-    shmap.erase(it);
-    return std::make_shared<ssl_connection>(id, io_loop, fd, sh);
-}
-
-void ssl_server::new_connection(int fd)
-{
-    auto *sh = new ssl_handshake(loop, get_ssl_ctx());
-    shmap.emplace(fd, sh);
-    sh->start_server_handshake(fd);
-    sh->onestablish = [this, fd]{ server::new_connection(fd); };
-    sh->onfailed = [this, fd]{ shmap.erase(fd); close(fd); };
-}
-
 namespace {
     struct ssl_ctx_free {
         void operator()(SSL_CTX *ctx) {
@@ -48,7 +28,7 @@ namespace {
     static std::string key_file;
 }
 
-SSL_CTX *ssl_server::get_ssl_ctx()
+static SSL_CTX *get_ssl_ctx()
 {
     int rc;
     static thread_local std::unique_ptr<SSL_CTX, ssl_ctx_free> ctx;
@@ -81,6 +61,26 @@ SSL_CTX *ssl_server::get_ssl_ctx()
         }
     }
     return ctx.get();
+}
+
+connection_ptr ssl_server::create_connection(int fd)
+{
+    size_t id = conn_id++;
+    evloop *io_loop = get_next_loop();
+    auto it = shmap.find(fd);
+    assert(it != shmap.end());
+    auto *sh = it->second.release();
+    shmap.erase(it);
+    return std::make_shared<ssl_connection>(id, io_loop, fd, sh);
+}
+
+void ssl_server::new_connection(int fd)
+{
+    auto *sh = new ssl_handshake(loop, get_ssl_ctx());
+    shmap.emplace(fd, sh);
+    sh->start_server_handshake(fd);
+    sh->onestablish = [this, fd]{ server::new_connection(fd); };
+    sh->onfailed = [this, fd]{ shmap.erase(fd); close(fd); };
 }
 
 void ssl_server::set_cipher_list(const char *your_cipher_list)
