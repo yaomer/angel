@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
 
     angel::evloop loop;
 
-    HttpServer server(&loop, angel::inet_addr(8000));
+    http_server server(&loop, angel::inet_addr(8000));
     server.set_base_dir(base_dir);
 
     server.File("/", [](request& req, Headers& headers){

@@ -115,7 +115,7 @@ struct uri {
 };
 
 //====================================================
-//=================== HttpServer =====================
+//=================== http_server ====================
 //====================================================
 
 class request : private message {
@@ -140,7 +140,7 @@ private:
     off_t filesize;
     std::string last_modified;
     std::string etag;
-    friend class HttpServer;
+    friend class http_server;
 };
 
 class response {
@@ -165,7 +165,7 @@ private:
     std::string buf;
     bool chunked = false;
     std::string chunked_buf;
-    friend class HttpServer;
+    friend class http_server;
     friend struct byte_range_set;
 };
 
@@ -183,12 +183,12 @@ enum ConditionCode {
 typedef std::function<void(request&, response&)> ServerHandler;
 typedef std::function<void(request&, Headers&)> FileHandler;
 
-class HttpServer {
+class http_server {
 public:
-    HttpServer(evloop *, inet_addr);
-    HttpServer& Get(std::string_view path, const ServerHandler handler);
-    HttpServer& Post(std::string_view path, const ServerHandler handler);
-    HttpServer& File(std::string_view path, const FileHandler handler);
+    http_server(evloop *, inet_addr);
+    http_server& Get(std::string_view path, const ServerHandler handler);
+    http_server& Post(std::string_view path, const ServerHandler handler);
+    http_server& File(std::string_view path, const FileHandler handler);
     // For static file
     void set_base_dir(std::string_view dir);
     // Set parallel threads for request
@@ -234,7 +234,7 @@ private:
 };
 
 //====================================================
-//=================== HttpClient =====================
+//=================== http_client ====================
 //====================================================
 
 class http_request {
@@ -262,7 +262,7 @@ private:
     int request_timeout = 1000 * 10;
     int pending_timeout = 1000 * 10;
     std::string method;
-    friend class HttpClient;
+    friend class http_client;
 };
 
 enum class ErrorCode {
@@ -290,7 +290,7 @@ private:
 
     ParseState state = ParseLine;
 
-    friend class HttpClient;
+    friend class http_client;
 };
 
 typedef std::future<http_response> response_future;
@@ -327,10 +327,10 @@ struct http_connection_pool {
     int active_conns();
 };
 
-class HttpClient {
+class http_client {
 public:
-    HttpClient();
-    ~HttpClient();
+    http_client();
+    ~http_client();
     void set_max_conns_per_route(int conns);
     response_future send(http_request& request);
 private:

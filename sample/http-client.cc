@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    HttpClient client;
+    http_client client;
     http_request request;
 
     request.set_url(argv[1]).Get();

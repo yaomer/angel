@@ -294,7 +294,7 @@ void uri::clear()
 }
 
 //====================================================
-//=================== HttpServer =====================
+//=================== http_server ====================
 //====================================================
 
 static const char *index_page()
@@ -494,7 +494,7 @@ void response::send_err()
     send(err_page(status_code));
 }
 
-void HttpServer::message_handler(const connection_ptr& conn, buffer& buf)
+void http_server::message_handler(const connection_ptr& conn, buffer& buf)
 {
     StatusCode code;
     if (!conn->is_connected()) return;
@@ -565,7 +565,7 @@ err:
     conn->close();
 }
 
-void HttpServer::process_request(const connection_ptr& conn, request& req, response& res)
+void http_server::process_request(const connection_ptr& conn, request& req, response& res)
 {
     bool is_keepalive = keepalive(req);
     res.add_header("Connection", is_keepalive ? "keep-alive" : "close");
@@ -600,7 +600,7 @@ void HttpServer::process_request(const connection_ptr& conn, request& req, respo
     }
 }
 
-bool HttpServer::keepalive(request& req)
+bool http_server::keepalive(request& req)
 {
     auto it = req.headers().find("Connection");
     if (it == req.headers().end()) {
@@ -610,7 +610,7 @@ bool HttpServer::keepalive(request& req)
     return util::equal_case(it->second, "keep-alive");
 }
 
-bool HttpServer::handle_user_router(request& req, response& res)
+bool http_server::handle_user_router(request& req, response& res)
 {
     auto& table = router.at(req.method());
     auto it = table.find(req.path());
@@ -619,7 +619,7 @@ bool HttpServer::handle_user_router(request& req, response& res)
     return true;
 }
 
-void HttpServer::handle_file_router(request& req, response& res)
+void http_server::handle_file_router(request& req, response& res)
 {
     auto it = file_table.find(req.path());
     if (it != file_table.end()) {
@@ -627,7 +627,7 @@ void HttpServer::handle_file_router(request& req, response& res)
     }
 }
 
-void HttpServer::handle_static_file_request(request& req, response& res)
+void http_server::handle_static_file_request(request& req, response& res)
 {
     bool root_index = false;
     if (req.path() == "/") {
@@ -708,7 +708,7 @@ void HttpServer::handle_static_file_request(request& req, response& res)
 // If-Match
 // If-Unmodified-Since
 //
-ConditionCode HttpServer::handle_conditional(request& req, response& res)
+ConditionCode http_server::handle_conditional(request& req, response& res)
 {
     if_range(req, res);
 
@@ -728,7 +728,7 @@ ConditionCode HttpServer::handle_conditional(request& req, response& res)
 //
 // It is used on updating requests, to prevent inadvertent
 // modification of the wrong version of a resource.
-ConditionCode HttpServer::if_match(request& req, response& res)
+ConditionCode http_server::if_match(request& req, response& res)
 {
     auto it = req.headers().find("If-Match");
     if (it == req.headers().end()) return NoHeader;
@@ -753,7 +753,7 @@ ConditionCode HttpServer::if_match(request& req, response& res)
 // specified in this field, an entity will not be returned from
 // the server; instead, a 304 (not modified) response will be
 // returned without any message-body.
-ConditionCode HttpServer::if_modified_since(request& req, response& res)
+ConditionCode http_server::if_modified_since(request& req, response& res)
 {
     auto it = req.headers().find("If-Modified-Since");
     if (it == req.headers().end()) return NoHeader;
@@ -771,7 +771,7 @@ ConditionCode HttpServer::if_modified_since(request& req, response& res)
 // It is used to prevent a method (e.g. PUT) from inadvertently
 // modifying an existing resource when the client believes that
 // the resource does not exist.
-ConditionCode HttpServer::if_none_match(request& req, response& res)
+ConditionCode http_server::if_none_match(request& req, response& res)
 {
     auto it = req.headers().find("If-None-Match");
     if (it == req.headers().end()) return NoHeader;
@@ -822,7 +822,7 @@ end:
 // request. Informally, its meaning is `if the entity is unchanged,
 // send me the part(s) that I am missing; otherwise, send me the
 // entire new entity`.
-ConditionCode HttpServer::if_range(request& req, response& res)
+ConditionCode http_server::if_range(request& req, response& res)
 {
     auto it = req.headers().find("If-Range");
     if (it == req.headers().end()) return NoHeader;
@@ -850,7 +850,7 @@ ConditionCode HttpServer::if_range(request& req, response& res)
 // If the requested variant has been modified since the specified time,
 // the server MUST NOT perform the requested operation, and MUST return
 // a 412 (Precondition Failed).
-ConditionCode HttpServer::if_unmodified_since(request& req, response& res)
+ConditionCode http_server::if_unmodified_since(request& req, response& res)
 {
     auto it = req.headers().find("If-Unmodified-Since");
     if (it == req.headers().end()) return NoHeader;
@@ -868,7 +868,7 @@ ConditionCode HttpServer::if_unmodified_since(request& req, response& res)
 //
 // The Expect request-header field is used to indicate that particular
 // server behaviors are required by the client.
-ConditionCode HttpServer::expect(request& req, response& res)
+ConditionCode http_server::expect(request& req, response& res)
 {
     auto it = req.headers().find("Expect");
     if (it == req.headers().end()) return NoHeader;
@@ -881,7 +881,7 @@ ConditionCode HttpServer::expect(request& req, response& res)
     return Failed;
 }
 
-void HttpServer::send_file(request& req, response& res)
+void http_server::send_file(request& req, response& res)
 {
     int fd = open(req.path().c_str(), O_RDONLY);
 
@@ -904,7 +904,7 @@ void HttpServer::send_file(request& req, response& res)
 }
 
 // Update or create a file
-void HttpServer::update_file(request& req, response& res)
+void http_server::update_file(request& req, response& res)
 {
     int fd = open(req.path().c_str(), O_RDWR | O_TRUNC | O_CREAT, 0644);
     if (fd < 0) {
@@ -928,7 +928,7 @@ void HttpServer::update_file(request& req, response& res)
     close(fd);
 }
 
-void HttpServer::delete_file(request& req, response& res)
+void http_server::delete_file(request& req, response& res)
 {
     if (req.has_file) {
         ::unlink(req.path().c_str());
@@ -998,7 +998,7 @@ static std::string content_range(std::string_view resp, off_t filesize)
 }
 
 // Range: bytes=0-100,-100\r\n
-void HttpServer::handle_range_request(request& req, response& res)
+void http_server::handle_range_request(request& req, response& res)
 {
     byte_range_set range_set;
 
@@ -1211,7 +1211,7 @@ const char *to_str(StatusCode code)
     return it != code_map.end() ? it->second : nullptr;
 }
 
-HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
+http_server::http_server(evloop *loop, inet_addr listen_addr)
     : server(loop, listen_addr)
 {
     server.set_connection_handler([this](const connection_ptr& conn){
@@ -1227,42 +1227,42 @@ HttpServer::HttpServer(evloop *loop, inet_addr listen_addr)
     set_idle(30); // 30s by default
 }
 
-void HttpServer::set_base_dir(std::string_view dir)
+void http_server::set_base_dir(std::string_view dir)
 {
     base_dir = dir;
     if (base_dir.back() == '/') base_dir.pop_back();
 }
 
-void HttpServer::set_parallel(unsigned n)
+void http_server::set_parallel(unsigned n)
 {
     if (n == 0) return;
     server.start_io_threads(n);
 }
 
-void HttpServer::set_idle(int secs)
+void http_server::set_idle(int secs)
 {
     if (secs <= 0) return;
     idle_time = secs;
 }
 
-void HttpServer::generate_file_etag_by(std::string_view way)
+void http_server::generate_file_etag_by(std::string_view way)
 {
     generate_file_etag_by_sha1 = (way == "sha1");
 }
 
-HttpServer& HttpServer::Get(std::string_view path, const ServerHandler handler)
+http_server& http_server::Get(std::string_view path, const ServerHandler handler)
 {
     router[GET].emplace(path, std::move(handler));
     return *this;
 }
 
-HttpServer& HttpServer::Post(std::string_view path, const ServerHandler handler)
+http_server& http_server::Post(std::string_view path, const ServerHandler handler)
 {
     router[POST].emplace(path, std::move(handler));
     return *this;
 }
 
-HttpServer& HttpServer::File(std::string_view path, const FileHandler handler)
+http_server& http_server::File(std::string_view path, const FileHandler handler)
 {
     std::string file(base_dir);
     file += path;
@@ -1271,7 +1271,7 @@ HttpServer& HttpServer::File(std::string_view path, const FileHandler handler)
     return *this;
 }
 
-void HttpServer::start()
+void http_server::start()
 {
     server.set_nodelay(true);
     server.set_keepalive(true);
@@ -1279,7 +1279,7 @@ void HttpServer::start()
 }
 
 //====================================================
-//=================== HttpClient =====================
+//=================== http_client ====================
 //====================================================
 
 http_request& http_request::set_url(std::string_view url)
@@ -1405,24 +1405,24 @@ StatusCode http_response::parse_line(buffer& buf)
     return Ok;
 }
 
-HttpClient::HttpClient()
+http_client::http_client()
 {
     resolver = dns::resolver::get_resolver();
 }
 
-HttpClient::~HttpClient()
+http_client::~http_client()
 {
     router.clear();
     sender.join();
 }
 
-void HttpClient::set_max_conns_per_route(int conns)
+void http_client::set_max_conns_per_route(int conns)
 {
     if (conns <= 0) return;
     max_conns_per_route = conns;
 }
 
-http_connection_pool *HttpClient::create_connection_pool(http_request& request)
+http_connection_pool *http_client::create_connection_pool(http_request& request)
 {
     auto *pool = new http_connection_pool();
 
@@ -1528,7 +1528,7 @@ void http_connection::err_notify(ErrorCode err_code)
     response.err_code = ErrorCode::None;
 }
 
-void HttpClient::send(http_connection *http_conn, http_request& request)
+void http_client::send(http_connection *http_conn, http_request& request)
 {
     auto& cli = http_conn->client;
     assert(cli->is_connected());
@@ -1537,7 +1537,7 @@ void HttpClient::send(http_connection *http_conn, http_request& request)
 }
 
 // Add a new http connection to pool.
-void HttpClient::add_connection(http_connection_pool *pool, http_request& request)
+void http_client::add_connection(http_connection_pool *pool, http_request& request)
 {
     auto *http_conn = pool->create_connection();
 
@@ -1571,14 +1571,14 @@ void HttpClient::add_connection(http_connection_pool *pool, http_request& reques
             });
 }
 
-void HttpClient::connection_timeout_handler(http_connection *http_conn)
+void http_client::connection_timeout_handler(http_connection *http_conn)
 {
     assert(http_conn->leased);
     http_conn->err_notify(ErrorCode::ConnectionTimeout);
     remove_connection(http_conn);
 }
 
-void HttpClient::set_request_timeout_timer(http_connection *http_conn, int request_timeout)
+void http_client::set_request_timeout_timer(http_connection *http_conn, int request_timeout)
 {
     http_conn->request_timeout_timer_id = sender.get_loop()->run_after(request_timeout,
             [this, http_conn]{
@@ -1587,7 +1587,7 @@ void HttpClient::set_request_timeout_timer(http_connection *http_conn, int reque
             });
 }
 
-void HttpClient::cancel_request_timeout_timer(http_connection *http_conn)
+void http_client::cancel_request_timeout_timer(http_connection *http_conn)
 {
     if (http_conn->request_timeout_timer_id > 0) {
         sender.get_loop()->cancel_timer(http_conn->request_timeout_timer_id);
@@ -1595,7 +1595,7 @@ void HttpClient::cancel_request_timeout_timer(http_connection *http_conn)
     }
 }
 
-void HttpClient::connection_reset_by_peer(http_connection *http_conn)
+void http_client::connection_reset_by_peer(http_connection *http_conn)
 {
     // To avoid calling remove_connection() repeatedly,
     // it can only be called when the server closes the connection,
@@ -1612,14 +1612,14 @@ void HttpClient::connection_reset_by_peer(http_connection *http_conn)
     this->remove_connection(http_conn);
 }
 
-void HttpClient::put_connection(http_connection *http_conn)
+void http_client::put_connection(http_connection *http_conn)
 {
     std::lock_guard<std::mutex> lk(router_mutex);
 
     http_conn->pool->release_connection(http_conn);
 }
 
-void HttpClient::remove_connection(http_connection *http_conn)
+void http_client::remove_connection(http_connection *http_conn)
 {
     std::lock_guard<std::mutex> lk(router_mutex);
 
@@ -1638,7 +1638,7 @@ static response_future err_future(ErrorCode err_code)
     return f;
 }
 
-response_future HttpClient::send(http_request& request)
+response_future http_client::send(http_request& request)
 {
     if (request.invalid_url || request.method.empty()) {
         return err_future(ErrorCode::InvalidRequest);
@@ -1694,14 +1694,14 @@ retry:
     return f;
 }
 
-void HttpClient::receive(http_connection *http_conn, buffer& buf)
+void http_client::receive(http_connection *http_conn, buffer& buf)
 {
     // The http connection is idle, ignoring all received messages.
     if (!http_conn->leased) {
         buf.retrieve_all();
         return;
     }
-    // Parse Response, similar to HttpServer.
+    // Parse Response, similar to http_server.
     StatusCode code;
     auto& res = http_conn->response;
     while (buf.readable() > 0) {
