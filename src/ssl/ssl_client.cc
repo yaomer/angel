@@ -34,7 +34,7 @@ static SSL_CTX *get_ssl_ctx()
 
 connection_ptr ssl_client::create_connection(int fd)
 {
-    return std::make_shared<ssl_connection>(1, loop, fd, sh.release());
+    return std::make_shared<ssl_connection>(get_next_id(), loop, fd, sh.release());
 }
 
 // At this time, the TCP connection has been established,

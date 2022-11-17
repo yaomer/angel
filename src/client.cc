@@ -18,14 +18,20 @@ client::~client()
     close_connection();
 }
 
+size_t client::get_next_id()
+{
+    // All clients share conn_id.
+    static std::atomic_size_t conn_id = 1;
+    return conn_id.fetch_add(1, std::memory_order_relaxed);
+}
+
 connection_ptr client::create_connection(int fd)
 {
-    return std::make_shared<connection>(1, loop, fd);
+    return std::make_shared<connection>(get_next_id(), loop, fd);
 }
 
 void client::new_connection(int fd)
 {
-    log_info("client(fd=%d) connected to host (%s)", fd, peer_addr.to_host());
     cli_conn = create_connection(fd);
     cli_conn->set_connection_handler(connection_handler);
     cli_conn->set_message_handler(message_handler);
@@ -34,6 +40,7 @@ void client::new_connection(int fd)
             this->close_connection();
             if (this->ops.is_reconnect) this->start();
             });
+    log_info("client(id=%zu, fd=%d) connected to host (%s)", cli_conn->id(), fd, peer_addr.to_host());
     loop->run_in_loop([conn = cli_conn]{ conn->establish(); });
     cancel_connection_timeout_timer();
 }

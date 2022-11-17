@@ -51,6 +51,8 @@ private:
     void add_connection_timeout_timer();
     void cancel_connection_timeout_timer();
 
+    static size_t get_next_id();
+
     evloop *loop;
     client_options ops;
     inet_addr peer_addr;
