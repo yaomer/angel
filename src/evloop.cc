@@ -29,12 +29,12 @@ using namespace util;
 namespace {
     // Ensure that each thread can only run one event loop at a time.
     thread_local evloop *this_thread_loop = nullptr;
-    // Protect __signaler_ptr to initialize properly.
+    // Protect signaler to initialize properly.
     //
     // Due to the particularity of signals, there can only be one signaler instance per process,
     // that is, it can only be bound to one evloop.
     std::mutex sig_mutex;
-    signaler_t *__signaler_ptr = nullptr;
+    signaler_t *signaler_ptr = nullptr;
 }
 
 evloop::evloop()
@@ -61,14 +61,16 @@ evloop::evloop()
     log_info("Use I/O multiplexing (%s)", dispatcher->name());
     sockops::socketpair(wake_pair);
     std::lock_guard<std::mutex> lk(sig_mutex);
-    if (!__signaler_ptr) {
+    if (!signaler_ptr) {
         signaler.reset(new signaler_t(this));
-        __signaler_ptr = signaler.get();
+        signaler_ptr = signaler.get();
     }
 }
 
 evloop::~evloop()
 {
+    close(wake_pair[0]);
+    close(wake_pair[1]);
     this_thread_loop = nullptr;
 }
 
@@ -89,7 +91,7 @@ void evloop::add_channel_in_loop(channel_ptr chl)
         chl->enable_read();
         log_debug("Add channel(fd=%d) to loop", chl->fd());
     } else {
-        log_warn("Add duplicate channel(fd=%d) to loop", chl->fd());
+        log_warn("Try to add duplicate channel(fd=%d) to loop", chl->fd());
     }
 }
 
@@ -150,15 +152,16 @@ void evloop::wakeup_init()
     chl->set_fd(wake_pair[0]);
     chl->set_read_handler([this]{ this->wakeup_read(); });
     add_channel(std::move(chl));
-    log_info("Add wake_pair(%d)", wake_pair[0]);
 }
 
 // Wakeup current io loop thread
 void evloop::wakeup(uint8_t v)
 {
+    // Multi-thread concurrently write is safe here.
+    // We have no writing order requirement, just write one byte into the pair.
     ssize_t n = write(wake_pair[1], &v, sizeof(v));
     if (n != sizeof(v)) {
-        log_error("Write (%zd) bytes instead of (%zu)", n, sizeof(v));
+        log_error("write(): %s", strerrno());
     }
 }
 
@@ -169,7 +172,7 @@ void evloop::wakeup_read()
     if (n > 0) {
         if (v) is_quit = true;
     } else {
-        log_error("wakeup_read(): %s", strerrno());
+        log_error("read(): %s", strerrno());
     }
 }
 
@@ -189,11 +192,17 @@ void evloop::run_in_loop(const functor cb)
 
 void evloop::queue_in_loop(const functor cb)
 {
-    {
-        std::lock_guard<std::mutex> lk(mtx);
-        functors.emplace_back(std::move(cb));
+    std::lock_guard<std::mutex> lk(mtx);
+    functors.emplace_back(std::move(cb));
+    // We don't have to wakeup() every time,
+    // just wakeup() when the first task is queued.
+    //
+    // WARNING: If you wakeup() every time, but evloop don't wakeup_read() in time,
+    // the wake_pair buffer may be filled, and when you wakeup() again,
+    // the wakeup thread will be blocked.
+    if (functors.size() == 1) {
+        wakeup(0);
     }
-    wakeup(0);
 }
 
 size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
@@ -222,21 +231,24 @@ void evloop::cancel_timer(size_t id)
 
 size_t evloop::add_signal(int signo, const signaler_handler_t handler)
 {
-    if (__signaler_ptr)
-        return __signaler_ptr->add_signal(signo, std::move(handler));
+    if (signaler_ptr) {
+        return signaler_ptr->add_signal(signo, std::move(handler));
+    }
     return (-1);
 }
 
 void evloop::ignore_signal(int signo)
 {
-    if (__signaler_ptr)
-        __signaler_ptr->ignore_siganl(signo);
+    if (signaler_ptr) {
+        signaler_ptr->ignore_siganl(signo);
+    }
 }
 
 void evloop::cancel_signal(size_t id)
 {
-    if (__signaler_ptr)
-        __signaler_ptr->cancel_signal(id);
+    if (signaler_ptr) {
+        signaler_ptr->cancel_signal(id);
+    }
 }
 
 void evloop::quit()
