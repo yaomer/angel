@@ -13,7 +13,6 @@ namespace angel {
 connector_t::connector_t(evloop *loop, inet_addr peer_addr)
     : loop(loop),
     peer_addr(peer_addr),
-    connect_channel(new channel(loop)),
     has_connected(false),
     retry_timer_id(0),
     wait_retry(false),
@@ -27,8 +26,8 @@ connector_t::~connector_t()
         loop->cancel_timer(retry_timer_id);
     }
     if (!wait_retry && !has_connected) {
-        loop->remove_channel(connect_channel);
-        close(sockfd);
+        loop->remove_channel(sockfd);
+        loop->run_in_loop([fd = sockfd]{ close(fd); });
     }
 }
 
@@ -38,27 +37,27 @@ void connector_t::connect()
     sockfd = sockops::socket(protocol);
     sockops::set_nonblock(sockfd);
     int ret = sockops::connect(sockfd, &peer_addr.addr());
-    connect_channel->set_fd(sockfd);
-    loop->add_channel(connect_channel);
+    auto chl = std::make_shared<channel>(loop);
+    chl->set_fd(sockfd);
+    loop->add_channel(chl);
     log_info("(fd=%d) connect -> host (%s)", sockfd, peer_addr.to_host());
     if (ret == 0) {
         // Usually if the server and client are on the same host,
         // the connection will be established immediately.
         connected();
-    } else if (ret < 0) {
-        if (errno == EINPROGRESS) {
-            connecting();
-        }
+        return;
     }
-}
-
-void connector_t::connecting()
-{
+    if (errno != EINPROGRESS) {
+        log_error("connect(): %s", util::strerrno());
+        return;
+    }
+    // The socket is non-blocking and the connection cannot be completed immediately.
+    // It is possible to select(2) or poll(2) for completion by selecting the socket for writing.
     log_debug("(fd=%d) connecting...", sockfd);
     auto check_handler = [this]{ this->check(); };
-    connect_channel->set_read_handler(check_handler);
-    connect_channel->set_write_handler(check_handler);
-    connect_channel->enable_write();
+    chl->set_read_handler(check_handler);
+    chl->set_write_handler(check_handler);
+    chl->enable_write();
 }
 
 void connector_t::connected()
@@ -67,8 +66,7 @@ void connector_t::connected()
     if (wait_retry) {
         loop->cancel_timer(retry_timer_id);
     }
-    loop->remove_channel(connect_channel);
-    connect_channel.reset();
+    loop->remove_channel(sockfd);
     has_connected = true;
     new_connection_handler(sockfd);
 }
@@ -96,11 +94,11 @@ void connector_t::check()
 
 void connector_t::retry()
 {
-    loop->remove_channel(connect_channel);
+    loop->remove_channel(sockfd);
+    loop->run_in_loop([fd = sockfd]{ close(fd); });
     log_error("try to reconnect -> (%s) after %d ms", peer_addr.to_host(), retry_interval);
     retry_timer_id = loop->run_after(retry_interval, [this]{ this->connect(); });
     wait_retry = true;
-    close(sockfd);
 }
 
 }

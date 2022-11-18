@@ -21,7 +21,7 @@ public:
 
     void connect();
     bool is_connected() { return has_connected; }
-    int connfd() const { return connect_channel->fd(); }
+    int connfd() const { return sockfd; }
     inet_addr& addr() { return peer_addr; }
 
     typedef std::function<void(int)> new_connection_handler_t;
@@ -29,14 +29,12 @@ public:
     std::string protocol = "tcp";
     int retry_interval = 1000; // 1s
 private:
-    void connecting();
     void connected();
     void check();
     void retry();
 
     evloop *loop;
     inet_addr peer_addr;
-    std::shared_ptr<channel> connect_channel;
     bool has_connected;
     size_t retry_timer_id;
     bool wait_retry;

@@ -69,8 +69,6 @@ evloop::evloop()
 
 evloop::~evloop()
 {
-    close(wake_pair[0]);
-    close(wake_pair[1]);
     this_thread_loop = nullptr;
 }
 
@@ -82,6 +80,11 @@ void evloop::add_channel(channel_ptr chl)
 void evloop::remove_channel(channel_ptr chl)
 {
     run_in_loop([this, chl = std::move(chl)]{ this->remove_channel_in_loop(std::move(chl)); });
+}
+
+void evloop::remove_channel(int fd)
+{
+    run_in_loop([this, fd]{ this->remove_channel_in_loop(fd); });
 }
 
 void evloop::add_channel_in_loop(channel_ptr chl)
@@ -100,6 +103,15 @@ void evloop::remove_channel_in_loop(channel_ptr chl)
     log_debug("Remove channel(fd=%d) from loop", chl->fd());
     chl->disable_all();
     channel_map.erase(chl->fd());
+}
+
+void evloop::remove_channel_in_loop(int fd)
+{
+    auto it = channel_map.find(fd);
+    if (it == channel_map.end()) return;
+    log_debug("Remove channel(fd=%d) from loop", fd);
+    it->second->disable_all();
+    channel_map.erase(fd);
 }
 
 void evloop::run()
@@ -128,6 +140,7 @@ void evloop::run()
         }
         do_functors();
     }
+    wakeup_close();
 }
 
 void evloop::do_functors()
@@ -152,6 +165,14 @@ void evloop::wakeup_init()
     chl->set_fd(wake_pair[0]);
     chl->set_read_handler([this]{ this->wakeup_read(); });
     add_channel(std::move(chl));
+}
+
+void evloop::wakeup_close()
+{
+    assert(is_io_loop_thread());
+    remove_channel_in_loop(wake_pair[0]);
+    close(wake_pair[0]);
+    close(wake_pair[1]);
 }
 
 // Wakeup current io loop thread

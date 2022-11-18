@@ -42,6 +42,7 @@ public:
     // Enable read event by default.
     void add_channel(channel_ptr chl);
     void remove_channel(channel_ptr chl);
+    void remove_channel(int fd);
 
     bool is_io_loop_thread();
     // Execute user callback on io loop thread.
@@ -65,12 +66,14 @@ public:
 private:
     void add_channel_in_loop(channel_ptr chl);
     void remove_channel_in_loop(channel_ptr chl);
+    void remove_channel_in_loop(int fd);
     void do_functors();
 
     channel_ptr search_channel(int fd)
     { return channel_map.find(fd)->second; }
 
     void wakeup_init();
+    void wakeup_close();
     void wakeup_read();
     void wakeup(uint8_t);
 
