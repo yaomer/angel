@@ -117,6 +117,8 @@ endfunction()
 
 add_test(bench bench.cc)
 
+add_test(bench_http bench_http.cc)
+
 add_sample(echo-server echo-server.cc)
 add_sample(echo-client echo-client.cc)
 

@@ -1545,7 +1545,7 @@ void http_client::add_connection(http_connection_pool *pool, http_request& reque
     inet_addr peer_addr(pool->addrs[0], request.uri.port);
 
 #if defined (ANGEL_USE_OPENSSL)
-    if (request.uri.port == 443) {
+    if (request.uri.scheme == "https") {
         http_conn->client.reset(new angel::ssl_client(sender.get_loop(), peer_addr));
     } else {
         http_conn->client.reset(new angel::client(sender.get_loop(), peer_addr));
