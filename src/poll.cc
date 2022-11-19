@@ -23,35 +23,51 @@ poll_base_t::~poll_base_t()
 {
 }
 
+#define EVMAP(poll_events, events) \
+    if ((events) & Read) (poll_events) |= POLLIN; \
+    if ((events) & Write) (poll_events) |= POLLOUT
+
 void poll_base_t::add(int fd, int events)
 {
-    struct pollfd pfd{0};
-    pfd.fd = fd;
-    if (events & Read) pfd.events |= POLLIN;
-    if (events & Write) pfd.events |= POLLOUT;
+    int poll_events = 0;
+
+    EVMAP(poll_events, events);
 
     auto it = indexs.find(fd);
-    if (it == indexs.end()) {
+    if (it == indexs.end()) { // Add a new fd.
+        struct pollfd pfd;
+        pfd.fd      = fd;
+        pfd.events  = poll_events;
+        pfd.revents = 0;
         pollfds.emplace_back(pfd);
         indexs.emplace(fd, pollfds.size() - 1);
-    } else {
-        pollfds[it->second].events |= pfd.events;
+    } else { // Add a new event for fd.
+        pollfds[it->second].events |= poll_events;
     }
 }
 
 void poll_base_t::remove(int fd, int events)
 {
     int poll_events = 0;
-    if (events & Read) poll_events |= POLLIN;
-    if (events & Write) poll_events |= POLLOUT;
 
-    auto& pfd = pollfds[indexs[fd]];
+    EVMAP(poll_events, events);
+
+    auto it = indexs.find(fd);
+    if (it == indexs.end()) {
+        log_warn("remove(): fd(%d) does not exist", fd);
+        return;
+    }
+
+    auto& pfd = pollfds[it->second];
     pfd.events &= ~poll_events;
 
     if (!pfd.events) {
-        std::swap(pfd, pollfds.back());
+        auto& back = pollfds.back();
+        indexs[back.fd] = it->second;
+        indexs.erase(it);
+
+        std::swap(pfd, back);
         pollfds.pop_back();
-        indexs.erase(fd);
     }
 }
 
