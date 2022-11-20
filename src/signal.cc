@@ -1,10 +1,12 @@
-#include "signaler.h"
+#include <angel/signal.h>
 
-#include <signal.h>
 #include <unistd.h>
 #include <string.h>
 
-#include <angel/evloop.h>
+#include <unordered_map>
+#include <forward_list>
+
+#include <angel/evloop_thread.h>
 #include <angel/sockops.h>
 #include <angel/logger.h>
 #include <angel/util.h>
@@ -15,25 +17,74 @@ using namespace util;
 
 static int sig_fd = -1;
 
-signaler_t::signaler_t(evloop *loop)
-    : loop(loop), sig_channel(new channel(loop)), sig_id(1)
+//
+// We use socketpair() to convert async-signals into sync I/O events for processing.
+//
+// We register fd[0](the read end of the pipe) in evloop, and then whenever a signal
+// is captured, we write one byte to fd[1](the write end of the pipe),
+// which is actually the signal value of the signal.
+//
+// Then when we listen to the occurrence of a readable event with signal channel
+// in loop, we call the different signal handler registered by the user
+// according to the read signal value.
+//
+class signaler_t {
+public:
+    signaler_t(const signaler_t&) = delete;
+    signaler_t& operator=(const signaler_t&) = delete;
+
+    static signaler_t& get_signaler()
+    {
+        static signaler_t signaler;
+        return signaler;
+    }
+
+    size_t add_signal(int signo, const signal_handler_t handler);
+    void ignore_siganl(int signo);
+    // Restore the default semantics of signo
+    void cancel_signal(size_t id);
+    void start();
+private:
+    signaler_t();
+    ~signaler_t();
+
+    struct signaler_event {
+        size_t sig_id;
+        signal_handler_t sig_cb;
+    };
+
+    void add_signal_in_loop(int signo, signaler_event event);
+    void ignore_siganl_in_loop(int signo);
+    void cancel_signal_in_loop(size_t id);
+    void sig_catch();
+
+    evloop *loop;
+    // Due to the particularity of signals, there can only be one signaler instance
+    // per process, that is, it can only be bound to one evloop.
+    // So we use a special thread to process signals.
+    evloop_thread sig_thread;
+    std::unordered_map<int, std::forward_list<signaler_event>> sig_map;
+    std::unordered_map<size_t, int> id_map;
+    std::atomic_size_t sig_id;
+    int sig_pair[2];
+};
+
+signaler_t::signaler_t()
 {
     if (sig_fd != -1)
         log_fatal("Only have one signaler instance in one process");
+    loop = sig_thread.get_loop();
     sockops::socketpair(sig_pair);
+    auto chl = std::make_shared<channel>(loop);
+    chl->set_fd(sig_pair[0]);
+    chl->set_read_handler([this]{ this->sig_catch(); });
+    loop->add_channel(chl);
     sig_fd = sig_pair[1];
 }
 
 signaler_t::~signaler_t()
 {
     log_debug("~signaler_t()");
-}
-
-void signaler_t::start()
-{
-    sig_channel->set_fd(sig_pair[0]);
-    sig_channel->set_read_handler([this]{ this->sig_catch(); });
-    loop->add_channel(sig_channel);
 }
 
 // Only async-signal-safe functions can be called in signal handler.
@@ -80,7 +131,7 @@ static void sigaction(int signo, void (*handler)(int))
     }
 }
 
-size_t signaler_t::add_signal(int signo, const signaler_handler_t handler)
+size_t signaler_t::add_signal(int signo, const signal_handler_t handler)
 {
     size_t id = sig_id.fetch_add(1, std::memory_order_relaxed);
 
@@ -155,7 +206,7 @@ void signaler_t::sig_catch()
 {
     static unsigned char buf[1024];
 
-    ssize_t n = read(sig_channel->fd(), buf, sizeof(buf));
+    ssize_t n = read(sig_pair[0], buf, sizeof(buf));
     if (n < 0) log_error("read: %s", strerrno());
 
     for (int i = 0; i < n; i++) {
@@ -167,6 +218,21 @@ void signaler_t::sig_catch()
             event.sig_cb();
         }
     }
+}
+
+size_t add_signal(int signo, const signal_handler_t handler)
+{
+    return signaler_t::get_signaler().add_signal(signo, std::move(handler));
+}
+
+void cancel_signal(size_t id)
+{
+    signaler_t::get_signaler().cancel_signal(id);
+}
+
+void ignore_signal(int signo)
+{
+    signaler_t::get_signaler().ignore_siganl(signo);
 }
 
 }

@@ -7,7 +7,6 @@
 
 #include "dispatcher.h"
 #include "timer.h"
-#include "signaler.h"
 
 #if defined (ANGEL_HAVE_KQUEUE)
 #include "kqueue.h"
@@ -29,12 +28,6 @@ using namespace util;
 namespace {
     // Ensure that each thread can only run one event loop at a time.
     thread_local evloop *this_thread_loop = nullptr;
-    // Protect signaler to initialize properly.
-    //
-    // Due to the particularity of signals, there can only be one signaler instance per process,
-    // that is, it can only be bound to one evloop.
-    std::mutex sig_mutex;
-    signaler_t *signaler_ptr = nullptr;
 }
 
 evloop::evloop()
@@ -60,11 +53,6 @@ evloop::evloop()
     }
     log_info("Use I/O multiplexing (%s)", dispatcher->name());
     sockops::socketpair(wake_pair);
-    std::lock_guard<std::mutex> lk(sig_mutex);
-    if (!signaler_ptr) {
-        signaler.reset(new signaler_t(this));
-        signaler_ptr = signaler.get();
-    }
 }
 
 evloop::~evloop()
@@ -117,7 +105,6 @@ void evloop::remove_channel_in_loop(int fd)
 void evloop::run()
 {
     wakeup_init();
-    if (signaler) signaler->start();
     while (!is_quit) {
         int64_t timeout = timer->timeout();
         int nevents = dispatcher->wait(this, timeout);
@@ -248,28 +235,6 @@ void evloop::cancel_timer(size_t id)
 {
     timer->cancel_timer(id);
     log_debug("Cancel a timer(id=%zu)", id);
-}
-
-size_t evloop::add_signal(int signo, const signaler_handler_t handler)
-{
-    if (signaler_ptr) {
-        return signaler_ptr->add_signal(signo, std::move(handler));
-    }
-    return (-1);
-}
-
-void evloop::ignore_signal(int signo)
-{
-    if (signaler_ptr) {
-        signaler_ptr->ignore_siganl(signo);
-    }
-}
-
-void evloop::cancel_signal(size_t id)
-{
-    if (signaler_ptr) {
-        signaler_ptr->cancel_signal(id);
-    }
 }
 
 void evloop::quit()

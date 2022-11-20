@@ -1,10 +1,10 @@
 #include <angel/server.h>
 
-#include <signal.h>
 #include <stdlib.h>
 
+#include <angel/signal.h>
+
 #include "listener.h"
-#include "signaler.h"
 #include "evloop_thread_pool.h"
 
 namespace angel {
@@ -161,9 +161,9 @@ void server::handle_signals()
 {
     // The SIGPIPE signal must be ignored, otherwise sending a message
     // to a closed connection will cause the server to exit unexpectedly.
-    loop->ignore_signal(SIGPIPE);
-    loop->add_signal(SIGINT, [this]{ this->clean_up(); });
-    loop->add_signal(SIGTERM, [this]{ this->clean_up(); });
+    ignore_signal(SIGPIPE);
+    add_signal(SIGINT, [this]{ this->clean_up(); });
+    add_signal(SIGTERM, [this]{ this->clean_up(); });
 }
 
 void server::start()

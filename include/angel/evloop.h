@@ -17,9 +17,6 @@ class dispatcher;
 class timer_t;
 typedef std::function<void()> timer_callback_t;
 
-class signaler_t;
-typedef std::function<void()> signaler_handler_t;
-
 typedef std::function<void()> functor;
 typedef std::shared_ptr<channel> channel_ptr;
 
@@ -58,11 +55,6 @@ public:
     size_t run_every(int64_t interval_ms, const timer_callback_t cb);
     // Cancel a timer and use it with run_after() and run_every().
     void cancel_timer(size_t id);
-
-    size_t add_signal(int signo, const signaler_handler_t handler);
-    void ignore_signal(int signo);
-    // Restore the default semantics of signo.
-    void cancel_signal(size_t id);
 private:
     void add_channel_in_loop(channel_ptr chl);
     void remove_channel_in_loop(channel_ptr chl);
@@ -79,7 +71,6 @@ private:
 
     std::unique_ptr<dispatcher> dispatcher;
     std::unique_ptr<timer_t> timer;
-    std::unique_ptr<signaler_t> signaler;
     std::unordered_map<int, std::shared_ptr<channel>> channel_map;
     std::vector<std::shared_ptr<channel>> active_channels;
     bool is_quit;

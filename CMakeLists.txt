@@ -37,7 +37,7 @@ set (SRC_FILES
     ${SRC_DIR}/server.cc
     ${SRC_DIR}/client.cc
     ${SRC_DIR}/timer.cc
-    ${SRC_DIR}/signaler.cc
+    ${SRC_DIR}/signal.cc
     ${SRC_DIR}/buffer.cc
     ${SRC_DIR}/logger.cc
     ${SRC_DIR}/util.cc
