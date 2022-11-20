@@ -4,7 +4,6 @@
 #include <fcntl.h>
 
 #include <angel/evloop.h>
-#include <angel/sockops.h>
 #include <angel/logger.h>
 #include <angel/util.h>
 

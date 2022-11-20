@@ -5,7 +5,7 @@
 #include <functional>
 
 #include <angel/inet_addr.h>
-#include <angel/socket.h>
+#include <angel/sockops.h>
 #include <angel/buffer.h>
 #include <angel/channel.h>
 

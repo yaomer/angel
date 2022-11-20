@@ -1,11 +1,24 @@
-#ifndef _ANGEL_SOCKOPS_H
-#define _ANGEL_SOCKOPS_H
+#ifndef __ANGEL_SOCKOPS_H
+#define __ANGEL_SOCKOPS_H
 
+#include <unistd.h>
 #include <arpa/inet.h>
 
 #include <string_view>
 
 namespace angel {
+
+class socket {
+public:
+    explicit socket(int fd) : sockfd(fd) {  }
+    ~socket() { close(sockfd); };
+    socket(const socket&) = delete;
+    socket& operator=(const socket&) = delete;
+    int fd() const { return sockfd; }
+private:
+    const int sockfd;
+};
+
 namespace sockops {
 
 static inline uint64_t hton64(uint64_t host)
@@ -70,4 +83,4 @@ ssize_t sendfile(int fd, int sockfd, off_t offset, off_t count);
 }
 }
 
-#endif // _ANGEL_SOCKOPS_H
+#endif // __ANGEL_SOCKOPS_H

@@ -1,6 +1,5 @@
 #include <angel/evloop.h>
 
-#include <angel/socket.h>
 #include <angel/sockops.h>
 #include <angel/logger.h>
 #include <angel/config.h>

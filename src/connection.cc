@@ -5,10 +5,6 @@
 #include <stdarg.h>
 
 #include <angel/evloop.h>
-#include <angel/inet_addr.h>
-#include <angel/socket.h>
-#include <angel/channel.h>
-#include <angel/sockops.h>
 #include <angel/logger.h>
 #include <angel/util.h>
 

@@ -10,7 +10,7 @@
 #include <angel/channel.h>
 #include <angel/buffer.h>
 #include <angel/inet_addr.h>
-#include <angel/socket.h>
+#include <angel/sockops.h>
 
 namespace angel {
 
