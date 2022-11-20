@@ -5,7 +5,7 @@
 #include <angel/signal.h>
 
 #include "listener.h"
-#include "evloop_thread_pool.h"
+#include "evloop_group.h"
 
 namespace angel {
 
@@ -30,8 +30,8 @@ inet_addr& server::listen_addr()
 
 evloop *server::get_next_loop()
 {
-    if (io_thread_pool && io_thread_pool->threads() > 0) {
-        return io_thread_pool->get_next_loop();
+    if (io_loop_group && io_loop_group->size() > 0) {
+        return io_loop_group->get_next_loop();
     } else {
         return loop;
     }
@@ -102,9 +102,9 @@ void server::for_each(const for_each_functor_t functor)
 void server::start_io_threads(size_t thread_nums)
 {
     if (thread_nums > 0) {
-        io_thread_pool.reset(new evloop_thread_pool(thread_nums));
+        io_loop_group.reset(new evloop_group(thread_nums));
     } else {
-        io_thread_pool.reset(new evloop_thread_pool());
+        io_loop_group.reset(new evloop_group());
     }
 }
 

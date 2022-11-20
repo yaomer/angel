@@ -13,7 +13,7 @@
 namespace angel {
 
 class listener_t;
-class evloop_thread_pool;
+class evloop_group;
 
 // Server supports several operating modes:
 // 1) [single-threaded reactor]
@@ -80,7 +80,7 @@ private:
 
     evloop *loop;
     std::unique_ptr<listener_t> listener;
-    std::unique_ptr<evloop_thread_pool> io_thread_pool;
+    std::unique_ptr<evloop_group> io_loop_group;
     std::unique_ptr<thread_pool> task_thread_pool;
     std::unordered_map<size_t, connection_ptr> connection_map;
     size_t conn_id;
