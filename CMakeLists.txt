@@ -145,3 +145,5 @@ add_sample(chat-server chat-server.cc)
 add_sample(fib-server fib-server.cc)
 
 add_sample(signal-test signal-test.cc)
+
+add_sample(sendmail sendmail.cc)
