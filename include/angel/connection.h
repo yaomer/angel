@@ -53,6 +53,7 @@ public:
     evloop *get_loop() { return loop; }
     inet_addr& get_local_addr() { return local_addr; }
     inet_addr& get_peer_addr() { return peer_addr; }
+    bool is_reset_by_peer() { return reset_by_peer; }
     bool is_connected() { return conn_state == state::connected; }
     bool is_closing() { return conn_state == state::closing; }
     bool is_closed() { return conn_state == state::closed; }
@@ -145,6 +146,7 @@ private:
     // Id of the next send task to be processed.
     size_t next_id;
 
+    std::atomic_bool reset_by_peer;
     connection_handler_t connection_handler;
     message_handler_t message_handler;
     close_handler_t close_handler;

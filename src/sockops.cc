@@ -1,15 +1,20 @@
 #include <angel/sockops.h>
 
-#include <unistd.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
-#include <fcntl.h>
 #include <string.h>
 
 #include <angel/util.h>
 #include <angel/logger.h>
 
 namespace angel {
+
+socket::~socket()
+{
+    log_debug("~socket(): close(fd=%d)", sockfd);
+    close(sockfd);
+};
 
 using namespace util;
 

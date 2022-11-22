@@ -11,9 +11,11 @@ namespace angel {
 class socket {
 public:
     explicit socket(int fd) : sockfd(fd) {  }
-    ~socket() { close(sockfd); };
+    ~socket();
+
     socket(const socket&) = delete;
     socket& operator=(const socket&) = delete;
+
     int fd() const { return sockfd; }
 private:
     const int sockfd;

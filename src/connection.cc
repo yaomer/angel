@@ -58,6 +58,7 @@ void connection::handle_read()
             input_buf.retrieve_all();
         }
     } else if (n == 0) {
+        reset_by_peer = true;
         force_close_connection();
     } else {
         handle_error();

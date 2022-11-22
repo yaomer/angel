@@ -14,7 +14,6 @@ channel::channel(evloop *loop)
 
 channel::~channel()
 {
-    log_debug("~channel(fd=%d)", evfd);
 }
 
 void channel::enable_read()
