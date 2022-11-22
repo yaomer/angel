@@ -7,20 +7,17 @@
 #include <angel/ssl_client.h>
 #endif
 
-static int num_requests = 10000;
+static int num_requests = 20000;
 static int concurrency  = 1;
-static int max_timeout  = 30 * 1000;
+static int timelimit    = 30 * 1000;
+static int timeout      = 15 * 1000;
 
-static int send_requests = 0, complete_requests = 0;
-static size_t total_bytes = 0;
-static long long total_latency = 0;
-
-static bool successful = true;
+static int send_requests = 0, complete_requests = 0, failures = 0;
+static long long total_bytes = 0, total_latency = 0;
 
 struct request_info {
     std::unique_ptr<angel::client> cli;
     long long start = angel::util::get_cur_time_us(); // request start time
-    size_t len = 0; // response content length
     int idx = 0;
 };
 
@@ -36,13 +33,21 @@ struct bench_http {
 private:
     void launch_request();
     void close_handler(request_info *ri);
-    void check_timeout();
 };
 
 void bench_http::launch_request()
 {
-    auto ri = std::make_unique<request_info>();
+    auto *ri = new request_info();
+
     ri->idx = send_requests++;
+    requests.emplace(ri->idx, ri);
+
+    loop->run_after(timeout, [this, idx = ri->idx]{
+            if (!requests.count(idx)) return;
+            requests.erase(idx);
+            failures++;
+            });
+
 #if defined (ANGEL_USE_OPENSSL)
     if (scheme == "https") {
         ri->cli.reset(new angel::ssl_client(loop, angel::inet_addr(ip, port)));
@@ -55,23 +60,22 @@ void bench_http::launch_request()
     ri->cli->set_connection_handler([this](const angel::connection_ptr& conn){
             conn->format_send("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n", path.c_str(), host.c_str());
             });
-    ri->cli->set_message_handler([ri = ri.get()](const angel::connection_ptr& conn, angel::buffer& buf){
+    ri->cli->set_message_handler([](const angel::connection_ptr& conn, angel::buffer& buf){
             // We don't parse http response.
-            ri->len += buf.readable();
+            total_bytes += buf.readable();
             buf.retrieve_all();
             });
-    ri->cli->set_close_handler([this, ri = ri.get()](const angel::connection_ptr& conn){
+    ri->cli->set_close_handler([this, ri](const angel::connection_ptr& conn){
+            if (!conn->is_reset_by_peer()) return;
             this->close_handler(ri);
             });
     ri->cli->start();
-    requests.emplace(ri->idx, std::move(ri));
 }
 
 void bench_http::close_handler(request_info *ri)
 {
-    total_bytes += ri->len;
-    total_latency += angel::util::get_cur_time_us() - ri->start;
     complete_requests++;
+    total_latency += angel::util::get_cur_time_us() - ri->start;
     if ((num_requests / 10) && complete_requests % (num_requests / 10) == 0)
         printf("Completed %d requests\n", complete_requests);
     loop->queue_in_loop([this, idx = ri->idx]{ this->requests.erase(idx); });
@@ -79,19 +83,6 @@ void bench_http::close_handler(request_info *ri)
         loop->quit();
     if (send_requests < num_requests)
         launch_request();
-}
-
-void bench_http::check_timeout()
-{
-    auto now = angel::util::get_cur_time_us();
-    for (auto& [idx, request] : requests) {
-        if (now - request->start >= max_timeout * 1000) {
-            fprintf(stderr, "Benchmarking timed out.\n");
-            successful = false;
-            loop->quit();
-            break;
-        }
-    }
 }
 
 bool bench_http::parse_url(std::string_view url)
@@ -140,7 +131,10 @@ bool bench_http::resolve()
 
 long bench_http::bench()
 {
-    loop->run_every(300, [this]{ this->check_timeout(); });
+    loop->run_after(timelimit, [this]{
+            fprintf(stderr, "### Benchmarking timed out.\n");
+            loop->quit();
+            });
 
     auto t1 = angel::util::get_cur_time_ms();
 
@@ -160,7 +154,8 @@ static void usage()
             "Usage: ./bench_http [options] http[s]://hostname[:port]/path\n"
             "    -c <concurrency> Number of multiple requests to perform at a time.\n"
             "    -n <requests>    Number of requests to perform for the benchmarking session.\n"
-            "    -t <timeout>     Wait for each response for <secs>. Default is 30 seconds.\n"
+            "    -t <timelimit>   Seconds to max. to spend on benchmarking. Default is 30 secs.\n"
+            "    -s <timeout>     Seconds to max. wait for each response. Default is 15 secs.\n"
            );
     exit(1);
 }
@@ -168,7 +163,7 @@ static void usage()
 int main(int argc, char *argv[])
 {
     int c;
-    while ((c = getopt(argc, argv, "c:kn:t:")) != -1) {
+    while ((c = getopt(argc, argv, "c:n:t:s:")) != -1) {
         switch (c) {
         case 'c':
             concurrency = atoi(optarg);
@@ -177,11 +172,14 @@ int main(int argc, char *argv[])
             num_requests = atoi(optarg);
             break;
         case 't':
-            max_timeout = atoi(optarg) * 1000;
+            timelimit = atoi(optarg) * 1000;
+            break;
+        case 's':
+            timeout = atoi(optarg) * 1000;
             break;
         default:
             fprintf(stderr, "Illegal argument \"%c\"\n", c);
-            exit(1);
+            usage();
         }
     }
     if (optind != argc - 1) {
@@ -203,16 +201,16 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    printf("Benchmarking...\n");
+
     auto total_cost = bench.bench();
 
     auto total_secs = (double)total_cost / 1000;
     auto total_latency_ms = (double)total_latency / 1000;
 
-    printf("Total of %zu bytes received.\n", total_bytes);
-    printf("Total of %d requests completed in %.3f secs.\n", complete_requests, total_secs);
-    if (successful) {
-        printf("Throughput: %.2f [Kbytes/sec]\n", total_bytes / 1024 / total_secs);
-        printf("Requests per second: %.2f [#/sec]\n", complete_requests / total_secs);
-        printf("Latency per request: %.2f [ms]\n", total_latency_ms / complete_requests);
-    }
+    printf("Total of %lld bytes received.\n", total_bytes);
+    printf("Total of %d requests completed, %d failures in %.3f secs.\n", complete_requests, failures, total_secs);
+    printf("Throughput: %lld (bytes/sec)\n", (long long)(total_bytes / total_secs));
+    printf("Requests per second: %.2f (#/sec)\n", complete_requests / total_secs);
+    printf("Latency per request: %.2f (ms)\n", total_latency_ms / complete_requests);
 }
