@@ -2,7 +2,6 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <assert.h>
 
 #include <angel/sockops.h>
 #include <angel/util.h>
@@ -43,7 +42,7 @@ static void padding(std::string& buf, const char *endptr, size_t size)
     uint64_t encoded_bits = sockops::hton64(size * 8);
     buf.append(reinterpret_cast<const char*>(&encoded_bits), 8);
 
-    assert(buf.size() % ChunkBytes == 0);
+    Assert(buf.size() % ChunkBytes == 0);
 }
 
 // Rotate Left Shift
@@ -246,7 +245,7 @@ void sha1::final_cal()
 void sha1::update(std::string_view data)
 {
     if (!buf.empty()) {
-        assert(buf.size() < ChunkBytes);
+        Assert(buf.size() < ChunkBytes);
         size_t len = std::min(ChunkBytes - buf.size(), data.size());
         buf.append(data.data(), len);
         data.remove_prefix(len);

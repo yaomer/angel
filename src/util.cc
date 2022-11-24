@@ -15,6 +15,12 @@
 namespace angel {
 namespace util {
 
+void __Assert(const char *e, const char *file, int line, const char *func)
+{
+    fprintf(stderr, "Assertion failed: `%s` at %s() - %s:%d\n", e, func, file, line);
+    log_fatal("Assertion failed: `%s` at %s() - %s:%d", e, func, file, line);
+}
+
 const char *strerr(int err)
 {
     static thread_local char errno_buf[256];
@@ -63,7 +69,7 @@ void set_thread_affinity(pthread_t tid, int cpu_number)
 #if defined (__APPLE__)
     log_warn("OS X Not support to set thread affinity");
 #elif defined (__linux__)
-    assert(cpu_number < get_ncpus());
+    Assert(cpu_number < get_ncpus());
     cpu_set_t mask;
     CPU_ZERO(&mask);
     CPU_SET(cpu_number, &mask);
@@ -102,7 +108,7 @@ ConfigParamlist parse_conf(const char *pathname)
             s = std::find_if_not(s, es, isspace);
             if (s == es || s[0] == '#') break;
             const char *p = std::find_if(s, es, isspace);
-            assert(p != es);
+            Assert(p != es);
             param.emplace_back(s, p);
             s = p + 1;
         } while (true);

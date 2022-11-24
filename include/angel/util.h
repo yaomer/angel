@@ -1,5 +1,5 @@
-#ifndef _ANGEL_UTIL_H
-#define _ANGEL_UTIL_H
+#ifndef __ANGEL_UTIL_H
+#define __ANGEL_UTIL_H
 
 #include <vector>
 #include <sstream>
@@ -214,9 +214,14 @@ struct format_result {
 };
 format_result format(const char *fmt, va_list ap);
 
+void __Assert(const char *e, const char *file, int line, const char *func);
+
 #define UNUSED(x) ((void)(x))
 
 }
 }
 
-#endif // _ANGEL_UTIL_H
+#define Assert(e)  \
+    ((void) ((e) ? ((void)0) : angel::util::__Assert(#e, __FILE__, __LINE__, __func__)))
+
+#endif // __ANGEL_UTIL_H

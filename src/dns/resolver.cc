@@ -164,7 +164,7 @@ void query_context::pack()
     buf.append(name);
     buf.append(charptr(&q_type), sizeof(q_type));
     buf.append(charptr(&q_class), sizeof(q_class));
-    assert(buf.size() <= max_udp_size);
+    Assert(buf.size() <= max_udp_size);
 }
 
 static const char *resolv_conf = "/etc/resolv.conf";

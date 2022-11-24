@@ -185,7 +185,7 @@ void signaler_t::cancel_signal_in_loop(size_t id)
     id_map.erase(it);
 
     auto iter = sig_map.find(signo);
-    assert(iter != sig_map.end());
+    Assert(iter != sig_map.end());
     auto& sl = iter->second;
     auto curr = sl.cbegin();
     auto prev = sl.cbefore_begin();
@@ -212,7 +212,7 @@ void signaler_t::sig_catch()
     for (int i = 0; i < n; i++) {
         int signo = buf[i];
         auto it = sig_map.find(signo);
-        assert(it != sig_map.end());
+        Assert(it != sig_map.end());
         log_info("Sig[%d] is triggered: %s", signo, strsignal(signo));
         for (auto& event : it->second) {
             event.sig_cb();

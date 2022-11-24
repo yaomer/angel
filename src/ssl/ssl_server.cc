@@ -1,5 +1,6 @@
 #include <angel/ssl_server.h>
 
+#include <angel/util.h>
 #include <angel/logger.h>
 
 #include "ssl_connection.h"
@@ -68,7 +69,7 @@ connection_ptr ssl_server::create_connection(int fd)
     size_t id = conn_id++;
     evloop *io_loop = get_next_loop();
     auto it = shmap.find(fd);
-    assert(it != shmap.end());
+    Assert(it != shmap.end());
     auto *sh = it->second.release();
     shmap.erase(it);
     return std::make_shared<ssl_connection>(id, io_loop, fd, sh);

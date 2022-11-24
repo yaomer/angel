@@ -66,7 +66,7 @@ int select_base_t::wait(evloop *loop, int64_t timeout)
     // nfds cannot be greater than FD_SETSIZE(usually 1024).
     //
     int nfds = maxfd + 1;
-    assert(nfds >= 0);
+    Assert(nfds >= 0);
     int nevents = select(nfds, &_rdset, &_wrset, nullptr,
             timeout >= 0 ? &tv : nullptr);
     int retval = nevents;
