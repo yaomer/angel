@@ -6,8 +6,9 @@
 #include <angel/resolver.h>
 
 #include <iostream>
-#include <fstream>
 #include <chrono>
+#include <random>
+#include <numeric>
 
 #include <angel/sockops.h>
 #include <angel/util.h>
@@ -86,23 +87,6 @@ static std::string to_ip(const char*& p)
     return sockops::to_host_ip(&addr);
 }
 
-struct query_context : public std::enable_shared_from_this<query_context> {
-    uint16_t id;
-    std::string name;
-    uint16_t q_type;
-    uint16_t q_class;
-    std::string buf;
-    std::promise<result> recv_promise;
-    size_t retransmit_timer_id;
-    ExponentialBackoff backoff;
-    resolver *resolver;
-
-    void pack();
-    void set_retransmit_timer();
-    void send_query();
-    void notify(result&& res);
-};
-
 //  Header
 //    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
 //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
@@ -137,8 +121,16 @@ struct query_context : public std::enable_shared_from_this<query_context> {
 //           5   refused
 //           6-15 reserved
 
-void query_context::pack()
-{
+struct query_context {
+    uint16_t id; // dns transaction id
+    std::string name;
+    uint16_t q_type;
+    uint16_t q_class;
+    std::string buf;
+    std::promise<result> res_promise;
+    size_t retransmit_timer_id;
+    ExponentialBackoff backoff;
+
     struct dns_header {
         uint16_t id;
         uint16_t flags;
@@ -148,24 +140,27 @@ void query_context::pack()
         uint16_t additional;
     } hdr;
 
-    hdr.id          = htons(id);
-    hdr.flags       = 0x0100;
-    hdr.query       = htons(1);
-    hdr.answer      = 0;
-    hdr.authority   = 0;
-    hdr.additional  = 0;
+    void pack()
+    {
+        hdr.id          = htons(id);
+        hdr.flags       = 0x0100;
+        hdr.query       = htons(1);
+        hdr.answer      = 0;
+        hdr.authority   = 0;
+        hdr.additional  = 0;
 
-    buf.resize(sizeof(hdr));
-    memcpy(&buf[0], &hdr, sizeof(hdr));
+        buf.resize(sizeof(hdr));
+        memcpy(&buf[0], &hdr, sizeof(hdr));
 
-    q_type  = htons(q_type);
-    q_class = htons(q_class);
+        q_type  = htons(q_type);
+        q_class = htons(q_class);
 
-    buf.append(name);
-    buf.append(charptr(&q_type), sizeof(q_type));
-    buf.append(charptr(&q_class), sizeof(q_class));
-    Assert(buf.size() <= max_udp_size);
-}
+        buf.append(name);
+        buf.append(charptr(&q_type), sizeof(q_type));
+        buf.append(charptr(&q_class), sizeof(q_class));
+        Assert(buf.size() <= max_udp_size);
+    }
+};
 
 static const char *resolv_conf = "/etc/resolv.conf";
 static const int name_server_port = 53;
@@ -184,26 +179,23 @@ static std::string parse_resolv_conf()
     return "";
 }
 
-typedef std::lock_guard<std::mutex> lock_t;
-
 resolver::resolver()
 {
     auto name_server_addr = parse_resolv_conf();
     if (name_server_addr == "") {
-        log_fatal("(resolver) can't find a name server address");
+        log_fatal("(resolver) Could not find a name server address");
     }
     log_info("(resolver) found a name server (%s)", name_server_addr.c_str());
+
+    loop = receiver.get_loop();
 
     client_options ops;
     ops.protocol = "udp";
     ops.is_reconnect = true;
-    cli.reset(new client(receiver.get_loop(), inet_addr(name_server_addr, name_server_port), ops));
+    cli.reset(new client(loop, inet_addr(name_server_addr, name_server_port), ops));
     cli->set_connection_handler([this](const connection_ptr& conn){
-            lock_t lk(delay_task_queue_mutex);
-            while (!delay_task_queue.empty()) {
-                delay_task_queue.front()();
-                delay_task_queue.pop();
-            }
+            for (auto& task : delay_task_queue) task();
+            delay_task_queue.clear();
             });
     cli->set_message_handler([this](const connection_ptr& conn, buffer& buf){
             this->unpack(buf);
@@ -211,13 +203,72 @@ resolver::resolver()
             });
 
     cache.reset(new class cache());
-    receiver.get_loop()->run_every(1000, [this]{ this->cache->evict(); });
+    loop->run_every(1000, [this]{ this->cache->evict(); });
 
     cli->start();
 }
 
 resolver::~resolver()
 {
+}
+
+uint16_t resolver::generate_transaction_id()
+{
+    std::random_device r;
+    std::mt19937 g(r());
+    std::uniform_int_distribution<uint16_t> u;
+
+    uint16_t id;
+    while (true) {
+        id = u(g);
+        // There is almost no conflict.
+        std::lock_guard<std::mutex> lk(id_set_mtx);
+        auto res = id_set.emplace(id);
+        if (res.second) break;
+    }
+    return id;
+}
+
+void resolver::send_query(query_context *qc)
+{
+    cli->conn()->send(qc->buf);
+    log_debug("(resolver) send query(id=%zu)", qc->id);
+    set_retransmit_timer(qc);
+}
+
+void resolver::set_retransmit_timer(query_context *qc)
+{
+    int after = qc->backoff.next_back_off();
+    if (after == 0) {
+        result res;
+        rr_base *rr = new rr_base();
+        rr->type = TIMEOUT;
+        res.emplace_back(rr);
+        notify(qc, std::move(res));
+        return;
+    }
+    qc->retransmit_timer_id = loop->run_after(after, [this, id = qc->id]{
+            retransmit(id);
+            });
+}
+
+void resolver::retransmit(uint16_t id)
+{
+    auto it = query_map.find(id);
+    if (it == query_map.end()) return;
+    cli->conn()->send(it->second->buf);
+    log_debug("(resolver) retransmit query(id=%zu)", id);
+    set_retransmit_timer(it->second.get());
+}
+
+void resolver::notify(query_context *qc, result&& res)
+{
+    Assert(loop->is_io_loop_thread());
+    loop->cancel_timer(qc->retransmit_timer_id);
+    qc->res_promise.set_value(std::move(res));
+    query_map.erase(qc->id);
+    std::lock_guard<std::mutex> lk(id_set_mtx);
+    id_set.erase(qc->id);
 }
 
 enum {
@@ -248,68 +299,68 @@ static void parse_answer_rrs(result& res, const char*& p, const char *start, int
         rr.len      = ntohs(u16(p));
         switch (rr.type) {
         case A:
-            {
-                a_rdata *a = new a_rdata(rr);
-                a->addr = to_ip(p);
-                res.emplace_back(dynamic_cast<rr_base*>(a));
-            }
+        {
+            a_rdata *a = new a_rdata(rr);
+            a->addr = to_ip(p);
+            res.emplace_back(dynamic_cast<rr_base*>(a));
             break;
+        }
         case NS:
-            {
-                ns_rdata *ns = new ns_rdata(rr);
-                ns->ns_name = parse_dns_name(start, p);
-                res.emplace_back(dynamic_cast<rr_base*>(ns));
-            }
+        {
+            ns_rdata *ns = new ns_rdata(rr);
+            ns->ns_name = parse_dns_name(start, p);
+            res.emplace_back(dynamic_cast<rr_base*>(ns));
             break;
+        }
         case CNAME:
-            {
-                cname_rdata *cname = new cname_rdata(rr);
-                cname->cname = parse_dns_name(start, p);
-                res.emplace_back(dynamic_cast<rr_base*>(cname));
-            }
+        {
+            cname_rdata *cname = new cname_rdata(rr);
+            cname->cname = parse_dns_name(start, p);
+            res.emplace_back(dynamic_cast<rr_base*>(cname));
             break;
+        }
         case MX:
-            {
-                mx_rdata *mx = new mx_rdata(rr);
-                mx->preference = ntohs(u16(p));
-                mx->exchange_name = parse_dns_name(start, p);
-                res.emplace_back(dynamic_cast<rr_base*>(mx));
-            }
+        {
+            mx_rdata *mx = new mx_rdata(rr);
+            mx->preference = ntohs(u16(p));
+            mx->exchange_name = parse_dns_name(start, p);
+            res.emplace_back(dynamic_cast<rr_base*>(mx));
             break;
+        }
         case TXT:
-            {
-                txt_rdata *txt = new txt_rdata(rr);
-                uint8_t txt_len = *p++;
-                txt->str.assign(p, p + txt_len);
-                p += txt_len;
-                res.emplace_back(dynamic_cast<rr_base*>(txt));
-            }
+        {
+            txt_rdata *txt = new txt_rdata(rr);
+            uint8_t txt_len = *p++;
+            txt->str.assign(p, p + txt_len);
+            p += txt_len;
+            res.emplace_back(dynamic_cast<rr_base*>(txt));
             break;
+        }
         case SOA:
-            {
-                soa_rdata *soa = new soa_rdata(rr);
-                soa->mname     = parse_dns_name(start, p);
-                soa->rname     = parse_dns_name(start, p);
-                soa->serial    = ntohl(u32(p));
-                soa->refresh   = ntohl(u32(p));
-                soa->retry     = ntohl(u32(p));
-                soa->expire    = ntohl(u32(p));
-                soa->minimum   = ntohl(u32(p));
-                res.emplace_back(dynamic_cast<rr_base*>(soa));
-            }
+        {
+            soa_rdata *soa = new soa_rdata(rr);
+            soa->mname     = parse_dns_name(start, p);
+            soa->rname     = parse_dns_name(start, p);
+            soa->serial    = ntohl(u32(p));
+            soa->refresh   = ntohl(u32(p));
+            soa->retry     = ntohl(u32(p));
+            soa->expire    = ntohl(u32(p));
+            soa->minimum   = ntohl(u32(p));
+            res.emplace_back(dynamic_cast<rr_base*>(soa));
             break;
+        }
         case PTR:
-            {
-                ptr_rdata *ptr = new ptr_rdata(rr);
-                ptr->ptr_name = parse_dns_name(start, p);
-                res.emplace_back(dynamic_cast<rr_base*>(ptr));
-            }
+        {
+            ptr_rdata *ptr = new ptr_rdata(rr);
+            ptr->ptr_name = parse_dns_name(start, p);
+            res.emplace_back(dynamic_cast<rr_base*>(ptr));
             break;
+        }
         }
     }
 }
 
-static bool is_same_name(std::string_view name, const char*& p)
+static bool match_name(std::string_view name, const char*& p)
 {
     for (auto c : name) {
         if (c != *p++) return false;
@@ -317,34 +368,35 @@ static bool is_same_name(std::string_view name, const char*& p)
     return true;
 }
 
+// UDP will receive a complete response once.
 void resolver::unpack(buffer& res_buf)
 {
     const char *p = res_buf.peek();
 
-    uint16_t id = ntohs(u16(p));
-    bool qr = p[0] >> 7;
-    bool ra = p[1] >> 7;
+    uint16_t id   = ntohs(u16(p));
+    uint8_t qr    = p[0] >> 7;
+    uint8_t ra    = p[1] >> 7;
     uint8_t rcode = p[1] & 0x0f;
     p += 2;
 
-    if (!qr) return;
-    (void)(ra);
+    if (!qr) return; // Not a response.
+    // Almost all DNS servers support recursive queries.
+    Assert(ra);
 
-    QueryMap::iterator it;
-    {
-        lock_t lk(query_map_mutex);
-        it = query_map.find(id);
-        if (it == query_map.end()) return;
-    }
-    log_debug("(resolver) recv query(id=%zu)", it->second->id);
+    auto it = query_map.find(id);
+    // Response mismatch.
+    if (it == query_map.end()) return;
+
+    auto& qc = it->second;
+    log_debug("(resolver) recv query(id=%zu)", qc->id);
 
     result res;
     if (rcode != NoError) {
         rr_base *rr = new rr_base();
-        rr->type = ERROR;
-        rr->name = rcode_map.at(rcode);
+        rr->type    = ERROR;
+        rr->name    = rcode_map.at(rcode);
         res.emplace_back(rr);
-        it->second->notify(std::move(res));
+        notify(qc.get(), std::move(res));
         return;
     }
 
@@ -353,92 +405,51 @@ void resolver::unpack(buffer& res_buf)
     uint16_t authority  = ntohs(u16(p));
     uint16_t additional = ntohs(u16(p));
 
-    (void)(query);
-    (void)(authority);
-    (void)(additional);
+    UNUSED(query);
+    UNUSED(authority);
+    UNUSED(additional);
 
-    if (!is_same_name(it->second->name, p)) return;
-    if (it->second->q_type != u16(p)) return;
-    if (it->second->q_class != u16(p)) return;
+    if (!match_name(qc->name, p)) return;
+    if (qc->q_type != u16(p)) return;
+    if (qc->q_class != u16(p)) return;
 
     parse_answer_rrs(res, p, res_buf.peek(), answer);
 
-    it->second->notify(std::move(res));
-}
-
-void query_context::notify(result&& res)
-{
-    if (retransmit_timer_id > 0) {
-        resolver->receiver.get_loop()->cancel_timer(retransmit_timer_id);
-    }
-    recv_promise.set_value(std::move(res));
-    {
-        lock_t lk(resolver->query_map_mutex);
-        resolver->query_map.erase(id);
-    }
-}
-
-void query_context::set_retransmit_timer()
-{
-    int after = backoff.next_back_off();
-    if (after == 0) {
-        result res;
-        rr_base *rr = new rr_base();
-        rr->type = TIMEOUT;
-        res.emplace_back(rr);
-        notify(std::move(res));
-        return;
-    }
-    retransmit_timer_id = resolver->receiver.get_loop()->run_after(after, [qc = shared_from_this()](){
-            auto r = qc->resolver;
-            bool need_retransmit;
-            {
-                lock_t lk(r->query_map_mutex);
-                need_retransmit = r->query_map.count(qc->id);
-            }
-            if (need_retransmit) {
-                r->cli->conn()->send(qc->buf);
-                log_debug("(resolver) retransmit query(id=%zu)", qc->id);
-                qc->set_retransmit_timer();
-            }
-            });
-}
-
-void query_context::send_query()
-{
-    resolver->cli->conn()->send(buf);
-    log_debug("(resolver) send query(id=%zu)", id);
-    set_retransmit_timer();
+    notify(qc.get(), std::move(res));
 }
 
 result_future resolver::query(std::string_view name, uint16_t q_type, uint16_t q_class)
 {
     auto *qc = new query_context();
-    qc->id = id++ % 65536;
-    qc->name = name;
-    qc->q_type = q_type;
+    qc->id      = generate_transaction_id();
+    qc->name    = name;
+    qc->q_type  = q_type;
     qc->q_class = q_class;
     // 1 + 2 + 4 + 8 + 16 == 31(s)
     qc->backoff = ExponentialBackoff(1000, 2, 5);
-    qc->resolver = this;
     qc->pack();
-    auto f = qc->recv_promise.get_future();
-    {
-        lock_t lk(query_map_mutex);
-        query_map.emplace(qc->id, qc);
-    }
-    if (!cli->is_connected()) {
-        std::shared_ptr<query_context> sptr(qc);
-        std::weak_ptr<query_context> wptr = sptr;
-        std::packaged_task<void()> task([wptr]() { if (!wptr.expired()) wptr.lock()->send_query(); });
-        {
-            lock_t lk(delay_task_queue_mutex);
-            delay_task_queue.emplace(std::move(task));
-        }
-    } else {
-        qc->send_query();
-    }
+
+    auto f = qc->res_promise.get_future();
+
+    loop->queue_in_loop([this, qc]{ query(qc); });
+
     return f;
+}
+
+void resolver::query(query_context *qc)
+{
+    auto res = query_map.emplace(qc->id, qc);
+    Assert(res.second);
+
+    if (!cli->is_connected()) {
+        delay_task_queue.emplace_back([this, id = qc->id]{
+                auto it = query_map.find(id);
+                if (it != query_map.end())
+                    send_query(it->second.get());
+                });
+    } else {
+        send_query(qc);
+    }
 }
 
 #define CLASS_IN 1 // the internet

@@ -21,9 +21,8 @@ class cache {
 public:
     cache_item *get(std::string_view name)
     {
-        mtx.lock();
+        std::lock_guard<std::mutex> lk(mtx);
         auto it = cache_map.find(std::string(name));
-        mtx.unlock();
         if (it != cache_map.end()) return &it->second;
         return nullptr;
     }
