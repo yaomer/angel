@@ -2,11 +2,10 @@
 #define __ANGEL_DNS_RESOLVER_H
 
 #include <vector>
-#include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <future>
-#include <memory>
-#include <variant>
+#include <mutex>
 
 #include <angel/evloop_thread.h>
 #include <angel/client.h>
@@ -141,23 +140,26 @@ private:
     resolver();
     ~resolver();
 
+    uint16_t generate_transaction_id();
+    void send_query(query_context *qc);
+    void set_retransmit_timer(query_context *qc);
+    void retransmit(uint16_t id);
+    void notify(query_context *qc, result res);
+
     void unpack(angel::buffer& res_buf);
     result_future query(std::string_view name, uint16_t q_type, uint16_t q_class);
+    void query(query_context *qc);
 
     // The background thread runs an `evloop` to receive the response
     angel::evloop_thread receiver;
+    angel::evloop *loop; // receiver.get_loop()
     std::unique_ptr<angel::client> cli;
-    std::atomic_size_t id = 1;
-    typedef std::unordered_map<uint16_t, std::shared_ptr<query_context>> QueryMap;
-    typedef std::queue<std::packaged_task<void()>> DelayTaskQueue;
-    QueryMap query_map;
-    std::mutex query_map_mutex;
-    DelayTaskQueue delay_task_queue;
-    std::mutex delay_task_queue_mutex;
+    std::unordered_map<uint16_t, std::unique_ptr<query_context>> query_map;
+    std::vector<std::function<void()>> delay_task_queue;
+    std::unordered_set<uint16_t> id_set;
+    std::mutex id_set_mtx;
     // Only Cache A record
     std::unique_ptr<cache> cache;
-
-    friend struct query_context;
 };
 
 }

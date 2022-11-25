@@ -261,7 +261,7 @@ void resolver::retransmit(uint16_t id)
     set_retransmit_timer(it->second.get());
 }
 
-void resolver::notify(query_context *qc, result&& res)
+void resolver::notify(query_context *qc, result res)
 {
     Assert(loop->is_io_loop_thread());
     loop->cancel_timer(qc->retransmit_timer_id);
