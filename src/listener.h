@@ -1,12 +1,10 @@
-#ifndef _ANGEL_LISTENER_H
-#define _ANGEL_LISTENER_H
+#ifndef __ANGEL_LISTENER_H
+#define __ANGEL_LISTENER_H
 
 #include <memory>
 #include <functional>
 
 #include <angel/inet_addr.h>
-#include <angel/sockops.h>
-#include <angel/buffer.h>
 #include <angel/channel.h>
 
 namespace angel {
@@ -21,27 +19,27 @@ public:
     listener_t(const listener_t&) = delete;
     listener_t& operator=(const listener_t&) = delete;
 
+    const inet_addr& addr() const { return listen_addr; }
     void listen();
-    int fd() const { return listen_socket.fd(); }
-    inet_addr& addr() { return listen_addr; }
 
-    // Set options on listen socket
+    // Set options on listen socket fd.
     bool nodelay   = false;
     bool keepalive = true;
     int keepalive_idle   = 0; // 0 will be ignored
     int keepalive_intvl  = 0; // 0 will be ignored
     int keepalive_probes = 0; // 0 will be ignored
-    typedef std::function<void(int)> new_connection_handler_t;
-    new_connection_handler_t new_connection_handler;
+
+    // Called (in loop thread) after accept(2) returns successfully.
+    // The accepted fd will be passed to onaccept(fd).
+    std::function<void(int)> onaccept;
 private:
     void handle_accept();
 
     evloop *loop;
-    std::shared_ptr<channel> listen_channel;
-    socket listen_socket;
-    inet_addr listen_addr;
+    channel *listen_channel;
+    const inet_addr listen_addr;
     int idle_fd;
 };
 }
 
-#endif // _ANGEL_LISTENER_H
+#endif // __ANGEL_LISTENER_H

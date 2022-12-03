@@ -72,13 +72,11 @@ int select_base_t::wait(evloop *loop, int64_t timeout)
     int retval = nevents;
     if (nevents > 0) {
         for (auto& fd : fds) {
-            int revs = 0;
-            if (FD_ISSET(fd, &_rdset)) revs |= Read;
-            if (FD_ISSET(fd, &_wrset)) revs |= Write;
             auto chl = loop->search_channel(fd);
-            chl->set_trigger_events(revs);
+            if (FD_ISSET(fd, &_rdset)) chl->trigger |= Read;
+            if (FD_ISSET(fd, &_wrset)) chl->trigger |= Write;
             loop->active_channels.emplace_back(chl);
-            if (revs && --nevents == 0)
+            if (chl->trigger && --nevents == 0)
                 break;
         }
     } else if (nevents < 0) {

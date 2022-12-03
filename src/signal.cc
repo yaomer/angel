@@ -66,6 +66,7 @@ private:
     std::unordered_map<int, std::forward_list<signaler_event>> sig_map;
     std::unordered_map<size_t, int> id_map;
     std::atomic_size_t sig_id;
+    channel *sig_channel;
     int sig_pair[2];
 };
 
@@ -75,10 +76,9 @@ signaler_t::signaler_t()
         log_fatal("Only have one signaler instance in one process");
     loop = sig_thread.get_loop();
     sockops::socketpair(sig_pair);
-    auto chl = std::make_shared<channel>(loop);
-    chl->set_fd(sig_pair[0]);
-    chl->set_read_handler([this]{ this->sig_catch(); });
-    loop->add_channel(chl);
+    sig_channel = new channel(loop, sig_pair[0]);
+    sig_channel->set_read_handler([this]{ this->sig_catch(); });
+    sig_channel->add();
     sig_fd = sig_pair[1];
 }
 

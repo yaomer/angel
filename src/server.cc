@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <angel/signal.h>
+#include <angel/util.h>
 
 #include "listener.h"
 #include "evloop_group.h"
@@ -23,7 +24,7 @@ server::~server()
 {
 }
 
-inet_addr& server::listen_addr()
+const inet_addr& server::listen_addr() const
 {
     return listener->addr();
 }
@@ -37,33 +38,40 @@ evloop *server::get_next_loop()
     }
 }
 
-connection_ptr server::create_connection(int fd)
+channel *server::make_channel(int fd)
 {
-    size_t id = conn_id++;
     evloop *io_loop = get_next_loop();
-    return std::make_shared<connection>(id, io_loop, fd);
+    channel *chl = new channel(io_loop, fd);
+    chl->add();
+    return chl;
 }
 
-void server::new_connection(int fd)
+connection_ptr server::create_connection(channel *chl)
 {
-    connection_ptr conn(create_connection(fd));
-    conn->set_connection_handler(connection_handler);
+    return std::make_shared<connection>(conn_id++, chl);
+}
+
+void server::establish(channel *chl)
+{
+    connection_ptr conn(create_connection(chl));
     conn->set_message_handler(message_handler);
     conn->set_high_water_mark_handler(high_water_mark, high_water_mark_handler);
     conn->set_close_handler([this](const connection_ptr& conn){
             this->remove_connection(conn);
             });
     connection_map.emplace(conn->id(), conn);
-    conn->get_loop()->run_in_loop([conn]{ conn->establish(); });
+    if (connection_handler) {
+        conn->get_loop()->run_in_loop([this, conn]{
+                connection_handler(conn);
+                });
+    }
 }
 
 void server::remove_connection(const connection_ptr& conn)
 {
     if (close_handler) close_handler(conn);
-    conn->set_state(connection::state::closed);
-    conn->get_loop()->remove_channel(conn->channel);
-    // We have to remove a connection in the io loop thread
-    // to prevent multiple threads from concurrently modifying the connection_map.
+    // We must remove a connection in the main io loop thread to prevent
+    // multiple threads from concurrently modifying the connection_map.
     loop->run_in_loop([this, id = conn->id()]{
             this->connection_map.erase(id);
             });
@@ -71,12 +79,14 @@ void server::remove_connection(const connection_ptr& conn)
 
 connection_ptr server::get_connection(size_t id)
 {
+    Assert(loop->is_io_loop_thread());
     auto it = connection_map.find(id);
     return (it != connection_map.cend()) ? it->second : nullptr;
 }
 
 size_t server::get_connection_nums() const
 {
+    Assert(loop->is_io_loop_thread());
     return connection_map.size();
 }
 
@@ -170,7 +180,7 @@ void server::start()
 {
     handle_signals();
     log_info("Server (%s) is running", listener->addr().to_host());
-    listener->new_connection_handler = [this](int fd){ this->new_connection(fd); };
+    listener->onaccept = [this](int fd){ this->establish(make_channel(fd)); };
     listener->listen();
 }
 

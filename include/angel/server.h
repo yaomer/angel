@@ -1,5 +1,5 @@
-#ifndef _ANGEL_SERVER_H
-#define _ANGEL_SERVER_H
+#ifndef __ANGEL_SERVER_H
+#define __ANGEL_SERVER_H
 
 #include <unordered_map>
 #include <functional>
@@ -30,7 +30,7 @@ public:
     server(const server&) = delete;
     server& operator=(const server&) = delete;
 
-    inet_addr& listen_addr();
+    const inet_addr& listen_addr() const;
     // must be call in main-thread
     connection_ptr get_connection(size_t id);
     size_t get_connection_nums() const;
@@ -70,10 +70,10 @@ public:
 
     static void daemon();
 private:
-    virtual connection_ptr create_connection(int fd);
-    virtual void new_connection(int fd);
+    channel *make_channel(int fd);
+    virtual connection_ptr create_connection(channel *);
+    virtual void establish(channel *);
     void remove_connection(const connection_ptr& conn);
-    void establish(const connection_ptr& conn);
     evloop* get_next_loop();
     void handle_signals();
     void clean_up();
@@ -95,4 +95,4 @@ private:
 
 }
 
-#endif // _ANGEL_SERVER_H
+#endif // __ANGEL_SERVER_H

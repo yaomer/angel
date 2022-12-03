@@ -24,7 +24,7 @@ kqueue_base_t::kqueue_base_t()
 
 kqueue_base_t::~kqueue_base_t()
 {
-    ::close(kqfd);
+    close(kqfd);
 }
 
 // Adds the events to the kqueue.
@@ -99,8 +99,18 @@ int kqueue_base_t::wait(evloop *loop, int64_t timeout)
 
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
+            // Different from select(2), poll(2) and epoll(2).
+            //
+            // Multiple triggered events on one fd will be returned separately.
+            // So we need to aggregate possible multiple events here.
+            //
+            // Although this will cause the same channel* to be added to active_channels
+            // multiple times, it doesn't matter.
+            //
+            // After each channel is processed, we will clear the channel->trigger,
+            // which guarantees that only one will be processed.
             auto chl = loop->search_channel(evlist[i].ident);
-            chl->set_trigger_events(evret(evlist[i]));
+            chl->trigger |= evret(evlist[i]);
             loop->active_channels.emplace_back(chl);
         }
     } else if (nevents < 0) {

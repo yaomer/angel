@@ -87,7 +87,7 @@ int epoll_base_t::wait(evloop *loop, int64_t timeout)
     if (nevents > 0) {
         for (int i = 0; i < nevents; i++) {
             auto chl = loop->search_channel(evlist[i].data.fd);
-            chl->set_trigger_events(evret(evlist[i].events));
+            chl->trigger = evret(evlist[i].events);
             loop->active_channels.emplace_back(chl);
         }
     } else if (nevents < 0) {

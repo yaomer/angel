@@ -1,5 +1,5 @@
-#ifndef _ANGEL_CONNECTION_H
-#define _ANGEL_CONNECTION_H
+#ifndef __ANGEL_CONNECTION_H
+#define __ANGEL_CONNECTION_H
 
 #include <functional>
 #include <memory>
@@ -10,7 +10,6 @@
 #include <angel/channel.h>
 #include <angel/buffer.h>
 #include <angel/inet_addr.h>
-#include <angel/sockops.h>
 
 namespace angel {
 
@@ -20,6 +19,7 @@ class connection;
 typedef std::shared_ptr<connection> connection_ptr;
 
 // Called after the connection is successfully established.
+// Used by server or client.
 typedef std::function<void(const connection_ptr&)> connection_handler_t;
 // Called after receiving the peer message.
 typedef std::function<void(const connection_ptr&, buffer&)> message_handler_t;
@@ -36,50 +36,53 @@ typedef std::function<void(const connection_ptr&)> send_complete_handler_t;
 //
 class connection : public std::enable_shared_from_this<connection> {
 public:
-    enum class state {
-        connecting,
-        connected,
-        closing,
-        closed,
-    };
-
-    connection(size_t id, evloop *loop, int sockfd);
+    // The chl->fd() must be the fd returned by accept(2) or connect(2),
+    // and the TCP connection has been successfully established.
+    connection(size_t id, class channel *chl);
     virtual ~connection();
 
     connection(const connection&) = delete;
     connection& operator=(const connection&) = delete;
 
     size_t id() const { return conn_id; }
-    evloop *get_loop() { return loop; }
-    inet_addr& get_local_addr() { return local_addr; }
-    inet_addr& get_peer_addr() { return peer_addr; }
-    bool is_reset_by_peer() { return reset_by_peer; }
-    bool is_connected() { return conn_state == state::connected; }
-    bool is_closing() { return conn_state == state::closing; }
-    bool is_closed() { return conn_state == state::closed; }
+    evloop *get_loop() const { return loop; }
+    const inet_addr& get_local_addr() const { return local_addr; }
+    const inet_addr& get_peer_addr() const { return peer_addr; }
+    bool is_reset_by_peer() const { return reset_by_peer; }
+    bool is_connected() const { return state == Connected; }
     // Save the context needed for the connection. (used by user)
     //
     // There should not be a connection_ptr in the context,
     // otherwise it will cause a circular reference.
     //
-    // If necessary,
-    // <connection*> or <weak_ptr<connection>> can be.
+    // If necessary, <connection*> can be.
+    //
+    // (not thread-safe)
+    // Generally set_context() in connection_handler(),
+    // and get_context() in message_handler() and close_handler().
     void set_context(std::any ctx) { context = std::move(ctx); }
     std::any& get_context() { return context; }
-    // Set idle TTL(Time to Live) for connection.
+    // Set idle TTL(Time to Live) for connection. (thread-safe)
     void set_ttl(int64_t ms);
-    // Close connection, there are two kinds of states:
-    // closed: Close the connection immediately.
-    // closing: Some data haven't been sent yet, so close after sending.
-    void close() { handle_close(false); }
+    // (thread-safe)
+    // close(): Async close connection, return immediately.
+    // close_wait(): Waiting until the connection is successfully closed.
+    //
+    // After that, there are the following two states:
+    // Closed: Close the connection immediately.
+    // Closing: Some data haven't been sent yet, so close after sending.
+    void close();
+    void close_wait();
 
-    // thread-safe
+    // (thread-safe)
     void send(std::string_view s);
     void send(const char *s, size_t len);
     void send(const void *v, size_t len);
+    // (thread-safe)
     void format_send(const char *fmt, ...);
-    // send_file() async-sends the specified file by zero copy.
+    // send_file() async-sends the specified file by zero copy. (thread-safe)
     void send_file(int fd, off_t offset, off_t count);
+    // (thread-safe)
     // If you want to close fd after sending the file, you can do that.
     // send_file(), and then
     // set_send_complete_handler([]{ close(fd); })
@@ -90,23 +93,20 @@ public:
     // Generally, they are only invoked by server and client,
     // and can not be called directly, unless you want to override
     // the handler set by server or client.
-    void set_connection_handler(const connection_handler_t handler)
-    { connection_handler = std::move(handler); }
-    void set_message_handler(const message_handler_t handler)
-    { message_handler = std::move(handler); }
-    void set_close_handler(const close_handler_t handler)
-    { close_handler = std::move(handler); }
-    void set_high_water_mark_handler(size_t size, const high_water_mark_handler_t handler)
-    {
-        high_water_mark = size;
-        high_water_mark_handler = std::move(handler);
-    }
+    void set_message_handler(message_handler_t handler);
+    void set_close_handler(close_handler_t handler);
+    void set_high_water_mark_handler(size_t size, high_water_mark_handler_t handler);
 private:
+    enum state_t { Connected, Closing, Closed };
+
+    bool is_closing() const { return state == Closing; }
+    bool is_closed() const { return state == Closed; }
+
     void handle_read();
     void handle_write();
     void handle_close(bool is_forced);
     void handle_error();
-    void force_close_connection() { handle_close(true); }
+    void force_close_connection();
     void send_in_loop(const char *data, size_t len);
     void send_file_in_loop(int fd, off_t offset, off_t count);
     void set_ttl_timer();
@@ -117,15 +117,13 @@ private:
     virtual ssize_t write(const char *data, size_t len);
     virtual ssize_t sendfile(int fd, off_t offset, off_t count);
 
-    size_t conn_id;
     evloop *loop;
-    std::shared_ptr<channel> channel;
-    std::unique_ptr<socket> socket;
-    buffer input_buf;
-    inet_addr local_addr;
-    inet_addr peer_addr;
+    channel *channel;
+    const size_t conn_id;
+    std::atomic<state_t> state;
+    const inet_addr local_addr;
+    const inet_addr peer_addr;
     std::any context;
-    std::atomic<state> conn_state;
     size_t ttl_timer_id;
     int64_t ttl_ms;
 
@@ -134,6 +132,7 @@ private:
         off_t offset;
         off_t count;
     };
+    buffer input_buf;
     buffer output_buf;
     // pair<send_id, output_buf offset len>
     std::queue<std::pair<size_t, size_t>> byte_stream_queue;
@@ -147,22 +146,14 @@ private:
     size_t next_id;
 
     std::atomic_bool reset_by_peer;
-    connection_handler_t connection_handler;
     message_handler_t message_handler;
     close_handler_t close_handler;
     high_water_mark_handler_t high_water_mark_handler;
     size_t high_water_mark;
 
-    // Called by server or client after the connection is successfully established.
-    // Used to register channel into evloop.
-    void establish();
-    void set_state(state state) { conn_state = state; }
-
-    friend class server;
-    friend class client;
     friend class ssl_connection;
 };
 
 }
 
-#endif // _ANGEL_CONNECTION_H
+#endif // __ANGEL_CONNECTION_H

@@ -1,5 +1,5 @@
-#ifndef _ANGEL_CHANNEL_H
-#define _ANGEL_CHANNEL_H
+#ifndef __ANGEL_CHANNEL_H
+#define __ANGEL_CHANNEL_H
 
 #include <functional>
 
@@ -13,54 +13,72 @@ enum event_type {
     Error   = 0x04,
 };
 
+typedef std::function<void()> event_handler_t;
+
+// channel is used to abstract an I/O event
+// and handle different I/O events according to the registered handler.
 //
-// Channel is used to abstract an I/O event
-// and handle different I/O events according to the registered callback.
+// It is the base event in the event loop of the reactor mode.
 //
-// It is the event in the event loop of the reactor mode.
-//
-// When using channels, read events are generally registered by default,
-// and only write events are registered when needed.
-//
-// Channel does not hold fd, that is to say, it will not close(fd) in destructor.
+// The ownership of channel is held by evloop.
 //
 class channel {
 public:
-    typedef std::function<void()> event_handler_t;
-
-    explicit channel(evloop *);
+    // channel holds fd by default,
+    // that is to say, it will close(fd) in destructor.
+    // If you don't want this, set `hold_fd` to false.
+    channel(evloop *loop, int fd, bool hold_fd = true);
     ~channel();
+
     channel(const channel&) = delete;
     channel& operator=(const channel&) = delete;
 
     int fd() const { return evfd; }
-    void set_fd(int fd) { evfd = fd; }
-    void set_trigger_events(int revents) { trigger = revents; }
-    bool is_reading() { return filter & Read; }
-    bool is_writing() { return filter & Write; }
+    evloop *get_loop() const { return loop; }
+
+    // add() and remove() should be used together,
+    // and MUST NOT delete channel* after add().
+
+    // Add channel to the loop.
+    // Read event is enabled by default.
+    // To avoid busy-loop, you should enable Write event when needed.
+    void add();
+    // Disable all associated events on fd, and removed from the loop.
+    void remove();
+
+    // After channel is added to the loop,
+    // the following member functions must be called in loop thread.
+    bool is_reading() const { return filter & Read; }
+    bool is_writing() const { return filter & Write; }
     void enable_read();
-    void disable_read();
     void enable_write();
+    void disable_read();
     void disable_write();
-    void disable_all();
-    void set_read_handler(const event_handler_t handler)
-    { read_handler = std::move(handler); }
-    void set_write_handler(const event_handler_t handler)
-    { write_handler = std::move(handler); }
-    void set_error_handler(const event_handler_t handler)
-    { error_handler = std::move(handler); }
-    void handle_event();
+
+    void set_read_handler(event_handler_t handler);
+    void set_write_handler(event_handler_t handler);
+    void set_error_handler(event_handler_t handler);
 private:
+    void disable_all();
+    void handle_event();
 
     evloop *loop;
-    int evfd;
-    int filter; // the event registered to evfd
-    int trigger; // triggered events returned by the kernel
+    const int evfd;
+    bool hold_fd;
+    int filter;  // Events of interest associated with evfd.
+    int trigger; // Events that have been triggered, returned by I/O Multiplexing.
     event_handler_t read_handler;
     event_handler_t write_handler;
     event_handler_t error_handler;
+
+    // Used to modify trigger.
+    friend class select_base_t;
+    friend class poll_base_t;
+    friend class kqueue_base_t;
+    friend class epoll_base_t;
+    friend class evloop;
 };
 
 }
 
-#endif // _ANGEL_CHANNEL_H
+#endif // __ANGEL_CHANNEL_H

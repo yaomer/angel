@@ -7,20 +7,6 @@
 #include <string_view>
 
 namespace angel {
-
-class socket {
-public:
-    explicit socket(int fd) : sockfd(fd) {  }
-    ~socket();
-
-    socket(const socket&) = delete;
-    socket& operator=(const socket&) = delete;
-
-    int fd() const { return sockfd; }
-private:
-    const int sockfd;
-};
-
 namespace sockops {
 
 static inline uint64_t hton64(uint64_t host)
@@ -42,10 +28,10 @@ static inline uint64_t ntoh64(uint64_t net)
 }
 
 int socket(std::string_view protocol = "tcp");
-void bind(int sockfd, struct sockaddr_in *addr);
+void bind(int sockfd, const struct sockaddr_in *addr);
 void listen(int sockfd);
 int accept(int sockfd);
-int connect(int sockfd, struct sockaddr_in *addr);
+int connect(int sockfd, const struct sockaddr_in *addr);
 
 void set_nonblock(int sockfd);
 void socketpair(int sockfd[]);

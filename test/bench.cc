@@ -49,10 +49,9 @@ int64_t run_once()
     g_loop = &loop;
 
     for (int i = 0; i < num_pipes * 2; i += 2) {
-        auto chl = std::make_shared<angel::channel>(&loop);
-        chl->set_fd(pipes[i]);
+        auto chl = new angel::channel(&loop, pipes[i], false);
         chl->set_read_handler([fd = pipes[i], idx = i]{ read_cb(fd, idx); });
-        loop.add_channel(std::move(chl));
+        chl->add();
     }
 
     fired = 0;

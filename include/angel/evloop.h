@@ -18,68 +18,68 @@ class timer_t;
 typedef std::function<void()> timer_callback_t;
 
 typedef std::function<void()> functor;
-typedef std::shared_ptr<channel> channel_ptr;
 
-// The event loop, the core of the recator mode.
+////////////////////////////////////////
+// The event loop, the core of angel. //
+////////////////////////////////////////
 class evloop {
 public:
     evloop();
     ~evloop();
+
     evloop(const evloop&) = delete;
     evloop& operator=(const evloop&) = delete;
 
-    // Run an event loop.
+    // Run the event loop.
+    // This will enter an infinite loop to poll events until quit() is called.
     void run();
+    // Quit the event loop. (thread-safe)
+    // It will return immediately without waiting for the evloop to exit.
     void quit();
 
     ////////////////////////////////////////////////////////////
     // The following public member functions are thread-safe. //
     ////////////////////////////////////////////////////////////
 
-    // Enable read event by default.
-    void add_channel(channel_ptr chl);
-    void remove_channel(channel_ptr chl);
-    void remove_channel(int fd);
-
+    // Current thread is io loop thread ?
     bool is_io_loop_thread();
     // Execute user callback on io loop thread.
-    // Execute immediately if the current thread is io thread, else queue_in_loop(cb).
-    void run_in_loop(const functor cb);
-    // Put the callback into the task queue of the io thread.
-    void queue_in_loop(const functor cb);
+    // Execute immediately if is_io_loop_thread() else queue_in_loop().
+    void run_in_loop(functor cb);
+    // Put the cb into the task queue of the io loop thread.
+    void queue_in_loop(functor cb);
 
-    // Execute a callback after timeout (ms), and a timer id is returned,
-    // that can be used to cancel a timer.
-    size_t run_after(int64_t timeout_ms, const timer_callback_t cb);
-    // Execute a callback every interval (ms)
-    size_t run_every(int64_t interval_ms, const timer_callback_t cb);
-    // Cancel a timer and use it with run_after() and run_every().
+    // Execute the cb after timeout (ms),
+    // and a timer id is returned, that can be used to cancel a timer.
+    size_t run_after(int64_t timeout_ms, timer_callback_t cb);
+    // Execute the cb every interval (ms).
+    // and a timer id is returned, that can be used to cancel a timer.
+    size_t run_every(int64_t interval_ms, timer_callback_t cb);
+    // Cancel a timer by id.
     void cancel_timer(size_t id);
 private:
-    void add_channel_in_loop(channel_ptr chl);
-    void remove_channel_in_loop(channel_ptr chl);
-    void remove_channel_in_loop(int fd);
     void do_functors();
-
-    channel_ptr search_channel(int fd)
-    { return channel_map.find(fd)->second; }
 
     void wakeup_init();
     void wakeup_close();
     void wakeup_read();
     void wakeup(uint8_t);
 
+    // Used by dispatcher.
+    channel *search_channel(int fd);
+
     std::unique_ptr<dispatcher> dispatcher;
     std::unique_ptr<timer_t> timer;
-    std::unordered_map<int, std::shared_ptr<channel>> channel_map;
-    std::vector<std::shared_ptr<channel>> active_channels;
-    bool is_quit;
-    std::thread::id cur_tid;
+    std::unordered_map<int, std::unique_ptr<channel>> channel_map;
+    std::vector<channel*> active_channels;
+    const std::thread::id cur_tid;
     // A task queue for transferring tasks
     // from non-io threads to io threads for execution.
     std::vector<functor> functors;
     std::mutex mtx;
     int wake_pair[2];
+    channel *wake_channel;
+    bool is_quit;
 
     friend class select_base_t;
     friend class poll_base_t;

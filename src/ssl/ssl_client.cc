@@ -1,5 +1,6 @@
 #include <angel/ssl_client.h>
 
+#include "ssl_handshake.h"
 #include "ssl_connection.h"
 
 namespace angel {
@@ -32,19 +33,19 @@ static SSL_CTX *get_ssl_ctx()
     return ctx.get();
 }
 
-connection_ptr ssl_client::create_connection(int fd)
+connection_ptr ssl_client::create_connection(channel *chl)
 {
-    return std::make_shared<ssl_connection>(get_next_id(), loop, fd, sh.release());
+    return std::make_shared<ssl_connection>(get_next_id(), chl, sh.release());
 }
 
 // At this time, the TCP connection has been established,
 // we try to complete SSL handshake.
-void ssl_client::new_connection(int fd)
+void ssl_client::establish(channel *chl)
 {
-    sh.reset(new ssl_handshake(loop, get_ssl_ctx()));
-    sh->start_client_handshake(fd);
-    sh->onestablish = [this, fd]{ client::new_connection(fd); };
-    sh->onfailed = [sh = sh.get(), fd]{ sh->shutdown(); close(fd); };
+    sh = std::make_unique<ssl_handshake>(chl, get_ssl_ctx());
+    sh->onestablish = [this](channel *chl){ client::establish(chl); };
+    sh->onfail      = [this]{ if (connection_failure_handler) connection_failure_handler(); };
+    sh->start_client_handshake();
 }
 
 }

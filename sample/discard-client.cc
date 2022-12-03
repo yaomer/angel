@@ -1,6 +1,7 @@
 #include <angel/client.h>
 #include <angel/util.h>
 
+#include <unistd.h>
 #include <fcntl.h>
 
 #include <iostream>

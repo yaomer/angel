@@ -3,17 +3,17 @@
 
 #include <angel/client.h>
 
-#include <angel/ssl_handshake.h>
-
 namespace angel {
+
+class ssl_handshake;
 
 class ssl_client : public client {
 public:
     ssl_client(evloop *, inet_addr, client_options ops = client_options());
     ~ssl_client();
 private:
-    connection_ptr create_connection(int fd) override;
-    void new_connection(int fd) override;
+    connection_ptr create_connection(channel *) override;
+    void establish(channel *) override;
     std::unique_ptr<ssl_handshake> sh;
 };
 

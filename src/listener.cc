@@ -4,6 +4,7 @@
 #include <fcntl.h>
 
 #include <angel/evloop.h>
+#include <angel/sockops.h>
 #include <angel/logger.h>
 #include <angel/util.h>
 
@@ -11,20 +12,20 @@ namespace angel {
 
 listener_t::listener_t(evloop *loop, inet_addr listen_addr)
     : loop(loop),
-    listen_channel(new channel(loop)),
-    listen_socket(sockops::socket()),
+    listen_channel(nullptr),
     listen_addr(listen_addr),
-    idle_fd(::open("/dev/null", O_RDONLY | O_CLOEXEC))
+    idle_fd(open("/dev/null", O_RDONLY | O_CLOEXEC))
 {
 }
 
 listener_t::~listener_t()
 {
+    listen_channel->remove();
 }
 
 void listener_t::listen()
 {
-    int fd = listen_socket.fd();
+    int fd = sockops::socket();
     sockops::set_reuseaddr(fd, true);
     sockops::set_nodelay(fd, nodelay);
     sockops::set_keepalive(fd, keepalive);
@@ -34,36 +35,37 @@ void listener_t::listen()
     sockops::set_nonblock(fd);
     sockops::bind(fd, &listen_addr.addr());
     sockops::listen(fd);
-    listen_channel->set_fd(fd);
+
+    listen_channel = new channel(loop, fd);
     listen_channel->set_read_handler([this]{ this->handle_accept(); });
-    loop->add_channel(listen_channel);
+    listen_channel->add();
 }
 
 void listener_t::handle_accept()
 {
-    int connfd = sockops::accept(listen_socket.fd());
-    if (connfd < 0) {
-        switch (errno) {
-        case EINTR:
-        case EWOULDBLOCK: // BSD
-        case EPROTO: // SVR4
-        case ECONNABORTED: // POSIX
-            break;
-        case EMFILE:
-            ::close(idle_fd);
-            connfd = sockops::accept(listen_socket.fd());
-            ::close(connfd);
-            idle_fd = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
-            break;
-        default:
-            log_error("accept: %s", util::strerrno());
-            break;
-        }
+    int connfd = sockops::accept(listen_channel->fd());
+    if (connfd >= 0) {
+        log_info("Accept a new connection(fd=%d)", connfd);
+        sockops::set_nonblock(connfd);
+        if (onaccept) onaccept(connfd);
+        else close(connfd);
         return;
     }
-    log_info("Accept a new connection(fd=%d)", connfd);
-    sockops::set_nonblock(connfd);
-    new_connection_handler(connfd);
+    switch (errno) {
+    case EINTR:
+    case EWOULDBLOCK: // BSD
+    case EPROTO: // SVR4
+    case ECONNABORTED: // POSIX
+        break;
+    case EMFILE:
+        close(idle_fd);
+        connfd = sockops::accept(listen_channel->fd());
+        close(connfd);
+        idle_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    default:
+        log_error("accept: %s", util::strerrno());
+        break;
+    }
 }
 
 }

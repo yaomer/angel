@@ -51,7 +51,7 @@ inet_addr::inet_addr(const inet_addr& addr)
 {
 }
 
-struct sockaddr_in& inet_addr::addr()
+const struct sockaddr_in& inet_addr::addr() const
 {
     return sockaddr;
 }

@@ -3,6 +3,7 @@
 #include <angel/util.h>
 #include <angel/logger.h>
 
+#include "ssl_handshake.h"
 #include "ssl_connection.h"
 
 namespace angel {
@@ -64,24 +65,22 @@ static SSL_CTX *get_ssl_ctx()
     return ctx.get();
 }
 
-connection_ptr ssl_server::create_connection(int fd)
+connection_ptr ssl_server::create_connection(channel *chl)
 {
-    size_t id = conn_id++;
-    evloop *io_loop = get_next_loop();
-    auto it = shmap.find(fd);
+    auto it = shmap.find(chl->fd());
     Assert(it != shmap.end());
     auto *sh = it->second.release();
     shmap.erase(it);
-    return std::make_shared<ssl_connection>(id, io_loop, fd, sh);
+    return std::make_shared<ssl_connection>(conn_id++, chl, sh);
 }
 
-void ssl_server::new_connection(int fd)
+void ssl_server::establish(channel *chl)
 {
-    auto *sh = new ssl_handshake(loop, get_ssl_ctx());
-    shmap.emplace(fd, sh);
-    sh->start_server_handshake(fd);
-    sh->onestablish = [this, fd]{ server::new_connection(fd); };
-    sh->onfailed = [this, fd]{ shmap.erase(fd); close(fd); };
+    auto *sh = new ssl_handshake(chl, get_ssl_ctx());
+    shmap.emplace(chl->fd(), sh);
+    sh->onestablish = [this](channel *chl){ server::establish(chl); };
+    sh->onfail      = [this, fd = chl->fd()]{ shmap.erase(fd); };
+    sh->start_server_handshake();
 }
 
 void ssl_server::set_cipher_list(const char *your_cipher_list)

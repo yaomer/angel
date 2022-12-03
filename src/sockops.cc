@@ -10,19 +10,18 @@
 
 namespace angel {
 
-socket::~socket()
-{
-    log_debug("~socket(): close(fd=%d)", sockfd);
-    close(sockfd);
-};
-
 using namespace util;
 
 namespace sockops {
 
-static inline struct sockaddr *sockaddr_cast(struct sockaddr_in *addr)
+static struct sockaddr *sockaddr_cast(struct sockaddr_in *addr)
 {
     return reinterpret_cast<struct sockaddr *>(addr);
+}
+
+static const struct sockaddr *sockaddr_const_cast(const struct sockaddr_in *addr)
+{
+    return reinterpret_cast<const struct sockaddr *>(addr);
 }
 
 int socket(std::string_view protocol)
@@ -40,9 +39,9 @@ int socket(std::string_view protocol)
     return sockfd;
 }
 
-void bind(int sockfd, struct sockaddr_in *localAddr)
+void bind(int sockfd, const struct sockaddr_in *local_addr)
 {
-    if (::bind(sockfd, sockaddr_cast(localAddr), sizeof(*localAddr)) < 0)
+    if (::bind(sockfd, sockaddr_const_cast(local_addr), sizeof(*local_addr)) < 0)
         log_fatal("bind: %s", strerrno());
 }
 
@@ -62,9 +61,9 @@ int accept(int sockfd)
     return connfd;
 }
 
-int connect(int sockfd, struct sockaddr_in *peerAddr)
+int connect(int sockfd, const struct sockaddr_in *peer_addr)
 {
-    return ::connect(sockfd, sockaddr_cast(peerAddr), sizeof(*peerAddr));
+    return ::connect(sockfd, sockaddr_const_cast(peer_addr), sizeof(*peer_addr));
 }
 
 void set_nonblock(int sockfd)

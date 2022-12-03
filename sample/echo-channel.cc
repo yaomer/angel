@@ -18,8 +18,7 @@ int main()
     cli.start();
 
     char buf[1024];
-    auto chl = std::make_shared<angel::channel>(&loop);
-    chl->set_fd(0); // Monitor stdin
+    auto chl = new angel::channel(&loop, 0); // Monitor stdin
     chl->set_read_handler([&buf, &cli, &loop]{
             fgets(buf, sizeof(buf), stdin);
             if (cli.is_connected()) {
@@ -29,7 +28,7 @@ int main()
                 loop.quit();
             }
             });
-    loop.add_channel(chl);
+    chl->add();
 
     loop.run();
 }

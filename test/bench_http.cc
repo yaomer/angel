@@ -1,3 +1,5 @@
+#include <getopt.h>
+
 #include <angel/client.h>
 #include <angel/util.h>
 #include <angel/resolver.h>
@@ -9,15 +11,17 @@
 
 static int num_requests = 20000;
 static int concurrency  = 1;
-static int timelimit    = 30 * 1000;
+static int timelimit    = 60 * 1000;
 static int timeout      = 15 * 1000;
+static int max_timeouts = 10;
 
-static int send_requests = 0, complete_requests = 0, failures = 0;
+static int send_requests = 0, completions = 0, failures = 0, timeouts = 0;
 static long long total_bytes = 0, total_latency = 0;
 
 struct request_info {
     std::unique_ptr<angel::client> cli;
     long long start = angel::util::get_cur_time_us(); // request start time
+    size_t timeout_timer_id;
     int idx = 0;
 };
 
@@ -33,6 +37,24 @@ struct bench_http {
 private:
     void launch_request();
     void close_handler(request_info *ri);
+
+    void check_finish()
+    {
+        if (completions + failures + timeouts == num_requests) {
+            loop->quit();
+        } else if (timeouts >= max_timeouts) {
+            printf("### Too many requests timed out.\n");
+            printf("### Benchmarking Aborted.\n");
+            printf("### It may means that\n"
+                   "### 1) The timeout specified by -s is too short.\n"
+                   "### 2) Too many TCP connections are on the server in TIME_WAIT state,\n"
+                   "       cause the server has no ports available.\n");
+            max_timeouts = INT_MAX;
+            loop->quit();
+        } else if (send_requests < num_requests) {
+            launch_request();
+        }
+    }
 };
 
 void bench_http::launch_request()
@@ -42,10 +64,10 @@ void bench_http::launch_request()
     ri->idx = send_requests++;
     requests.emplace(ri->idx, ri);
 
-    loop->run_after(timeout, [this, idx = ri->idx]{
-            if (!requests.count(idx)) return;
-            requests.erase(idx);
-            failures++;
+    ri->timeout_timer_id = loop->run_after(timeout, [this, ri]{
+            requests.erase(ri->idx);
+            timeouts++;
+            check_finish();
             });
 
 #if defined (ANGEL_USE_OPENSSL)
@@ -59,6 +81,12 @@ void bench_http::launch_request()
 #endif
     ri->cli->set_connection_handler([this](const angel::connection_ptr& conn){
             conn->format_send("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n", path.c_str(), host.c_str());
+            });
+    ri->cli->set_connection_failure_handler([this, ri]{
+            loop->cancel_timer(ri->timeout_timer_id);
+            requests.erase(ri->idx);
+            failures++;
+            check_finish();
             });
     ri->cli->set_message_handler([](const angel::connection_ptr& conn, angel::buffer& buf){
             // We don't parse http response.
@@ -74,15 +102,13 @@ void bench_http::launch_request()
 
 void bench_http::close_handler(request_info *ri)
 {
-    complete_requests++;
+    loop->cancel_timer(ri->timeout_timer_id);
+    completions++;
     total_latency += angel::util::get_cur_time_us() - ri->start;
-    if ((num_requests / 10) && complete_requests % (num_requests / 10) == 0)
-        printf("Completed %d requests\n", complete_requests);
-    loop->queue_in_loop([this, idx = ri->idx]{ this->requests.erase(idx); });
-    if (complete_requests == num_requests)
-        loop->quit();
-    if (send_requests < num_requests)
-        launch_request();
+    if ((num_requests / 10) && completions % (num_requests / 10) == 0)
+        printf("Completed %d requests\n", completions);
+    requests.erase(ri->idx);
+    check_finish();
 }
 
 bool bench_http::parse_url(std::string_view url)
@@ -154,8 +180,9 @@ static void usage()
             "Usage: ./bench_http [options] http[s]://hostname[:port]/path\n"
             "    -c <concurrency> Number of multiple requests to perform at a time.\n"
             "    -n <requests>    Number of requests to perform for the benchmarking session.\n"
-            "    -t <timelimit>   Seconds to max. to spend on benchmarking. Default is 30 secs.\n"
+            "    -t <timelimit>   Seconds to max. to spend on benchmarking. Default is 60 secs.\n"
             "    -s <timeout>     Seconds to max. wait for each response. Default is 15 secs.\n"
+            "    -S <number>      Maximum number of timeout requests. Default is 10.\n"
            );
     exit(1);
 }
@@ -163,7 +190,7 @@ static void usage()
 int main(int argc, char *argv[])
 {
     int c;
-    while ((c = getopt(argc, argv, "c:n:t:s:")) != -1) {
+    while ((c = getopt(argc, argv, "c:n:t:s:S:")) != -1) {
         switch (c) {
         case 'c':
             concurrency = atoi(optarg);
@@ -176,6 +203,9 @@ int main(int argc, char *argv[])
             break;
         case 's':
             timeout = atoi(optarg) * 1000;
+            break;
+        case 'S':
+            max_timeouts = atoi(optarg);
             break;
         default:
             fprintf(stderr, "Illegal argument \"%c\"\n", c);
@@ -208,9 +238,11 @@ int main(int argc, char *argv[])
     auto total_secs = (double)total_cost / 1000;
     auto total_latency_ms = (double)total_latency / 1000;
 
+    printf("========================================\n");
     printf("Total of %lld bytes received.\n", total_bytes);
-    printf("Total of %d requests completed, %d failures in %.3f secs.\n", complete_requests, failures, total_secs);
+    printf("Total of %d requests completed, %d failed, %d timed out in %.3f secs.\n",
+            completions, failures, timeouts, total_secs);
     printf("Throughput: %lld (bytes/sec)\n", (long long)(total_bytes / total_secs));
-    printf("Requests per second: %.2f (#/sec)\n", complete_requests / total_secs);
-    printf("Latency per request: %.2f (ms)\n", total_latency_ms / complete_requests);
+    printf("Requests per second: %.2f (#/sec)\n", completions / total_secs);
+    printf("Latency per request: %.2f (ms)\n", total_latency_ms / completions);
 }

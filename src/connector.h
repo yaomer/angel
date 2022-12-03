@@ -1,5 +1,5 @@
-#ifndef _ANGEL_CONNECTOR_H
-#define _ANGEL_CONNECTOR_H
+#ifndef __ANGEL_CONNECTOR_H
+#define __ANGEL_CONNECTOR_H
 
 #include <memory>
 #include <functional>
@@ -19,27 +19,26 @@ public:
     connector_t(const connector_t&) = delete;
     connector_t& operator=(const connector_t&) = delete;
 
+    const inet_addr& addr() const { return peer_addr; }
     void connect();
-    bool is_connected() { return has_connected; }
-    int connfd() const { return sockfd; }
-    inet_addr& addr() { return peer_addr; }
 
-    typedef std::function<void(int)> new_connection_handler_t;
-    new_connection_handler_t new_connection_handler;
-    std::string protocol = "tcp";
-    int retry_interval = 1000; // 1s
+    const char *protocol = "tcp";
+    bool keep_reconnect  = false;
+    int retry_interval   = 3000; // 3s
+
+    std::function<void(channel*)> onconnect;
+    std::function<void()> onfail;
 private:
     void connected();
+    void shutdown();
     void check();
     void retry();
 
     evloop *loop;
-    inet_addr peer_addr;
-    bool has_connected;
+    const inet_addr peer_addr;
+    channel *connect_channel;
     size_t retry_timer_id;
-    bool wait_retry;
-    int sockfd;
 };
 }
 
-#endif // _ANGEL_CONNECTOR_H
+#endif // __ANGEL_CONNECTOR_H

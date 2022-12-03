@@ -4,8 +4,6 @@
 
 #include "poll.h"
 
-#include <unistd.h>
-
 #include <angel/evloop.h>
 #include <angel/logger.h>
 #include <angel/util.h>
@@ -71,12 +69,17 @@ void poll_base_t::remove(int fd, int events)
     }
 }
 
-static int evret(int events)
+static int evret(int revents)
 {
     int revs = 0;
-    if (events & POLLIN) revs |= Read;
-    if (events & POLLOUT) revs |= Write;
-    if (events & POLLERR) revs |= Error;
+    if (revents == (POLLIN | POLLHUP)) {
+        // Non-blocking connect(2) failed.
+        revs = Read | Write;
+    } else {
+        if (revents & POLLIN) revs |= Read;
+        if (revents & POLLOUT) revs |= Write;
+        if (revents & POLLERR) revs |= Error;
+    }
     return revs;
 }
 
@@ -88,7 +91,7 @@ int poll_base_t::wait(evloop *loop, int64_t timeout)
         for (auto& pfd : pollfds) {
             if (pfd.revents > 0) {
                 auto chl = loop->search_channel(pfd.fd);
-                chl->set_trigger_events(evret(pfd.revents));
+                chl->trigger = evret(pfd.revents);
                 loop->active_channels.emplace_back(chl);
                 if (--nevents == 0)
                     break;

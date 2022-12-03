@@ -34,6 +34,7 @@ size_t timer_t::add_timer(timer_task_t *task)
 
 void timer_t::cancel_timer(size_t id)
 {
+    if (id == 0) return;
     loop->run_in_loop([this, id]{ this->cancel_timer_in_loop(id); });
 }
 
@@ -52,7 +53,7 @@ void timer_t::cancel_timer_in_loop(size_t id)
     auto range = timer_set.equal_range(iter->second.get());
     for (auto it = range.first; it != range.second; ++it) {
         if ((*it)->id == id) {
-            log_debug("timer(id=%d) has been canceled", id);
+            log_debug("Cancel a timer(id=%d)", id);
             timer_set.erase(it);
             timer_map.erase(iter);
             break;
@@ -79,8 +80,10 @@ void timer_t::tick()
 
         // Update interval timer.
         if (cur->interval > 0) {
-            auto *task = new timer_task_t(now + cur->interval,
-                    cur->interval, cur->timer_cb);
+            // To avoid timing error accumulation,
+            // we should use `cur->expire` as new base expire time instead of `now`.
+            auto expire = cur->expire + cur->interval;
+            auto *task = new timer_task_t(expire, cur->interval, std::move(cur->timer_cb));
             task->id = cur->id;
             add_timer_in_loop(task);
         }

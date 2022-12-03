@@ -4,46 +4,62 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <future>
+
 #include <angel/evloop.h>
+#include <angel/sockops.h>
 #include <angel/logger.h>
 #include <angel/util.h>
 
 namespace angel {
 
-using namespace util;
-
-connection::connection(size_t id, evloop *loop, int sockfd)
-    : conn_id(id),
-    loop(loop),
-    channel(new class channel(loop)),
-    socket(new class socket(sockfd)),
-    local_addr(sockops::get_local_addr(sockfd)),
-    peer_addr(sockops::get_peer_addr(sockfd)),
-    conn_state(state::connecting),
+connection::connection(size_t id, class channel *chl)
+    : loop(chl->get_loop()),
+    channel(chl),
+    conn_id(id),
+    state(Connected),
+    local_addr(sockops::get_local_addr(chl->fd())),
+    peer_addr(sockops::get_peer_addr(chl->fd())),
     ttl_timer_id(0), ttl_ms(0),
     send_id(1), next_id(1),
     high_water_mark(0)
 {
-    channel->set_fd(sockfd);
     channel->set_read_handler([this]{ this->handle_read(); });
     channel->set_write_handler([this]{ this->handle_write(); });
     channel->set_error_handler([this]{ this->handle_error(); });
-    log_info("connection(id=%zu, fd=%d) is %s", id, sockfd, get_state_str());
+    log_info("connection(id=%zu, fd=%d) is %s", id, channel->fd(), get_state_str());
 }
 
 connection::~connection()
 {
-    log_info("connection(id=%zu, fd=%d) is %s", conn_id, socket->fd(), get_state_str());
+    Assert(is_closed());
 }
 
-void connection::establish()
+void connection::close()
 {
-    loop->add_channel(channel);
-    set_state(state::connected);
-    log_info("connection(id=%zu, fd=%d) is %s", conn_id, socket->fd(), get_state_str());
-    if (connection_handler) {
-        connection_handler(shared_from_this());
+    loop->run_in_loop([conn = shared_from_this()]{
+            conn->handle_close(false);
+            });
+}
+
+void connection::close_wait()
+{
+    if (loop->is_io_loop_thread()) {
+        handle_close(false);
+    } else {
+        std::promise<void> barrier;
+        auto f = barrier.get_future();
+        loop->queue_in_loop([conn = shared_from_this(), &barrier]{
+                conn->handle_close(false);
+                barrier.set_value();
+                });
+        f.wait();
     }
+}
+
+void connection::force_close_connection()
+{
+    handle_close(true);
 }
 
 void connection::handle_read()
@@ -60,6 +76,7 @@ void connection::handle_read()
     } else if (n == 0) {
         reset_by_peer = true;
         force_close_connection();
+        reset_by_peer = false;
     } else {
         handle_error();
     }
@@ -126,6 +143,7 @@ void connection::handle_write()
 
 void connection::handle_close(bool is_forced)
 {
+    Assert(loop->is_io_loop_thread());
     if (is_closed()) return;
     // We must cancel the ttl timer here, not when the connection is destructed;
     // otherwise, if the ttl timer exists, the lifetime of the connection will be extended.
@@ -134,25 +152,23 @@ void connection::handle_close(bool is_forced)
         ttl_timer_id = 0;
     }
     if (!is_forced && !send_queue_is_empty()) {
-        set_state(state::closing);
+        state = Closing;
         return;
     }
+    state = Closed;
+    log_info("connection(id=%zu, fd=%d) is %s", conn_id, channel->fd(), get_state_str());
+    channel->remove();
     if (close_handler) {
-        loop->run_in_loop([conn = shared_from_this()]{
-                // Avoid calling close_handler() again in close_handler().
-                auto close_handler = std::move(conn->close_handler);
-                conn->close_handler = nullptr;
-                close_handler(conn);
-                });
+        close_handler(shared_from_this());
     }
 }
 
 void connection::handle_error()
 {
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-        log_warn("connection(id=%zu, fd=%d): %s", conn_id, channel->fd(), strerrno());
+        log_warn("connection(id=%zu, fd=%d): %s", conn_id, channel->fd(), util::strerrno());
     } else {
-        log_error("connection(id=%zu, fd=%d): %s", conn_id, channel->fd(), strerrno());
+        log_error("connection(id=%zu, fd=%d): %s", conn_id, channel->fd(), util::strerrno());
         force_close_connection();
     }
 }
@@ -280,7 +296,7 @@ void connection::format_send(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    auto res = format(fmt, ap);
+    auto res = util::format(fmt, ap);
     va_end(ap);
     send(res.buf, res.len);
     if (res.alloced) delete []res.buf;
@@ -297,16 +313,11 @@ void connection::send_file(int fd, off_t offset, off_t count)
 void connection::set_ttl(int64_t ms)
 {
     if (ms <= 0) return;
-    ttl_ms = ms;
-    if (ttl_timer_id > 0) loop->cancel_timer(ttl_timer_id);
-    set_ttl_timer();
-}
-
-void connection::update_ttl_timer()
-{
-    if (ttl_timer_id == 0) return;
-    loop->cancel_timer(ttl_timer_id);
-    set_ttl_timer();
+    loop->run_in_loop([conn = shared_from_this(), ms]{
+            conn->ttl_ms = ms;
+            conn->loop->cancel_timer(conn->ttl_timer_id);
+            conn->set_ttl_timer();
+            });
 }
 
 void connection::set_ttl_timer()
@@ -316,13 +327,36 @@ void connection::set_ttl_timer()
             });
 }
 
+void connection::update_ttl_timer()
+{
+    if (ttl_timer_id > 0) {
+        loop->cancel_timer(ttl_timer_id);
+        set_ttl_timer();
+    }
+}
+
+void connection::set_message_handler(message_handler_t handler)
+{
+    message_handler = std::move(handler);
+}
+
+void connection::set_close_handler(close_handler_t handler)
+{
+    close_handler = std::move(handler);
+}
+
+void connection::set_high_water_mark_handler(size_t size, high_water_mark_handler_t handler)
+{
+    high_water_mark = size;
+    high_water_mark_handler = std::move(handler);
+}
+
 const char *connection::get_state_str()
 {
-    switch (conn_state) {
-    case state::connecting: return "<Connecting>";
-    case state::connected: return "<Connected>";
-    case state::closing: return "<Closing>";
-    case state::closed: return "<Closed>";
+    switch (state) {
+    case Connected: return "<Connected>";
+    case Closing: return "<Closing>";
+    case Closed: return "<Closed>";
     default: return "<None>";
     }
 }

@@ -1,6 +1,7 @@
 #include <angel/evloop.h>
 
 #include <angel/sockops.h>
+#include <angel/util.h>
 #include <angel/logger.h>
 #include <angel/config.h>
 
@@ -31,7 +32,6 @@ namespace {
 
 evloop::evloop()
     : timer(new timer_t(this)),
-    is_quit(false),
     cur_tid(std::this_thread::get_id())
 {
 #if defined (ANGEL_HAVE_EPOLL)
@@ -51,59 +51,18 @@ evloop::evloop()
         this_thread_loop = this;
     }
     log_info("Use I/O multiplexing (%s)", dispatcher->name());
-    sockops::socketpair(wake_pair);
+    wakeup_init();
 }
 
 evloop::~evloop()
 {
+    wakeup_close();
     this_thread_loop = nullptr;
-}
-
-void evloop::add_channel(channel_ptr chl)
-{
-    run_in_loop([this, chl = std::move(chl)]{ this->add_channel_in_loop(std::move(chl)); });
-}
-
-void evloop::remove_channel(channel_ptr chl)
-{
-    run_in_loop([this, chl = std::move(chl)]{ this->remove_channel_in_loop(std::move(chl)); });
-}
-
-void evloop::remove_channel(int fd)
-{
-    run_in_loop([this, fd]{ this->remove_channel_in_loop(fd); });
-}
-
-void evloop::add_channel_in_loop(channel_ptr chl)
-{
-    auto r = channel_map.emplace(chl->fd(), chl);
-    if (r.second) {
-        chl->enable_read();
-        log_debug("Add channel(fd=%d) to loop", chl->fd());
-    } else {
-        log_warn("Try to add duplicate channel(fd=%d) to loop", chl->fd());
-    }
-}
-
-void evloop::remove_channel_in_loop(channel_ptr chl)
-{
-    log_debug("Remove channel(fd=%d) from loop", chl->fd());
-    chl->disable_all();
-    channel_map.erase(chl->fd());
-}
-
-void evloop::remove_channel_in_loop(int fd)
-{
-    auto it = channel_map.find(fd);
-    if (it == channel_map.end()) return;
-    log_debug("Remove channel(fd=%d) from loop", fd);
-    it->second->disable_all();
-    channel_map.erase(fd);
 }
 
 void evloop::run()
 {
-    wakeup_init();
+    is_quit = false;
     while (!is_quit) {
         int64_t timeout = timer->timeout();
         int nevents = dispatcher->wait(this, timeout);
@@ -126,7 +85,6 @@ void evloop::run()
         }
         do_functors();
     }
-    wakeup_close();
 }
 
 void evloop::do_functors()
@@ -136,7 +94,7 @@ void evloop::do_functors()
         std::lock_guard<std::mutex> lk(mtx);
         if (!functors.empty()) {
             // It can't be executed here, otherwise deadlock may occur.
-            // (such as queue_in_loop())
+            // (such as queue_in_loop() will require mtx, then causes deadlock)
             tfuncs.swap(functors);
         }
     }
@@ -147,17 +105,15 @@ void evloop::do_functors()
 
 void evloop::wakeup_init()
 {
-    auto chl = std::make_shared<channel>(this);
-    chl->set_fd(wake_pair[0]);
-    chl->set_read_handler([this]{ this->wakeup_read(); });
-    add_channel(std::move(chl));
+    sockops::socketpair(wake_pair);
+    wake_channel = new channel(this, wake_pair[0]);
+    wake_channel->set_read_handler([this]{ this->wakeup_read(); });
+    wake_channel->add();
 }
 
 void evloop::wakeup_close()
 {
-    assert(is_io_loop_thread());
-    remove_channel_in_loop(wake_pair[0]);
-    close(wake_pair[0]);
+    wake_channel->remove();
     close(wake_pair[1]);
 }
 
@@ -183,12 +139,17 @@ void evloop::wakeup_read()
     }
 }
 
+channel *evloop::search_channel(int fd)
+{
+    return channel_map[fd].get();
+}
+
 bool evloop::is_io_loop_thread()
 {
     return std::this_thread::get_id() == cur_tid;
 }
 
-void evloop::run_in_loop(const functor cb)
+void evloop::run_in_loop(functor cb)
 {
     if (!is_io_loop_thread()) {
         queue_in_loop(std::move(cb));
@@ -197,7 +158,7 @@ void evloop::run_in_loop(const functor cb)
     }
 }
 
-void evloop::queue_in_loop(const functor cb)
+void evloop::queue_in_loop(functor cb)
 {
     std::lock_guard<std::mutex> lk(mtx);
     functors.emplace_back(std::move(cb));
@@ -212,20 +173,20 @@ void evloop::queue_in_loop(const functor cb)
     }
 }
 
-size_t evloop::run_after(int64_t timeout, const timer_callback_t cb)
+size_t evloop::run_after(int64_t timeout, timer_callback_t cb)
 {
-    int64_t expire = get_cur_time_ms() + timeout;
-    timer_task_t *task = new timer_task_t(expire, 0, std::move(cb));
-    size_t id = timer->add_timer(task);
+    auto expire = util::get_cur_time_ms() + timeout;
+    auto *task  = new timer_task_t(expire, 0, std::move(cb));
+    size_t id   = timer->add_timer(task);
     log_debug("Add a timer(id=%zu) after %lld ms", id, timeout);
     return id;
 }
 
-size_t evloop::run_every(int64_t interval, const timer_callback_t cb)
+size_t evloop::run_every(int64_t interval, timer_callback_t cb)
 {
-    int64_t expire = get_cur_time_ms() + interval;
-    timer_task_t *task = new timer_task_t(expire, interval, std::move(cb));
-    size_t id = timer->add_timer(task);
+    auto expire = util::get_cur_time_ms() + interval;
+    auto *task  = new timer_task_t(expire, interval, std::move(cb));
+    size_t id   = timer->add_timer(task);
     log_debug("Add a timer(id=%zu) every %lld ms", id, interval);
     return id;
 }
@@ -233,7 +194,6 @@ size_t evloop::run_every(int64_t interval, const timer_callback_t cb)
 void evloop::cancel_timer(size_t id)
 {
     timer->cancel_timer(id);
-    log_debug("Cancel a timer(id=%zu)", id);
 }
 
 void evloop::quit()

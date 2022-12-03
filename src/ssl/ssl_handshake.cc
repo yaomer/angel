@@ -1,11 +1,12 @@
-#include <angel/ssl_handshake.h>
+#include "ssl_handshake.h"
 
+#include <angel/evloop.h>
 #include <angel/logger.h>
 
 namespace angel {
 
-ssl_handshake::ssl_handshake(evloop *loop, SSL_CTX *ctx)
-    : loop(loop), ctx(ctx), ssl(nullptr)
+ssl_handshake::ssl_handshake(class channel *chl, SSL_CTX *ctx)
+    : channel(chl), ctx(ctx), ssl(nullptr)
 {
 }
 
@@ -14,43 +15,43 @@ ssl_handshake::~ssl_handshake()
     shutdown();
 }
 
-void ssl_handshake::start_client_handshake(int fd)
+void ssl_handshake::start_client_handshake()
 {
     ssl = SSL_new(ctx);
     SSL_set_connect_state(ssl);
-    start_handshake(fd);
+    channel->get_loop()->run_in_loop([this]{ start_handshake(); });
 }
 
-void ssl_handshake::start_server_handshake(int fd)
+void ssl_handshake::start_server_handshake()
 {
     ssl = SSL_new(ctx);
     SSL_set_accept_state(ssl);
-    start_handshake(fd);
+    channel->get_loop()->run_in_loop([this]{ start_handshake(); });
 }
 
-void ssl_handshake::start_handshake(int fd)
+void ssl_handshake::start_handshake()
 {
-    SSL_set_fd(ssl, fd);
-    log_info("(fd=%d) Start SSL handshake", fd);
-    channel.reset(new class channel(loop));
-    channel->set_fd(fd);
-    auto check_handler = [this, fd]{ this->handshake(fd); };
+    SSL_set_fd(ssl, channel->fd());
+    log_info("(fd=%d) Start SSL handshake", channel->fd());
+    auto check_handler = [this]{ this->handshake(); };
     channel->set_read_handler(check_handler);
     channel->set_write_handler(check_handler);
-    loop->add_channel(channel);
-    handshake(fd);
+    handshake();
 }
 
-void ssl_handshake::handshake(int fd)
+void ssl_handshake::handshake()
 {
     int rc = SSL_do_handshake(ssl);
     // SSL handshake was successfully completed.
     if (rc == 1) {
-        log_info("(fd=%d) SSL handshake successful", fd);
-        loop->remove_channel(channel);
-        channel.reset();
-        if (onestablish) onestablish();
-        else shutdown();
+        log_info("(fd=%d) SSL handshake successful", channel->fd());
+        if (onestablish) {
+            // Transfer the ownership of the channel to the upper layer.
+            onestablish(channel);
+            channel = nullptr;
+        } else {
+            shutdown();
+        }
         return;
     }
     // SSL handshake in progress.
@@ -64,7 +65,7 @@ void ssl_handshake::handshake(int fd)
     // When using a non-blocking socket, nothing is to be done, but select()
     // can be used to check for the required condition.
     //
-    // When fd is readable or writable, just call handshake(fd) again,
+    // When fd is readable or writable, just call handshake() again,
     // until the handshake is complete.
     int err = SSL_get_error(ssl, rc);
     if (err == SSL_ERROR_WANT_READ) {
@@ -76,11 +77,10 @@ void ssl_handshake::handshake(int fd)
     } else { // fatal error
         char buf[256];
         ERR_error_string(err, buf);
-        log_error("(fd=%d) SSL handshake failed: %s", fd, buf);
-        loop->remove_channel(channel);
-        channel.reset();
-        if (onfailed) onfailed();
-        else shutdown();
+        log_error("(fd=%d) SSL handshake failed: %s", channel->fd(), buf);
+        shutdown();
+        // `this` may be deleted in onfail().
+        if (onfail) onfail();
     }
 }
 
@@ -99,6 +99,10 @@ void ssl_handshake::shutdown()
         SSL_shutdown(ssl);
         SSL_free(ssl);
         ssl = nullptr;
+    }
+    if (channel) {
+        channel->remove();
+        channel = nullptr;
     }
 }
 
