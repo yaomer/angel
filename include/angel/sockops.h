@@ -4,8 +4,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#include <string_view>
-
 namespace angel {
 namespace sockops {
 
@@ -27,7 +25,7 @@ static inline uint64_t ntoh64(uint64_t net)
 #endif
 }
 
-int socket(std::string_view protocol = "tcp");
+int socket(const char *protocol = "tcp");
 void bind(int sockfd, const struct sockaddr_in *addr);
 void listen(int sockfd);
 int accept(int sockfd);

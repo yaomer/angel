@@ -16,10 +16,13 @@ static void fill(struct sockaddr_in& sockaddr, const std::string& ip, int port)
 {
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip.c_str(), &sockaddr.sin_addr) <= 0)
-        log_fatal("inet_pton: %s", util::strerrno());
+    int rc = inet_pton(AF_INET, ip.c_str(), &sockaddr.sin_addr);
+    if (rc == 0) {
+        log_fatal("inet_pton(%s): Invalid ipv4 address", ip.c_str());
+    } else if (rc < 0) {
+        log_fatal("inet_pton(%s): %s", ip.c_str(), util::strerrno());
+    }
 }
-
 
 inet_addr::inet_addr(int port)
 {

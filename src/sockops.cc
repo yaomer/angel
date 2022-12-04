@@ -24,12 +24,14 @@ static const struct sockaddr *sockaddr_const_cast(const struct sockaddr_in *addr
     return reinterpret_cast<const struct sockaddr *>(addr);
 }
 
-int socket(std::string_view protocol)
+// socket() creates an endpoint for communication and returns
+// a file descriptor that refers to that endpoint.
+int socket(const char *protocol)
 {
     int sockfd = -1;
-    if (protocol == "tcp") {
+    if (strcmp(protocol, "tcp") == 0) {
         sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
-    } else if (protocol == "udp") {
+    } else if (strcmp(protocol, "udp") == 0) {
         sockfd = ::socket(AF_INET, SOCK_DGRAM, 0);
     } else {
         log_fatal("protocol should be set (tcp or udp)");
@@ -39,20 +41,31 @@ int socket(std::string_view protocol)
     return sockfd;
 }
 
+// bind() assigns the address specified by local_addr to the socket
+// referred to by the sockfd.
 void bind(int sockfd, const struct sockaddr_in *local_addr)
 {
     if (::bind(sockfd, sockaddr_const_cast(local_addr), sizeof(*local_addr)) < 0)
         log_fatal("bind: %s", strerrno());
 }
 
-#define LISTENQ 1024
-
+// listen() marks the socket referred to by sockfd as a passive socket,
+// that is, as a socket that will be used to accept incoming connection
+// requests using accept(2).
 void listen(int sockfd)
 {
-    if (::listen(sockfd, LISTENQ) < 0)
+    // The backlog parameter defines the maximum length for
+    // the queue of pending connections.
+    //
+    // backlog = min(somaxconn, backlog)
+    //
+    int backlog = 1024;
+    if (::listen(sockfd, backlog) < 0)
         log_fatal("listen: %s", strerrno());
 }
 
+// accept() extracts the first connection request on the queue of
+// pending connections for the listening socket.
 int accept(int sockfd)
 {
     struct sockaddr_in addr;
@@ -61,6 +74,17 @@ int accept(int sockfd)
     return connfd;
 }
 
+// For SOCK_STREAM socket, connect() attempts to make a connection to peer socket.
+// For SOCK_DGRAM socket, connect() specifies the peer socket is that to which
+// datagrams are to be sent.
+//
+// Generally, stream sockets may successfully connect() only once; datagram sockets
+// may use connect() multiple times to change their association.
+//
+// For datagram sockets that need continuous communication, calling connect()
+// may be a better choice, because it avoids dynamically registering and
+// deleting peer socket when sendto(2) is called every time.
+//
 int connect(int sockfd, const struct sockaddr_in *peer_addr)
 {
     return ::connect(sockfd, sockaddr_const_cast(peer_addr), sizeof(*peer_addr));
