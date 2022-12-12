@@ -3,9 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
-#include <unordered_set>
 #include <future>
-#include <mutex>
 
 #include <angel/evloop_thread.h>
 #include <angel/client.h>
@@ -25,8 +23,7 @@ enum type {
     MX      = 15, // mail exchange
     TXT     = 16, // text strings
     //============================
-    ERROR   = 17, // query error
-    TIMEOUT = 18, // query timeout
+    ERROR   = 128, // query error
 };
 
 struct a_rdata;
@@ -140,24 +137,21 @@ private:
     resolver();
     ~resolver();
 
-    uint16_t generate_transaction_id();
     void send_query(query_context *qc);
     void set_retransmit_timer(query_context *qc);
     void retransmit(uint16_t id);
     void notify(query_context *qc, result res);
+    void err_notify(query_context *qc, const char *err);
 
     void unpack(angel::buffer& res_buf);
     result_future query(std::string_view name, uint16_t q_type, uint16_t q_class);
-    void query(query_context *qc);
+    void do_query(query_context *qc);
 
     // The background thread runs an `evloop` to receive the response
     angel::evloop_thread receiver;
     angel::evloop *loop; // receiver.get_loop()
     std::unique_ptr<angel::client> cli;
     std::unordered_map<uint16_t, std::unique_ptr<query_context>> query_map;
-    std::vector<std::function<void()>> delay_task_queue;
-    std::unordered_set<uint16_t> id_set;
-    std::mutex id_set_mtx;
     // Only Cache A record
     std::unique_ptr<cache> cache;
 };
